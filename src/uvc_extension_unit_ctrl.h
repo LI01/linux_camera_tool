@@ -41,25 +41,25 @@
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id buffer size
  */
-#define LI_XU_SENSOR_MODES_SWITCH_SIZE 2
-#define LI_XU_SENSOR_WINDOW_REPOSITION_SIZE 8
-#define LI_XU_LED_MODES_SIZE 1
-#define LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE 8
-#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE 2//////////////
+#define LI_XU_SENSOR_MODES_SWITCH_SIZE (2)
+#define LI_XU_SENSOR_WINDOW_REPOSITION_SIZE (8)
+#define LI_XU_LED_MODES_SIZE (1)
+#define LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE (8)
+#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE (2)//////////////
 
-#define LI_XU_SENSOR_UUID_HWFW_REV_SIZE 49
-#define LI_XU_PTS_QUERY_SIZE 4
-#define LI_XU_SOFT_TRIGGER_SIZE 2
-#define LI_XU_TRIGGER_DELAY_SIZE 2
-#define LI_XU_TRIGGER_MODE_SIZE 2
-#define LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE 256 
-#define LI_XU_SENSOR_REG_RW_SIZE 5
-#define LI_XU_ERASE_EEPROM_SIZE 0/////////
-#define LI_XU_GENERIC_I2C_RW_SIZE 262
-#define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE 33
+#define LI_XU_SENSOR_UUID_HWFW_REV_SIZE (49)
+#define LI_XU_PTS_QUERY_SIZE (4)
+#define LI_XU_SOFT_TRIGGER_SIZE (2)
+#define LI_XU_TRIGGER_DELAY_SIZE (2)
+#define LI_XU_TRIGGER_MODE_SIZE (2)
+#define LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE (256) 
+#define LI_XU_SENSOR_REG_RW_SIZE (5)
+#define LI_XU_ERASE_EEPROM_SIZE (0)/////////
+#define LI_XU_GENERIC_I2C_RW_SIZE (262)
+#define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE (33)
 
 
-/* --- I2C slave address list --- */
+/* --- 8-bit I2C slave address list --- */
 /*  On-semi Sensor */
 #define AP020X_I2C_ADDR (0xBA)
 #define AR0231_I2C_ADDR (0x20)
@@ -71,17 +71,21 @@
 /* Omnivision Sensor */
 #define OV2311_I2C_ADDR (0xC0)
 #define OS05A20_I2C_ADDR (0x6C)
+/* Toshiba Bridge */
+#define TC_MIPI_BRIDGE_I2C_ADDR (0x1C)
 /*  Maxim Serdes */
-#define MAX9295_SER_I2C_ADDR (0x80)
-#define MAX9296_DESER_I2C_ADDR (0x90)
+#define MAX96705_SER_I2C_ADDR (0x80)
+#define MAX9295_SER_I2C_ADDR (0x80) //0x88, 0xC4
+#define MAX9272_SER_I2C_ADDR (0x90)
+#define MAX9296_DESER_I2C_ADDR (0x90) //0xD4
+/* TI Serdes */
+#define TI913_SER_I2C_ADDR (0xB4)//0xB2
+#define TI953_SER_I2C_ADDR (0x60) 
+#define TI914_DESER_I2C_ADDR (0xC0)
+#define TI954_DESER_I2C_ADDR (0x30)
 
-struct device_info
-{
-    unsigned int hw_rev;
-    unsigned int fw_rev;
-    char uuid[40];
-   // char fuseid[16]; - some camera has fuse id
-};
+
+
 
 typedef struct reg_pair
 {
@@ -176,7 +180,8 @@ void set_sensor_gain_rgb(int fd,unsigned int rGain,
 						 unsigned int grGain,
 						 unsigned int gbGain,
 						 unsigned int bGain);
-void read_cam_uuid_hwfw_rev(int fd, struct device_info *dev);
+int read_cam_uuid_hwfw_rev(int fd);
+
 void get_pts(int fd);
 void soft_trigger(int fd);
 void trigger_delay_time(int fd, unsigned int delay_time);

@@ -76,6 +76,7 @@ void set_save_raw_flag(int flag)
 {
 	*save_raw = flag;
 }
+
 int set_shift(int *shift_flag)
 {
 	if (*shift_flag == 1)
@@ -84,6 +85,7 @@ int set_shift(int *shift_flag)
 		return 4;
 	if (*shift_flag == 3)
 		return 0;
+	return 2;
 }
 int add_bayer_forcv(int *bayer_flag)
 {
@@ -95,6 +97,7 @@ int add_bayer_forcv(int *bayer_flag)
 		return 2;
 	if (*bayer_flag == 4)
 		return 3;
+	return 2;
 }
 
 void change_datatype(void *datatype)
@@ -465,7 +468,7 @@ void get_a_frame(struct device *dev)
 			image_count++;
 			set_save_raw_flag(0);
 		}
-		decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
+		//decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
 
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
 		{
@@ -549,6 +552,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 
 		cv::Mat img(height, width, 0, (void *)p);
 		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		
 		if (*(save_bmp))
 		{
 			printf("save a bmp\n");

@@ -18,7 +18,7 @@
 **                      	Global data 
 *****************************************************************************/
 struct uvc_xu_control_query xu_query;
-
+//struct device_info device_info1;
 // define the buffer for storage
 unsigned char buf1[LI_XU_SENSOR_MODES_SWITCH_SIZE] = {0}; 
 unsigned char buf2[LI_XU_SENSOR_WINDOW_REPOSITION_SIZE] = {0}; 
@@ -41,6 +41,11 @@ unsigned int m_rGain = 0x1;
 unsigned int m_grGain = 0x1;
 unsigned int m_gbGain = 0x1;
 unsigned int m_bGain = 0x1;
+
+extern int fw_rev;
+ int hw_rev;
+ char uuid[64];
+
 /*****************************************************************************
 **                           Function definition
 *****************************************************************************/
@@ -257,24 +262,25 @@ void set_sensor_gain_rgb(int fd,unsigned int rGain,
  * read camera uuid hardware firmware revision
  * for uuid and fuseid, request for new driver to fit needs
  */
-void read_cam_uuid_hwfw_rev(int fd, struct device_info *dev)
+int read_cam_uuid_hwfw_rev(int fd)
 {
     CLEAR(buf7);
+	
     char uuidBuf[45];
     read_from_UVC_extension(fd, LI_XU_SENSOR_UUID_HWFW_REV,
         LI_XU_SENSOR_UUID_HWFW_REV_SIZE, buf7);
-    dev->hw_rev = buf7[0] | (buf7[1] << 8);
-    dev->fw_rev = buf7[2] | (buf7[3] << 8);
+    hw_rev = buf7[0] | (buf7[1] << 8);
+    fw_rev = buf7[2] | (buf7[3] << 8);
     for (int i=0; i < (36+9); i++)
     {
         uuidBuf[i] = buf7[4+i];
     }
-    strcpy(dev->uuid, uuidBuf);
-    // printf("hardware rev=%d\n", dev->hw_rev);
-    // printf("firmware rev=%d\n", dev->fw_rev);
-    // printf("uuid=%s\n", dev->uuid);
+    strcpy(uuid, uuidBuf);
+    printf("hardware rev=%d\n", hw_rev);
+    printf("firmware rev=%d\n", fw_rev);
+    printf("uuid=%s\n", uuid);
+	return fw_rev;
 }
-
 
 /*
  * currently PTS information are placed in 2 places

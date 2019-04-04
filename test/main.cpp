@@ -23,7 +23,6 @@
 
 #include "../includes/shortcuts.h"
 
-// TODO: change according to your setup
 
 
 int v4l2_dev;
@@ -43,12 +42,12 @@ int main(int argc, char ** argv)
 		printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
 		return 0;
 	}
-	struct device_info device_info1;
-	CLEAR(device_info1);
-	read_cam_uuid_hwfw_rev(v4l2_dev,&device_info1);
-	printf("hardware rev=%d\n", device_info1.hw_rev);
-    printf("firmware rev=%d\n", device_info1.fw_rev);
-    printf("uuid=%s\n", device_info1.uuid);
+	// struct device_info device_info1;
+	// CLEAR(device_info1);
+	fw_rev = read_cam_uuid_hwfw_rev(v4l2_dev);
+	// printf("hardware rev=%d\n", device_info1.hw_rev);
+    // printf("firmware rev=%d\n", device_info1.fw_rev);
+    // printf("uuid=%s\n", device_info1.uuid);
 
 	check_dev_cap(&dev);
 	video_get_format(&dev);
