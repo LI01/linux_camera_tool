@@ -23,6 +23,7 @@
 
 /* for mmap */
 //#include <sys/mman.h>
+
 /* Include files to use OpenCV API */
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -31,13 +32,20 @@
 #include "../includes/shortcuts.h"
 #include "extend_cam_ctrl.h"
 #include <string.h>
-
+#include <omp.h> //for openmp
+/****************************************************************************
+**                      	Global data 
+*****************************************************************************/
 static int *save_bmp;
 static int *save_raw;
 static int *bayer_flag;
 static int *shift_flag;
 
 int image_count;
+
+/*****************************************************************************
+**                           Function definition
+*****************************************************************************/
 static int save_frame_image_bmp(cv::Mat opencvImage)
 {
 
@@ -68,11 +76,49 @@ void set_save_raw_flag(int flag)
 {
 	*save_raw = flag;
 }
-
-void change_datatype (void* datatype)
+int set_shift(int *shift_flag)
 {
-    if (strcmp((char *)datatype), )
+	if (*shift_flag == 1)
+		return 2;
+	if (*shift_flag == 2)
+		return 4;
+	if (*shift_flag == 3)
+		return 0;
 }
+int add_bayer_forcv(int *bayer_flag)
+{
+	if (*bayer_flag == 1)
+		return 0;
+	if (*bayer_flag == 2)
+		return 1;
+	if (*bayer_flag == 3)
+		return 2;
+	if (*bayer_flag == 4)
+		return 3;
+}
+
+void change_datatype(void *datatype)
+{
+	if (strcmp((char *)datatype, "1") == 0)
+		*shift_flag == 1;
+	if (strcmp((char *)datatype, "2") == 0)
+		*shift_flag == 2;
+	if (strcmp((char *)datatype, "3") == 0)
+		*shift_flag == 3;
+}
+
+void change_bayerpattern(void *bayer)
+{
+	if (strcmp((char *)bayer, "1") == 0)
+		*shift_flag == 1;
+	if (strcmp((char *)bayer, "2") == 0)
+		*shift_flag == 2;
+	if (strcmp((char *)bayer, "3") == 0)
+		*shift_flag == 3;
+	if (strcmp((char *)bayer, "4") == 0)
+		*shift_flag == 4;
+}
+
 // static __THREAD_TYPE capture_thread;
 
 // /*video buffer data mutex*/
@@ -110,10 +156,10 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	save_raw = (int *)mmap(NULL, sizeof *save_raw, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	shift_flag = (int *)mmap(NULL, sizeof *shift_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-						   						   
+							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
 	return v4l2_dev;
 }
 
@@ -412,7 +458,8 @@ void get_a_frame(struct device *dev)
 			return;
 		}
 		if (*(save_raw))
-		{	printf("save a raw\n");
+		{
+			printf("save a raw\n");
 			v4l2_core_save_data_to_file("captures.raw",
 										dev->buffers->start, dev->imagesize);
 			image_count++;
@@ -487,26 +534,47 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	unsigned short *srcShort = (unsigned short *)p;
 	unsigned char *dst = (unsigned char *)p;
 
-	for (int i = 0; i < height; i++)
+	/* --- for bayer camera ---*/
+	if (shift != 0)
 	{
-		for (int j = 0; j < width; j++)
+#pragma omp for
+		for (int i = 0; i < height; i++)
 		{
-			tmp = *(srcShort++) >> shift; // todo Macro define
-			*(dst++) = (unsigned char)tmp;
+			for (int j = 0; j < width; j++)
+			{
+				tmp = *(srcShort++) >> shift; // todo Macro define
+				*(dst++) = (unsigned char)tmp;
+			}
 		}
-	}
 
-	cv::Mat img(height, width, 0, (void *)p);
-	cv::cvtColor(img, img, CV_BayerRG2BGR);
-	if (*(save_bmp))
-	{	printf("save a jpg\n");
-		save_frame_image_bmp(img);
-		image_count++;
-		set_save_bmp_flag(0);
-	}
+		cv::Mat img(height, width, 0, (void *)p);
+		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		if (*(save_bmp))
+		{
+			printf("save a bmp\n");
+			save_frame_image_bmp(img);
+			image_count++;
+			set_save_bmp_flag(0);
+		}
 
-	cv::resizeWindow("cam", 640, 480);
-	cv::imshow("cam", img);
+		cv::resizeWindow("cam", 640, 480);
+		cv::imshow("cam", img);
+	}
+	/* --- for yuv camera ---*/
+	else
+	{
+		cv::Mat img(height, width, CV_16UC2, (void *)p);
+		if (*(save_bmp))
+		{
+			printf("save a bmp\n");
+			save_frame_image_bmp(img);
+			image_count++;
+			set_save_bmp_flag(0);
+		}
+
+		cv::resizeWindow("cam", 640, 480);
+		cv::imshow("cam", img);
+	}
 	if (cv::waitKey(_1MS) == _ESC_KEY)
 	{
 		cv::destroyWindow("cam");
@@ -561,5 +629,3 @@ int video_free_buffers(struct device *dev)
 
 	return 0;
 }
-
-

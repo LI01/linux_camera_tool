@@ -107,9 +107,10 @@ void video_capture_save_raw();
 void video_capture_save_bmp();
 
 void change_datatype(void* datatype); 
+void change_bayerpattern(void *bayer);
 int set_shift(int *shift_flag); 
 int add_bayer_forcv(int *bayer_flag);
-void change_bayerpattern(void *bayer);
+
 
 /* 
  * opencv only support debayering 8 and 16 bits 
