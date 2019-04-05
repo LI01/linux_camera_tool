@@ -18,18 +18,13 @@ int main(int argc, char ** argv)
 	char *ret_dev_name = enum_v4l2_device(dev_name);
 	v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
 
-	// v4l2_dev = open_v4l2_device(dev_name, &dev);
 	if (v4l2_dev < 0)
 	{
 		printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
 		return 0;
 	}
-	// struct device_info device_info1;
-	// CLEAR(device_info1);
+
 	fw_rev = read_cam_uuid_hwfw_rev(v4l2_dev);
-	// printf("hardware rev=%d\n", device_info1.hw_rev);
-    // printf("firmware rev=%d\n", device_info1.fw_rev);
-    // printf("uuid=%s\n", device_info1.uuid);
 
 	check_dev_cap(&dev);
 	video_get_format(&dev);
