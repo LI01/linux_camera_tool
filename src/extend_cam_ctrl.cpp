@@ -100,6 +100,8 @@ int add_bayer_forcv(int *bayer_flag)
 	return 2;
 }
 
+
+
 void change_datatype(void *datatype)
 {
 	if (strcmp((char *)datatype, "1") == 0)
@@ -162,6 +164,7 @@ int open_v4l2_device(char *device_name, struct device *dev)
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	
 
 	return v4l2_dev;
 }

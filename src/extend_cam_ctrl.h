@@ -111,7 +111,6 @@ void change_bayerpattern(void *bayer);
 int set_shift(int *shift_flag); 
 int add_bayer_forcv(int *bayer_flag);
 
-
 /* 
  * opencv only support debayering 8 and 16 bits 
  * 
