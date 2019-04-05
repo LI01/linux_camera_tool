@@ -1,6 +1,4 @@
 #pragma once
-#ifndef _SHORTCUTS_H_
-#define _SHORTCUTS_H_
 
 #include <pthread.h>
 #include <inttypes.h>
@@ -55,12 +53,3 @@ struct device
     unsigned int bytesperline;
     unsigned int imagesize;
 };
-
-struct device_info
-{
-    unsigned int hw_rev;
-    unsigned int fw_rev;
-    char uuid[40];
-   // char fuseid[16]; - some camera has fuse id
-};
-#endif
