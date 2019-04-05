@@ -1,6 +1,4 @@
 #pragma once
-#ifndef _UI_CONTROL_H_
-#define _UI_CONTROL_H_
 #include <gtk/gtk.h>
 
 void radio_datatype(GtkWidget *widget, gpointer data);
@@ -22,4 +20,3 @@ void capture_raw(GtkWidget *widget);
 void send_trigger(GtkWidget *widget);
 
 int init_control_gui(int argc, char* argv[]);
-#endif
