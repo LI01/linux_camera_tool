@@ -103,23 +103,23 @@ int add_bayer_forcv(int *bayer_flag)
 void change_datatype(void *datatype)
 {
 	if (strcmp((char *)datatype, "1") == 0)
-		*shift_flag == 1;
+		*shift_flag = 1;
 	if (strcmp((char *)datatype, "2") == 0)
-		*shift_flag == 2;
+		*shift_flag = 2;
 	if (strcmp((char *)datatype, "3") == 0)
-		*shift_flag == 3;
+		*shift_flag = 3;
 }
 
 void change_bayerpattern(void *bayer)
 {
 	if (strcmp((char *)bayer, "1") == 0)
-		*shift_flag == 1;
+		*bayer_flag = 1;
 	if (strcmp((char *)bayer, "2") == 0)
-		*shift_flag == 2;
+		*bayer_flag = 2;
 	if (strcmp((char *)bayer, "3") == 0)
-		*shift_flag == 3;
+		*bayer_flag = 3;
 	if (strcmp((char *)bayer, "4") == 0)
-		*shift_flag == 4;
+		*bayer_flag = 4;
 }
 
 // static __THREAD_TYPE capture_thread;
@@ -270,7 +270,8 @@ void video_set_format(struct device *dev, int width,
 			   errno);
 		return;
 	}
-	printf("Get Video format: %c%c%c%c (%08x) %ux%u\nbyte per line:%d\nsize image:%ud\n",
+	printf("Get Video format: %c%c%c%c (%08x) %ux%u\n 	\
+			byte per line:%d\nsize image:%ud\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 8) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 16) & 0xff,
@@ -463,12 +464,14 @@ void get_a_frame(struct device *dev)
 		if (*(save_raw))
 		{
 			printf("save a raw\n");
-			v4l2_core_save_data_to_file("captures.raw",
+			char buf_name[16];
+        	snprintf(buf_name, sizeof(buf_name), "captures_%d.raw",image_count);
+			v4l2_core_save_data_to_file(buf_name,
 										dev->buffers->start, dev->imagesize);
 			image_count++;
 			set_save_raw_flag(0);
 		}
-		//decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
+		decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
 
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
 		{
@@ -526,7 +529,7 @@ int v4l2_core_save_data_to_file(const char *filename, const void *data, int size
  * args: 
  * 		struct device *dev - every infomation for camera
  * 		const void *p - pointer for the buffer
- * 		int shift - values to shift(RAW10 - 2, RAW12 - 4) 
+ * 		int shift - values to shift(RAW10 - 2, RAW12 - 4, YUV422 - 0) 
  * 
  */
 void decode_a_frame(struct device *dev, const void *p, int shift)
@@ -567,7 +570,8 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	/* --- for yuv camera ---*/
 	else
 	{
-		cv::Mat img(height, width, CV_16UC2, (void *)p);
+		cv::Mat img(height, width, CV_8UC2, (void *)p);
+		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
 		if (*(save_bmp))
 		{
 			printf("save a bmp\n");
@@ -579,6 +583,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		cv::resizeWindow("cam", 640, 480);
 		cv::imshow("cam", img);
 	}
+
 	if (cv::waitKey(_1MS) == _ESC_KEY)
 	{
 		cv::destroyWindow("cam");

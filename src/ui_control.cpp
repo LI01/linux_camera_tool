@@ -9,33 +9,26 @@
 *****************************************************************************/
 GtkWidget *label_device, *label_hw_rev, *label_fw_rev;
 GtkWidget *label_datatype, *vbox2, *radio01, *radio02, *radio03;
-/*
-    CV_BayerBG2BGR =46,
-    CV_BayerGB2BGR =47,
-    CV_BayerRG2BGR =48,
-    CV_BayerGR2BGR =49,
-*/
 GtkWidget *label_bayer, *vbox3, *radio_bg, *radio_gb, *radio_rg, *radio_gr;
-GtkWidget *entry_i2c_addr;
-
 GtkWidget *label_exposure, *label_gain;
 GtkWidget *hscale_exposure, *hscale_gain;
-GtkWidget *label_i2c_addr;
+GtkWidget *label_i2c_addr, *entry_i2c_addr;
 GtkWidget *label_addr_width, *vbox, *radio1, *radio2;
 GtkWidget *label_reg_addr, *entry_reg_addr;
 GtkWidget *label_reg_val, *entry_reg_val;
 GtkWidget *button_read, *button_write;
 GtkWidget *check_button_just_sensor;
+GtkWidget *check_button_auto_exposure;
 GtkWidget *label_capture, *button_capture_bmp, *button_capture_raw;
 GtkWidget *label_gamma, *entry_gamma, *button_apply_gamma;
 GtkWidget *label_trig, *check_button_trig_en, *button_trig;
-//struct device_info device_info1;
+
 /****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
 extern int v4l2_dev;
 extern int fw_rev;
-//extern struct device_info device_info1;
+
 extern char *get_manufacturer_name();
 extern char *get_product();
 extern char *get_serial();
@@ -50,58 +43,29 @@ extern int read_cam_uuid_hwfw_rev(int fd);
 extern void soft_trigger(int fd);
 extern void trigger_enable(int fd, int ena, int enb);
 extern void sensor_reg_write(int fd,int regAddr, int regVal);
-extern void sensor_reg_read(int fd,int regAddr);
+extern int sensor_reg_read(int fd,int regAddr);
 extern void generic_I2C_write(int fd,int rw_flag, int bufCnt,
 					   int slaveAddr, int regAddr, unsigned char *i2c_data);
-extern void generic_I2C_read(int fd,int rw_flag, int bufCnt,
+extern int generic_I2C_read(int fd,int rw_flag, int bufCnt,
 					  int slaveAddr, int regAddr);
 extern void change_datatype(void *datatype);
 extern void change_bayerpattern(void *bayer);
-extern int read_cam_hw_rev(int fd);
-extern int read_cam_fw_rev(int fd);  
+
 
 /****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-void capture_bmp(GtkWidget *widget)
-{
-    video_capture_save_bmp();
-}
-void capture_raw(GtkWidget *raw)
-{
-    video_capture_save_raw();
-}
 
 void radio_datatype(GtkWidget *widget, gpointer data)
 {
     change_datatype(data);
-    // if (strcmp((char *)data, "1") == 0)
-    // {
-    //     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
-    //         g_print("RAW10 %s button is set to active\n", (char *)data);
-    //     else
-    //         g_print("RAW10 %s button is set to deactive\n", (char *)data);
-    // }
-    // if (strcmp((char *)data, "2") == 0)
-    // {
-    //     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
-    //         g_print("RAW12 %s button is set to active\n", (char *)data);
-    //     else
-    //         g_print("RAW12 %s button is set to deactive\n", (char *)data);
-    // }
-
-    // if (strcmp((char *)data, "3") == 0)
-    // {
-    //     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
-    //         g_print("YUV422 %s button is set to active\n", (char *)data);
-    //     else
-    //         g_print("YUV422 %s button is set to deactive\n", (char *)data);
-    // }
 }
+
 void radio_bayerpattern (GtkWidget *widget, gpointer data)
 {
     change_bayerpattern(data);
 }
+
 void hscale_exposure_up(GtkRange *widget, gpointer data)
 {
     int exposure_time;
@@ -117,6 +81,68 @@ void hscale_gain_up(GtkRange *widget, gpointer data)
     gain = (int)gtk_range_get_value(widget);
     set_gain(v4l2_dev, gain);
     g_print("gain is %d\n", gain);
+}
+
+void capture_bmp(GtkWidget *widget)
+{
+    video_capture_save_bmp();
+}
+void capture_raw(GtkWidget *raw)
+{
+    video_capture_save_raw();
+}
+
+void register_write(GtkWidget *widget)
+{
+    //sensor write
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor))) 
+    {
+        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
+             NULL, 16);
+        int regVal = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_val)),
+             NULL, 16);
+        sensor_reg_write(v4l2_dev,regAddr, regVal);
+    }
+    //generic write
+    else
+    {
+        int slaveAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)),
+             NULL, 16);
+        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
+             NULL, 16);
+        int regVal = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_val)),
+             NULL, 16);
+        generic_I2C_write(v4l2_dev,0x81, 1,
+			slaveAddr, regAddr, (unsigned char*)regVal);
+    }
+}
+
+void register_read(GtkWidget *widget)
+{
+    //sensor read
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor))) 
+    {
+        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
+             NULL, 16);
+             
+        int regVal = sensor_reg_read(v4l2_dev,regAddr);
+        char buf[6];
+        snprintf(buf, sizeof(buf), "0x%x",regVal);
+        gtk_entry_set_text(GTK_ENTRY(entry_reg_val), buf);
+    }
+    //generic read
+    else
+    {
+        int slaveAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)),
+             NULL, 16);
+        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
+             NULL, 16);
+        int regVal = generic_I2C_read(v4l2_dev,0x02, 1, slaveAddr, regAddr);
+        char buf[6];
+        snprintf(buf, sizeof(buf), "0x%x",regVal);
+        gtk_entry_set_text(GTK_ENTRY(entry_reg_val), buf);
+
+    }
 }
 
 void toggled_addr_length(GtkWidget *widget, gpointer data)
@@ -137,21 +163,28 @@ void toggled_addr_length(GtkWidget *widget, gpointer data)
     }
 }
 
-// void trim_leading_0x(char *hex_val) {
-//     if (hex_val == NULL) return;
-//     if (hex_val[0] == '0' && hex_val[1] == 'x') {
-//         hex_val[0] = ' ';
-//         hex_val[1] = ' ';
-//     }
-// }
-
-void reg_update(GtkWidget *widget, gpointer data)
+void enable_ae(GtkToggleButton *toggle_button)
 {
-
-    // int i2c_addr;
-    // i2c_addr = atoi(trim_leading_0x((char *)
-    //       gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr))));
-    //g_print("i2c addr = 0x%s", i2c_addr);
+    if (gtk_toggle_button_get_active(toggle_button))
+        set_exposure_auto(v4l2_dev, 0);
+    else
+        set_exposure_auto(v4l2_dev, 1);
+    
+}
+void send_trigger(GtkWidget *widget)
+{
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_trig_en))) {
+        //positive edge
+        trigger_enable(v4l2_dev, 1, 1);
+        g_print("trigger enabled\n");
+        soft_trigger(v4l2_dev);
+        g_print("send one trigger\n");   
+    }
+    else 
+    {   
+        trigger_enable(v4l2_dev, 0, 0);
+        g_print("trigger disabled\n");
+    }
 }
 
 //fail
@@ -248,7 +281,7 @@ int init_control_gui(int argc, char *argv[])
     gtk_label_set_text(GTK_LABEL(label_gain), "Gain:");
 
     hscale_exposure = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
-                                               0.0, 400.0, 1.0);
+                                               0.0, 4000.0, 1.0);
     hscale_gain = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
                                            0.0, 63.0, 1.0);
 
@@ -279,11 +312,14 @@ int init_control_gui(int argc, char *argv[])
     radio2 = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio1)), "16 bit");
     gtk_box_pack_start(GTK_BOX(vbox), radio2, 0, 0, 0);
+    check_button_auto_exposure = gtk_check_button_new_with_label("Enable auto exposure");
     //TODO: callback
     g_signal_connect(radio1, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "1");
     g_signal_connect(radio2, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "2");
+    g_signal_connect(GTK_TOGGLE_BUTTON(check_button_auto_exposure), "toggled",
+        G_CALLBACK(enable_ae), NULL);
 
     /* ---fifth row--- */
     label_reg_addr = gtk_label_new("Reg Addr:");
@@ -293,6 +329,7 @@ int init_control_gui(int argc, char *argv[])
     gtk_entry_set_width_chars(GTK_ENTRY(entry_reg_addr), -1);
     button_read = gtk_button_new_with_label("Read");
     //TODO: callback
+    g_signal_connect(button_read, "clicked", G_CALLBACK(register_read), NULL);
 
     /* --- sixth row --- */
     label_reg_val = gtk_label_new("Reg Value:");
@@ -302,7 +339,7 @@ int init_control_gui(int argc, char *argv[])
     gtk_entry_set_width_chars(GTK_ENTRY(entry_reg_val), -1);
     button_write = gtk_button_new_with_label("Write");
     //TODO: callback
-    //g_signal_connect(button_write, "clicked", G_CALLBACK(reg_update), NULL);
+    g_signal_connect(button_write, "clicked", G_CALLBACK(register_write), NULL);
 
     /* --- seventh row --- */
     label_capture = gtk_label_new("Capture:");
@@ -321,7 +358,11 @@ int init_control_gui(int argc, char *argv[])
     button_apply_gamma = gtk_button_new_with_label("Apply");
 
 
-
+    /* --- eighth row --- */
+    label_trig = gtk_label_new("Trigger Sensor:");
+    check_button_trig_en = gtk_check_button_new_with_label("Enable");
+    button_trig = gtk_button_new_with_label("Shot 1 trigger");
+    g_signal_connect(button_trig, "clicked", G_CALLBACK(send_trigger), NULL);
 
     /* --- Layout, don't change --- */
     // zero row: device info, hw, fw revision
@@ -331,69 +372,70 @@ int init_control_gui(int argc, char *argv[])
     //gtk_grid_attach(GTK_GRID(grid), label_hw_rev, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), label_fw_rev, col++, row, 1, 1);
 
-    // first row: choose sensor datatype for data shift
-    // row ++;
-    // col = 0;   
-    // gtk_grid_attach(GTK_GRID(grid), label_datatype, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), vbox2, col++, row, 2, 1);
-    // // second row: bayer pattern
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_bayer, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), vbox3, col++, row, 2, 1);
-    // // third row: exposure
-    // row ++;
-    // col = 0;    
-    // gtk_grid_attach(GTK_GRID(grid), label_exposure, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), hscale_exposure, col++, row, 3, 1);
-    // // forth row: gain
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_gain, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), hscale_gain, col++, row, 3, 1);
-    // // fifth row: i2c addr
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_i2c_addr, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), entry_i2c_addr, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), check_button_just_sensor, col++, row, 1, 1);
-    // // sixth row: reg addr width
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_addr_width, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), vbox, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), check_button_just_sensor, col++, row, 1, 1);
-    // // seventh row: reg addr
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_reg_addr, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), entry_reg_addr, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), button_read, col++, row, 1, 1);
-    // // eighth row: reg val
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_reg_val, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), entry_reg_val, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), button_write, col++, row, 1, 1);
-    // // ninth row: capture bmp, raw
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_capture, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), button_capture_bmp, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), button_capture_raw, col++, row, 1, 1);
-    // // tenth row: gamma correction
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_gamma, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), entry_gamma, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), button_apply_gamma, col++, row, 1, 1);
-    // // eleventh row: trigger
-    // row ++;
-    // col = 0;
-    // gtk_grid_attach(GTK_GRID(grid), label_trig, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), check_button_trig_en, col++, row, 1, 1);
-    // gtk_grid_attach(GTK_GRID(grid), button_trig, row++, row, 1, 1);
-
+    //first row: choose sensor datatype for data shift
+    row ++;
+    col = 0;   
+    gtk_grid_attach(GTK_GRID(grid), label_datatype, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), vbox2, col++, row, 2, 1);
+    // second row: bayer pattern
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_bayer, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), vbox3, col++, row, 2, 1);
+    // third row: exposure
+    row ++;
+    col = 0;    
+    gtk_grid_attach(GTK_GRID(grid), label_exposure, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), hscale_exposure, col++, row, 3, 1);
+    // forth row: gain
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_gain, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), hscale_gain, col++, row, 3, 1);
+    // fifth row: i2c addr
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_i2c_addr, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), entry_i2c_addr, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), check_button_just_sensor, col++, row, 1, 1);
+    // sixth row: reg addr width
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_addr_width, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), vbox, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), check_button_auto_exposure, col++, row, 1, 1);
+    // seventh row: reg addr
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_reg_addr, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), entry_reg_addr, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_read, col++, row, 1, 1);
+    // eighth row: reg val
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_reg_val, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), entry_reg_val, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_write, col++, row, 1, 1);
+    // ninth row: capture bmp, raw
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_capture, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_capture_bmp, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_capture_raw, col++, row, 1, 1);
+    // tenth row: gamma correction
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_gamma, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), entry_gamma, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_apply_gamma, col++, row, 1, 1);
+    // eleventh row: trigger
+    row ++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_trig, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), check_button_trig_en, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_trig, col++, row, 1, 1);
+    row++;
+    col = 0;
     /* --- Grid Setup --- */
     gtk_grid_set_column_homogeneous(GTK_GRID(grid), FALSE);
     gtk_widget_set_hexpand(grid, TRUE);

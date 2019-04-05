@@ -344,7 +344,7 @@ void soft_trigger(int fd)
     CLEAR(buf9);
     write_to_UVC_extension(fd, LI_XU_SOFT_TRIGGER, 
         LI_XU_SOFT_TRIGGER_SIZE, buf9);
-    printf("send one trigger\n");
+    //printf("send one trigger\n");
 }
 
 
@@ -376,7 +376,7 @@ void trigger_enable(int fd, int ena, int enb)
     buf11[1] = 0x00;
     write_to_UVC_extension(fd, LI_XU_TRIGGER_MODE,
         LI_XU_TRIGGER_MODE_SIZE, buf11);
-    printf("trigger mode enable\n");
+    //printf("trigger mode enable\n");
 }
 
 /*
@@ -505,7 +505,7 @@ void sensor_reg_write(int fd,int regAddr, int regVal)
  * 		fd 		- file descriptor
  * 		regAddr - register address want to access
  */
-void sensor_reg_read(int fd,int regAddr)
+int sensor_reg_read(int fd,int regAddr)
 {
 
 	int regVal = 0;
@@ -526,6 +526,7 @@ void sensor_reg_read(int fd,int regAddr)
 
 	regVal = (buf14[3] << 8) + buf14[4];
 	printf("Read Sensor REG[0x%x] = 0x%x\r\n", regAddr, regVal);
+	return regVal;
 }
 
 /*
@@ -593,7 +594,7 @@ void generic_I2C_write(int fd,int rw_flag, int bufCnt,
  * 		regAddr  - register address want to access
  * 		i2c_data - pointer to register value   
  */
-void generic_I2C_read(int fd,int rw_flag, int bufCnt,
+int generic_I2C_read(int fd,int rw_flag, int bufCnt,
 					  int slaveAddr, int regAddr)
 
 {
@@ -622,4 +623,5 @@ void generic_I2C_read(int fd,int rw_flag, int bufCnt,
 	}
 	printf("I2C slave ADDR[0x%x], Read REG[0x%x]: 0x%x\r\n",
 		   slaveAddr, regAddr, regVal);
+	return regVal;
 }

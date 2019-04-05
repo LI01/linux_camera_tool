@@ -190,8 +190,8 @@ void load_register_setting_from_configuration(int fd,int regCount,
 											  const struct reg_pair *buffer);
 void load_register_setting_from_flash_manually(int fd);                                              
 void sensor_reg_write(int fd,int regAddr, int regVal);
-void sensor_reg_read(int fd,int regAddr);
+int sensor_reg_read(int fd,int regAddr);
 void generic_I2C_write(int fd,int rw_flag, int bufCnt,
 					   int slaveAddr, int regAddr, unsigned char *i2c_data);
-void generic_I2C_read(int fd,int rw_flag, int bufCnt,
+int generic_I2C_read(int fd,int rw_flag, int bufCnt,
 					  int slaveAddr, int regAddr);                      
