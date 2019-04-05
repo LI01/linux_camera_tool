@@ -1,9 +1,40 @@
+/****************************************************************************
+  This sample is released as public domain. It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+
+  This is the sample code for Leopard USB3.0 camera use v4l2 and opencv for 
+  camera streaming and display.
+
+  Common implementation of a v4l2 application
+  1. Open a descriptor to the device.
+  2. Retrieve and analyse the device's capabilities.
+  3. Set the capture format(YUYV etc).
+  4. Prepare the device for buffering handling. 
+     when capturing a frame, you have to submit a buffer to the device(queue)
+     and retrieve it once it's been filled with data(dequeue)
+     Before you can do this, you must inform the cdevice about 
+     your buffer(buffer request)
+  5. For each buffer you wish to use, you must negotiate characteristics with 
+     the device(buffer size, frame start offset in memory), and create a new
+     memory mapping for it
+  6. Put the device into streaming mode
+  7. Once your buffers are ready, all you have to do is keep queueing and
+     dequeueing your buffer repeatedly, and every call will bring you a new 
+     frame. The delay you set between each frames by putting your program to
+     sleep is what determines your fps
+  8. Turn off streaming mode
+  9. Unmap the buffer
+ 10. Close your descriptor to the device 
+  
+  Author: Danyu L
+  Last edit: 2019/04
+*****************************************************************************/
 #pragma once
 
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-
 
 struct buffer
 {
@@ -16,135 +47,37 @@ struct buffer
 **							 Function declaration
 *****************************************************************************/
 
-/* 
- * open the /dev/video* uvc camera device
- * 
- * args: 
- * 		device_name 
- * 		struct device *dev for adding fd
- * returns: 
- * 		file descriptor v4l2_dev
- */
-int open_v4l2_device(char *device_name, struct device *dev);
-
-/* 
- * retrive device's capabilities
- * 
- * args: 
- * 		struct device *dev - device infomation
- * returns: 
- * 		error value
- */
-int check_dev_cap(struct device *dev);
-
-/*
- * activate streaming 
- * 
- * args: 
- * 		struct device *dev - device infomation
- */
-void start_camera(struct device *dev);
-
-/*
- * deactivate streaming 
- * 
- * args: 
- * 		struct device *dev - device infomation
- */
-void stop_Camera(struct device *dev);
-
-/*
- * video get format - Leopard camera format is YUYV
- * run this to get the resolution
- * args: 
- * 		struct device *dev - device infomation
- * 	  	
- */
-void video_get_format(struct device *dev);
-/*
- * video set format - Leopard camera format is YUYV
- * need to do a v4l2-ctl --list-formats-ext to see the resolution
- * args: 
- * 		struct device *dev - device infomation
- * 	  	width - resoultion width
- * 		height - resolution height
- * 		pixelformat - V4L2_PIX_FMT_YUYV
- * 
- */
-void video_set_format(struct device *dev, 
-                      int width, int height, int pixelformat);
-
-/* 
- * To get a frame in few steps
- * 1. prepare information about the buffer you are queueing
- * 	  (done in video_allocate_buffers)
- * 2. activate the device streaming capability
- * 3. queue the buffer,  handling your buffer over to the device,
- *    put it into the incoming queue, wait for it to write stuff in
- * 4. dequeue the buffer, the device is done, you may read the buffer
- * 
- * args: 
- * 		struct device *dev - put buffers in
-*/
-int streaming_loop(struct device *dev);
-
-/* 
- * Typically start two loops:
- * 1. runs for as long as you want to
- *    capture frames (shoot the video).
- * 2. iterates over your buffers everytime. 
- *
- * args: 
- * 		struct device *dev - every infomation for camera
- */
-void get_a_frame(struct device *dev);
-
 int v4l2_core_save_data_to_file(const char *filename, const void *data, int size);
-
 void set_save_raw_flag(int flag);
-void set_save_bmp_flag(int flag);
 void video_capture_save_raw();
+
+void set_save_bmp_flag(int flag);
 void video_capture_save_bmp();
 
 void change_datatype(void* datatype); 
-void change_bayerpattern(void *bayer);
-int set_shift(int *shift_flag); 
+int set_shift(int *shift_flag);
+
+void change_bayerpattern(void *bayer); 
 int add_bayer_forcv(int *bayer_flag);
 
-/* 
- * opencv only support debayering 8 and 16 bits 
- * 
- * decode the frame, move each pixel by certain bits,
- * and mask it for 8 bits, render a frame using opencv
- * args: 
- * 		struct device *dev - every infomation for camera
- * 		const void *p - pointer for the buffer
- * 		int shift - values to shift(RAW10 - 2, RAW12 - 4) 
- * 
- */
+int open_v4l2_device(char *device_name, struct device *dev);
+int check_dev_cap(struct device *dev);
+
+void start_camera(struct device *dev);
+void stop_Camera(struct device *dev);
+
+
+void video_get_format(struct device *dev);
+void video_set_format(struct device *dev, 
+                      int width, int height, int pixelformat);
+
+
+int streaming_loop(struct device *dev);
+
+void get_a_frame(struct device *dev);
 void decode_a_frame(struct device *dev, const void *p, int shift);
-
-/*
- * request, allocate and map buffers
- * 
- * args: 
- * 		struct device *dev - put buffers in
- * 		nbufs - number of buffer request, map
- * returns: 
- * 		errno 
- * 
- */ 
+ 
 int video_alloc_buffers(struct device *dev, int nbufs);
-
-/*
- * free, unmap buffers
- * 
- * args: 
- * 		struct device *dev - put buffers in
- * returns: 
- * 		errno 
- * 
- */ 
 int video_free_buffers(struct device *dev);
 
 

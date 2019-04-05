@@ -1,29 +1,11 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/types.h>
-#include <limits.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <sys/ioctl.h>
-#include <linux/videodev2.h>
-#include <linux/usb/video.h>
-#include <errno.h>
-#include <iconv.h>
-#include <linux/uvcvideo.h>
-#include <sys/stat.h>
-#include <sys/fcntl.h>
+
+#include "../includes/shortcuts.h"
+
 #include "../src/uvc_extension_unit_ctrl.h"
 #include "../src/extend_cam_ctrl.h"
 #include "../src/ui_control.h"
 #include "../src/cam_property.h"
 #include "../src/v4l2_devices.h"
-
-
-#include "../includes/shortcuts.h"
-
-
 
 int v4l2_dev;
 int fw_rev;
@@ -54,12 +36,15 @@ int main(int argc, char ** argv)
 	video_alloc_buffers(&dev, 1);
 	
 	sensor_reg_read(v4l2_dev, 0x55d7);
+	//generic_I2C_read(v4l2_dev, 0x02, 8, 0x20, 0x0210);
+	
 	//set_sensor_gain_rgb(v4l2_dev, 0x555, 0x0, 0x0, 0x0);
+	
 	//run a v4l2-ctl --list-formats-ext to see the resolution
 	//video_set_format(v4l2_dev, 3840, 2050, V4L2_PIX_FMT_YUYV);
 
-	//generic_I2C_read(v4l2_dev, 0x02, 8, 0x20, 0x0210);
-	// Activate streaming
+
+	/* Activate streaming */
 	start_camera(&dev);
 	pid_t pid;
 	pid = fork();
@@ -68,7 +53,8 @@ int main(int argc, char ** argv)
 	} else if (pid > 0) {
 		
 		streaming_loop(&dev);
-		// Deactivate streaming
+
+		/* Deactivate streaming */
 		stop_Camera(&dev);
 		video_free_buffers(&dev);
 		

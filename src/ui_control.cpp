@@ -1,7 +1,6 @@
 
 #include <cstring>
-#include <stdio.h>
-#include <stdlib.h>
+
 #include "../includes/shortcuts.h"
 #include "ui_control.h"
 /****************************************************************************
@@ -22,40 +21,83 @@ GtkWidget *check_button_auto_exposure;
 GtkWidget *label_capture, *button_capture_bmp, *button_capture_raw;
 GtkWidget *label_gamma, *entry_gamma, *button_apply_gamma;
 GtkWidget *label_trig, *check_button_trig_en, *button_trig;
+
 int address_width_flag;
+extern int v4l2_dev;
+extern int fw_rev;
 /****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
-extern int v4l2_dev;
-extern int fw_rev;
-
 extern char *get_manufacturer_name();
 extern char *get_product();
 extern char *get_serial();
-extern void video_capture_save_bmp();
-extern void video_capture_save_raw();
+
+extern int read_cam_uuid_hwfw_rev(int fd);
+
+extern void change_datatype(void *datatype);
+extern void change_bayerpattern(void *bayer);
 
 extern void set_exposure_absolute(int fd, int exposure_absolute);
 extern void set_gain(int fd, int analog_gain);
 extern void set_exposure_auto(int fd, int exposure_auto);
 
-extern int read_cam_uuid_hwfw_rev(int fd);
-extern void soft_trigger(int fd);
-extern void trigger_enable(int fd, int ena, int enb);
 extern void sensor_reg_write(int fd, int regAddr, int regVal);
 extern int sensor_reg_read(int fd, int regAddr);
 extern void generic_I2C_write(int fd, int rw_flag, int bufCnt,
-                              int slaveAddr, int regAddr, unsigned char *i2c_data);
+            int slaveAddr, int regAddr, unsigned char *i2c_data);
 extern int generic_I2C_read(int fd, int rw_flag, int bufCnt,
                             int slaveAddr, int regAddr);
-extern void change_datatype(void *datatype);
-extern void change_bayerpattern(void *bayer);
+
+
+extern void video_capture_save_bmp();
+extern void video_capture_save_raw();
+
+extern void soft_trigger(int fd);
+extern void trigger_enable(int fd, int ena, int enb);
 
 /****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
+
+void radio_datatype(GtkWidget *widget, gpointer data)
+{   
+    (void)widget;
+    change_datatype(data);
+}
+
+void radio_bayerpattern(GtkWidget *widget, gpointer data)
+{
+    (void)widget;
+    change_bayerpattern(data);
+}
+
+void hscale_exposure_up(GtkRange *widget)
+{
+    int exposure_time;
+    exposure_time = (int)gtk_range_get_value(widget);
+    set_exposure_absolute(v4l2_dev, exposure_time);
+    g_print("exposure is %d lines\n", exposure_time);
+}
+
+void hscale_gain_up(GtkRange *widget)
+{
+    int gain;
+    gain = (int)gtk_range_get_value(widget);
+    set_gain(v4l2_dev, gain);
+    g_print("gain is %d\n", gain);
+}
+
+void enable_ae(GtkToggleButton *toggle_button)
+{
+    if (gtk_toggle_button_get_active(toggle_button))
+        set_exposure_auto(v4l2_dev, 0);
+    else
+        set_exposure_auto(v4l2_dev, 1);
+}
+
 void toggled_addr_length(GtkWidget *widget, gpointer data)
 {
+    (void)widget;
     if (strcmp((char *)data, "1") == 0)
         address_width_flag = 1;
     
@@ -63,6 +105,7 @@ void toggled_addr_length(GtkWidget *widget, gpointer data)
         address_width_flag = 2;
     
 }
+
 int addr_width_for_rw(int address_width_flag)
 {
     if (address_width_flag == 1)
@@ -72,44 +115,11 @@ int addr_width_for_rw(int address_width_flag)
     return 1;
 }
 
-void radio_datatype(GtkWidget *widget, gpointer data)
-{
-    change_datatype(data);
-}
-
-void radio_bayerpattern(GtkWidget *widget, gpointer data)
-{
-    change_bayerpattern(data);
-}
-
-void hscale_exposure_up(GtkRange *widget, gpointer data)
-{
-    int exposure_time;
-    exposure_time = (int)gtk_range_get_value(widget);
-    set_exposure_absolute(v4l2_dev, exposure_time);
-    g_print("exposure is %d lines\n", exposure_time);
-}
-
-void hscale_gain_up(GtkRange *widget, gpointer data)
-{
-    int gain;
-    gain = (int)gtk_range_get_value(widget);
-    set_gain(v4l2_dev, gain);
-    g_print("gain is %d\n", gain);
-}
-
-void capture_bmp(GtkWidget *widget)
-{
-    video_capture_save_bmp();
-}
-void capture_raw(GtkWidget *raw)
-{
-    video_capture_save_raw();
-}
-
 void register_write(GtkWidget *widget)
 {
-    //sensor write
+    (void)widget;
+
+    /* sensor read */
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
         int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
@@ -118,7 +128,8 @@ void register_write(GtkWidget *widget)
                             NULL, 16);
         sensor_reg_write(v4l2_dev, regAddr, regVal);
     }
-    //generic write
+
+    /* generic i2c slave read */
     else
     {
         int slaveAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)),
@@ -131,22 +142,19 @@ void register_write(GtkWidget *widget)
         buf[0] = regVal & 0xff;
         buf[1] = (regVal >> 8) & 0xff;
 
+        /* write 8/16 bit data */
         if (addr_width_for_rw(address_width_flag) != 1)
-        {
-            generic_I2C_write(v4l2_dev, 0x82, 2,
-                              slaveAddr, regAddr, buf);
-        }
+            generic_I2C_write(v4l2_dev, 0x82, 2, slaveAddr, regAddr, buf);
         else
-        {
-            generic_I2C_write(v4l2_dev, 0x81, 1,
-                              slaveAddr, regAddr, buf);
-        }
+            generic_I2C_write(v4l2_dev, 0x81, 1, slaveAddr, regAddr, buf);
+
     }
 }
 
 void register_read(GtkWidget *widget)
 {
-    //sensor read
+    (void)widget;
+    /* sensor read */
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
         int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
@@ -157,7 +165,8 @@ void register_read(GtkWidget *widget)
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_reg_val), buf);
     }
-    //generic read
+
+    /* generic i2c slave read */
     else
     {
         int slaveAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)),
@@ -171,31 +180,44 @@ void register_read(GtkWidget *widget)
     }
 }
 
-void enable_ae(GtkToggleButton *toggle_button)
+
+void capture_bmp(GtkWidget *widget)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-        set_exposure_auto(v4l2_dev, 0);
-    else
-        set_exposure_auto(v4l2_dev, 1);
+    (void)widget;
+    video_capture_save_bmp();
 }
+
+void capture_raw(GtkWidget *widget)
+{
+    (void)widget;
+    video_capture_save_raw();
+}
+
 
 void send_trigger(GtkWidget *widget)
 {
+    (void)widget;
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_trig_en)))
     {
-        //positive edge
+        /* positive edge */
         trigger_enable(v4l2_dev, 1, 1);
+        // /* negative edge */
+        // trigger_enable(v4l2_dev, 1, 0);
         g_print("trigger enabled\n");
         soft_trigger(v4l2_dev);
         g_print("send one trigger\n");
     }
     else
     {
+        /* disable trigger */
         trigger_enable(v4l2_dev, 0, 0);
         g_print("trigger disabled\n");
     }
 }
 
+/****************************************************************************
+**                      	Main GUI
+*****************************************************************************/
 //fail
 //g++ ui_control.cpp -o test2 `gtk-config --cflags --libs`
 //pass
@@ -360,7 +382,7 @@ int init_control_gui(int argc, char *argv[])
     button_trig = gtk_button_new_with_label("Shot 1 trigger");
     g_signal_connect(button_trig, "clicked", G_CALLBACK(send_trigger), NULL);
 
-    /* --- Layout, don't change --- */
+    /* ---------------- Layout, don't change ---------------------------- */
     // zero row: device info, hw, fw revision
     int row = 0;
     int col = 0;

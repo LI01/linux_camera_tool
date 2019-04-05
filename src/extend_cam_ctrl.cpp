@@ -1,51 +1,93 @@
-/*
- * Common implementation of a v4l2 application
- * 1. open a descriptor to the device
- * 2. retrieve and analyse the device's capabilities.
- * 3. set the capture format(YUYV etc)
- * 4. prepare the device for buffering handling. 
- *    when capturing a frame, you have to submit a buffer to the device(queue)
- *    and retrieve it once it's been filled with data(dequeue)
- *    Before you can do this, you must inform the cdevice about 
- *    your buffer(buffer request)
- * 5. For each buffer you wish to use, you must negotiate characteristics with 
- *    the device(buffer size, frame start offset in memory), and create a new
- *    memory mapping for it
- * 6. Put the device into streaming mode
- * 7. Once your buffers are ready, all you have to do is keep queueing and
- *    dequeueing your buffer repeatedly, and every call will bring you a new 
- *    frame. The delay you set between each frames by putting your program to
- *    sleep is what determines your fps
- * 8. Turn off streaming mode
- * 9. Unmap the buffer
- * 9. Close your descriptor to the device 
- */
+/****************************************************************************
+  This sample is released as public domain.  It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
 
-/* for mmap */
-//#include <sys/mman.h>
+  This is the sample code for Leopard USB3.0 camera use v4l2 and opencv for 
+  camera streaming and display.
+
+  Common implementation of a v4l2 application
+  1. Open a descriptor to the device.
+  2. Retrieve and analyse the device's capabilities.
+  3. Set the capture format(YUYV etc).
+  4. Prepare the device for buffering handling. 
+     when capturing a frame, you have to submit a buffer to the device(queue)
+     and retrieve it once it's been filled with data(dequeue)
+     Before you can do this, you must inform the cdevice about 
+     your buffer(buffer request)
+  5. For each buffer you wish to use, you must negotiate characteristics with 
+     the device(buffer size, frame start offset in memory), and create a new
+     memory mapping for it
+  6. Put the device into streaming mode
+  7. Once your buffers are ready, all you have to do is keep queueing and
+     dequeueing your buffer repeatedly, and every call will bring you a new 
+     frame. The delay you set between each frames by putting your program to
+     sleep is what determines your fps
+  8. Turn off streaming mode
+  9. Unmap the buffer
+ 10. Close your descriptor to the device 
+  
+  Author: Danyu L
+  Last edit: 2019/04
+*****************************************************************************/
 
 /* Include files to use OpenCV API */
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include "../includes/shortcuts.h"
-#include "extend_cam_ctrl.h"
 #include <string.h>
 #include <omp.h> //for openmp
+
+#include "../includes/shortcuts.h"
+#include "extend_cam_ctrl.h"
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-static int *save_bmp;
-static int *save_raw;
-static int *bayer_flag;
-static int *shift_flag;
+/* 
+ * Since we use fork, variables btw two processes are not shared
+ * use mmap for all the variables you need to share between gui and videostreaming
+ */
+static int *save_bmp; 	/* flag for saving bmp */
+static int *save_raw; 	/* flag for saving raw */
+static int *bayer_flag; /* flag for choosing bayer pattern */
+static int *shift_flag; /* flag for shift raw data */
 
-int image_count;
+static int image_count;
 
+struct v4l2_buffer queuebuffer;
 /*****************************************************************************
 **                           Function definition
 *****************************************************************************/
+
+/*
+ * callback for save bmp image from gui
+ */
+void video_capture_save_bmp()
+{
+	set_save_bmp_flag(1);
+}
+
+/*
+ * set save raw image flag 
+ * args:
+ * 		flag - set the flag when get capture button clicked,
+ * 			   reset flag to zero once image is saved
+ */
+void set_save_bmp_flag(int flag)
+{
+	*save_bmp = flag;
+}
+
+
+/*
+ * save data to bitmap using opencv
+ * args:
+ *	 opencv mat image to be captured
+ *
+ * asserts:
+ *   none
+ */
 static int save_frame_image_bmp(cv::Mat opencvImage)
 {
 
@@ -57,26 +99,73 @@ static int save_frame_image_bmp(cv::Mat opencvImage)
 	return 0;
 }
 
-void video_capture_save_bmp()
-{
-	set_save_bmp_flag(1);
-}
-
+/*
+ * callback for save raw image from gui
+ */
 void video_capture_save_raw()
 {
 	set_save_raw_flag(1);
 }
 
-void set_save_bmp_flag(int flag)
-{
-	*save_bmp = flag;
-}
-
+/*
+ * set save raw image flag 
+ * args:
+ * 		flag - set the flag when get capture button clicked,
+ * 			   reset flag to zero once image is saved
+ */
 void set_save_raw_flag(int flag)
 {
 	*save_raw = flag;
 }
 
+/*
+ * save data to file
+ * args:
+ *   filename - string with filename
+ *   data - pointer to data
+ *   size - data size in bytes = sizeof(uint8_t)
+ *
+ * asserts:
+ *   none
+ *
+ * returns: error code
+ */
+int v4l2_core_save_data_to_file(const char *filename, const void *data, int size)
+{
+	FILE *fp;
+	int ret = 0;
+
+	if ((fp = fopen(filename, "wb")) != NULL)
+	{
+		ret = fwrite((uint8_t *)data, size, 1, fp);
+
+		if (ret < 1)
+			ret = 1; /*write error*/
+		else
+			ret = 0;
+
+		fflush(fp); /*flush data stream to file system*/
+		if (fsync(fileno(fp)) || fclose(fp))
+			fprintf(stderr, "V4L2_CORE: (save_data_to_file) error \
+				- couldn't write buffer to file: %s\n",
+					strerror(errno));
+		else
+			printf("V4L2_CORE: saved data to %s\n", filename);
+	}
+	else
+		ret = 1;
+
+	return (ret);
+}
+
+/*
+ * return the shift value for choiced sensor datatype
+ * RAW10 - shift 2 bits
+ * RAW12 - shift 4 bits
+ * YUV422 - shift 0 bit
+ * Crosslink doesn't support decode RAW14, RAW16 so far,
+ * these two datatypes weren't used in USB3 camera
+ */
 int set_shift(int *shift_flag)
 {
 	if (*shift_flag == 1)
@@ -87,6 +176,36 @@ int set_shift(int *shift_flag)
 		return 0;
 	return 2;
 }
+/*
+ * callback for change sensor datatype shift flag
+ * args:
+ * 		datatype - RAW10  -> set *shift_flag = 1
+ *  			   RAW12  -> set *shift_flag = 2
+ * 				   YUV422 -> set *shift_flag = 3
+ */
+void change_datatype(void *datatype)
+{
+	if (strcmp((char *)datatype, "1") == 0)
+		*shift_flag = 1;
+	if (strcmp((char *)datatype, "2") == 0)
+		*shift_flag = 2;
+	if (strcmp((char *)datatype, "3") == 0)
+		*shift_flag = 3;
+}
+
+
+/*
+ * determine the sensor bayer pattern to correctly debayer the image
+ *   CV_BayerBG2BGR =46   -> bayer_flag_increment = 0
+ *   CV_BayerGB2BGR =47   -> bayer_flag_increment = 1
+ *   CV_BayerRG2BGR =48   -> bayer_flag_increment = 2
+ *   CV_BayerGR2BGR =49	  -> bayer_flag_increment = 3
+ * default bayer pattern: RGGB
+ * args:
+ * 		bayer_flag - flag for determining bayer pattern 
+ * returns:
+ * 		bayer pattern flag increment
+ */
 int add_bayer_forcv(int *bayer_flag)
 {
 	if (*bayer_flag == 1)
@@ -100,18 +219,12 @@ int add_bayer_forcv(int *bayer_flag)
 	return 2;
 }
 
-
-
-void change_datatype(void *datatype)
-{
-	if (strcmp((char *)datatype, "1") == 0)
-		*shift_flag = 1;
-	if (strcmp((char *)datatype, "2") == 0)
-		*shift_flag = 2;
-	if (strcmp((char *)datatype, "3") == 0)
-		*shift_flag = 3;
-}
-
+/*
+ * callback for change sensor bayer pattern for debayering
+ * args:
+ * 		bayer - for updating *bayer_flag
+ *  			   
+ */
 void change_bayerpattern(void *bayer)
 {
 	if (strcmp((char *)bayer, "1") == 0)
@@ -130,7 +243,7 @@ void change_bayerpattern(void *bayer)
 // static __MUTEX_TYPE mutex = __STATIC_MUTEX_INIT;
 // #define __PMUTEX &mutex
 
-struct v4l2_buffer queuebuffer;
+
 
 /* 
  * open the /dev/video* uvc camera device
@@ -164,7 +277,6 @@ int open_v4l2_device(char *device_name, struct device *dev)
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	
 
 	return v4l2_dev;
 }
@@ -207,6 +319,7 @@ int check_dev_cap(struct device *dev)
 	}
 	return 0;
 }
+
 /*
  * activate streaming 
  * 
@@ -225,6 +338,7 @@ void start_camera(struct device *dev)
 	}
 	return;
 }
+
 /*
  * deactivate streaming 
  * 
@@ -327,6 +441,7 @@ void video_get_format(struct device *dev)
 		   fmt.fmt.pix.sizeimage);
 	return;
 }
+
 /*
  * request, allocate and map buffers
  * 
@@ -359,12 +474,12 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 	}
 	printf("%u buffers requested.\n", bufrequest.count);
 
-	//allocate buffer
+	/* allocate buffer */
 	buffers = (buffer *)malloc(bufrequest.count * sizeof buffers[0]);
 	if (buffers == NULL)
 		return -ENOMEM;
 
-	//map the buffers
+	/* map the buffers */
 	for (unsigned int i = 0; i < dev->nbufs; i++)
 	{
 		CLEAR(querybuffer);
@@ -468,7 +583,7 @@ void get_a_frame(struct device *dev)
 		{
 			printf("save a raw\n");
 			char buf_name[16];
-        	snprintf(buf_name, sizeof(buf_name), "captures_%d.raw",image_count);
+			snprintf(buf_name, sizeof(buf_name), "captures_%d.raw", image_count);
 			v4l2_core_save_data_to_file(buf_name,
 										dev->buffers->start, dev->imagesize);
 			image_count++;
@@ -485,45 +600,7 @@ void get_a_frame(struct device *dev)
 	return;
 }
 
-/*
- * save data to file
- * args:
- *   filename - string with filename
- *   data - pointer to data
- *   size - data size in bytes = sizeof(uint8_t)
- *
- * asserts:
- *   none
- *
- * returns: error code
- */
-int v4l2_core_save_data_to_file(const char *filename, const void *data, int size)
-{
-	FILE *fp;
-	int ret = 0;
 
-	if ((fp = fopen(filename, "wb")) != NULL)
-	{
-		ret = fwrite((uint8_t *)data, size, 1, fp);
-
-		if (ret < 1)
-			ret = 1; /*write error*/
-		else
-			ret = 0;
-
-		fflush(fp); /*flush data stream to file system*/
-		if (fsync(fileno(fp)) || fclose(fp))
-			fprintf(stderr, "V4L2_CORE: (save_data_to_file) error \
-				- couldn't write buffer to file: %s\n",
-					strerror(errno));
-		else
-			printf("V4L2_CORE: saved data to %s\n", filename);
-	}
-	else
-		ret = 1;
-
-	return (ret);
-}
 /* 
  * opencv only support debayering 8 and 16 bits 
  * 
@@ -546,19 +623,22 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	/* --- for bayer camera ---*/
 	if (shift != 0)
 	{
-#pragma omp for
+	 	/* shift bits for 16-bit stream and get lower 8-bit for opencv 
+	 	 * debayering */
+		/* use openmp loop parallelism to accelate shifting */
+		#pragma omp for
 		for (int i = 0; i < height; i++)
 		{
 			for (int j = 0; j < width; j++)
 			{
-				tmp = *(srcShort++) >> shift; // todo Macro define
+				tmp = *(srcShort++) >> shift; 
 				*(dst++) = (unsigned char)tmp;
 			}
 		}
 
 		cv::Mat img(height, width, 0, (void *)p);
 		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-		
+
 		if (*(save_bmp))
 		{
 			printf("save a bmp\n");
