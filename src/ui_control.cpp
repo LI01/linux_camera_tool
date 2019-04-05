@@ -1,6 +1,4 @@
 
-#include <cstring>
-
 #include "../includes/shortcuts.h"
 #include "ui_control.h"
 /****************************************************************************
@@ -58,19 +56,21 @@ extern void trigger_enable(int fd, int ena, int enb);
 /****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-
+/* callback for sensor datatype updates*/
 void radio_datatype(GtkWidget *widget, gpointer data)
 {   
     (void)widget;
     change_datatype(data);
 }
 
+/* callback for bayer pattern choice updates*/
 void radio_bayerpattern(GtkWidget *widget, gpointer data)
 {
     (void)widget;
     change_bayerpattern(data);
 }
 
+/* callback for updating exposure time line */
 void hscale_exposure_up(GtkRange *widget)
 {
     int exposure_time;
@@ -79,6 +79,7 @@ void hscale_exposure_up(GtkRange *widget)
     g_print("exposure is %d lines\n", exposure_time);
 }
 
+/* callback for updating analog gain */
 void hscale_gain_up(GtkRange *widget)
 {
     int gain;
@@ -87,6 +88,7 @@ void hscale_gain_up(GtkRange *widget)
     g_print("gain is %d\n", gain);
 }
 
+/* callback for enabling/disabling auto exposure */
 void enable_ae(GtkToggleButton *toggle_button)
 {
     if (gtk_toggle_button_get_active(toggle_button))
@@ -95,6 +97,7 @@ void enable_ae(GtkToggleButton *toggle_button)
         set_exposure_auto(v4l2_dev, 1);
 }
 
+/* callback for updating register address length 8/16 bits */
 void toggled_addr_length(GtkWidget *widget, gpointer data)
 {
     (void)widget;
@@ -105,7 +108,7 @@ void toggled_addr_length(GtkWidget *widget, gpointer data)
         address_width_flag = 2;
     
 }
-
+/* generate address width flag for callback in register read/write */
 int addr_width_for_rw(int address_width_flag)
 {
     if (address_width_flag == 1)
@@ -115,6 +118,7 @@ int addr_width_for_rw(int address_width_flag)
     return 1;
 }
 
+/* callback for register write */
 void register_write(GtkWidget *widget)
 {
     (void)widget;
@@ -151,6 +155,7 @@ void register_write(GtkWidget *widget)
     }
 }
 
+/* callback for register read */
 void register_read(GtkWidget *widget)
 {
     (void)widget;
@@ -180,20 +185,26 @@ void register_read(GtkWidget *widget)
     }
 }
 
-
+/* callback for capturing bmp */
 void capture_bmp(GtkWidget *widget)
 {
     (void)widget;
     video_capture_save_bmp();
 }
 
+/* callback for captuing raw */
 void capture_raw(GtkWidget *widget)
 {
     (void)widget;
     video_capture_save_raw();
 }
-
-
+//TODO: callback for gamma correction
+void gamma_correction(GtkWidget)
+{
+    float gamma = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_gamma)));
+    g_print("gamma = %f\n", gamma);
+}
+/* callback for triggering sensor functionality */
 void send_trigger(GtkWidget *widget)
 {
     (void)widget;
@@ -376,6 +387,9 @@ int init_control_gui(int argc, char *argv[])
     gtk_entry_set_width_chars(GTK_ENTRY(entry_gamma), -1);
     button_apply_gamma = gtk_button_new_with_label("Apply");
 
+    g_signal_connect(button_apply_gamma, "clicked", G_CALLBACK(gamma_correction),
+            NULL);
+
     /* --- row 11 --- */
     label_trig = gtk_label_new("Trigger Sensor:");
     check_button_trig_en = gtk_check_button_new_with_label("Enable");
@@ -383,7 +397,7 @@ int init_control_gui(int argc, char *argv[])
     g_signal_connect(button_trig, "clicked", G_CALLBACK(send_trigger), NULL);
 
     /* ---------------- Layout, don't change ---------------------------- */
-    // zero row: device info, hw, fw revision
+    // zero row: device info, fw revision
     int row = 0;
     int col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_device, col++, row, 1, 1);

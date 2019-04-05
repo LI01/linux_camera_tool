@@ -27,11 +27,11 @@
 #define LI_XU_SENSOR_GAIN_CONTROL_A (0x05)
 
 #define LI_XU_SENSOR_UUID_HWFW_REV (0x07)
-#define LI_XU_PTS_QUERY (0x08) // not suppoprted by all usb cameras
+#define LI_XU_PTS_QUERY (0x08) 
 #define LI_XU_SOFT_TRIGGER (0x09)
 #define LI_XU_TRIGGER_DELAY (0x0a)
 #define LI_XU_TRIGGER_MODE (0x0b)
-#define LI_XU_SENSOR_REGISTER_CONFIGURATION (0x0c) // not supported by all usb cameras
+#define LI_XU_SENSOR_REGISTER_CONFIGURATION (0x0c) 
 #define LI_XU_SENSOR_REG_RW (0x0e)
 #define LI_XU_ERASE_EEPROM (0x0f)
 #define LI_XU_GENERIC_I2C_RW (0x10)
@@ -45,7 +45,7 @@
 #define LI_XU_SENSOR_WINDOW_REPOSITION_SIZE (8)
 #define LI_XU_LED_MODES_SIZE (1)
 #define LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE (8)
-#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE (2)//////////////
+#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE (2)
 
 #define LI_XU_SENSOR_UUID_HWFW_REV_SIZE (49)
 #define LI_XU_PTS_QUERY_SIZE (4)

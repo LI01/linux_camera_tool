@@ -12,7 +12,7 @@
 *****************************************************************************/
 
 #pragma once
-
+#include <libudev.h>
 char* get_manufacturer_name(); 
 char* get_product();
 char *get_serial();

@@ -1,24 +1,18 @@
 #pragma once
 
-#include <pthread.h>
-#include <inttypes.h>
+//#include <pthread.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <limits.h>
-#include <ctype.h>
 #include <unistd.h>
-#include <stdarg.h>
-#include <sys/ioctl.h>
+#include <sys/ioctl.h> 
 #include <linux/videodev2.h>
 #include <linux/usb/video.h>
 #include <errno.h>
-#include <iconv.h>
 #include <linux/uvcvideo.h>
-#include <sys/stat.h>
-#include <sys/fcntl.h>
-#include <sys/mman.h>
+#include <sys/fcntl.h> /* for open() syscall */ 
+#include <sys/mman.h> /* for using mmap */
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 #define SIZE(a) (sizeof(a) / sizeof(*a))

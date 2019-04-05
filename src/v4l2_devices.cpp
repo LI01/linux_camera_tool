@@ -10,7 +10,7 @@
   Author: Danyu L
   Last edit: 2019/04
 *****************************************************************************/
-#include <libudev.h>
+
 #include "../includes/shortcuts.h"
 #include "v4l2_devices.h"
 
@@ -116,7 +116,7 @@ char* enum_v4l2_device(char *dev_name)
         //        serial);
 
         udev_device_unref(dev);
-        //TODO:delete this for other computer
+        //TODO:delete this for other computer?
         return dev_name;
     }
     /* Free the enumerator object */

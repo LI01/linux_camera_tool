@@ -237,6 +237,11 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = 4;
 }
 
+//only apply gamma curve for lower 8-bit data
+void apply_gamma(void *p, float gamma_val)
+{
+
+}
 // static __THREAD_TYPE capture_thread;
 
 // /*video buffer data mutex*/
@@ -269,6 +274,7 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	}
 	dev->fd = v4l2_dev;
 
+	/* mmap the variables for processes share */
 	save_bmp = (int *)mmap(NULL, sizeof *save_bmp, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	save_raw = (int *)mmap(NULL, sizeof *save_raw, PROT_READ | PROT_WRITE,
@@ -456,7 +462,7 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 {
 	struct buffer *buffers;
 
-	//request buffer
+	/* request buffer */
 	struct v4l2_requestbuffers bufrequest;
 	struct v4l2_buffer querybuffer;
 	CLEAR(bufrequest);
@@ -546,11 +552,12 @@ int streaming_loop(struct device *dev)
 {
 	cv::namedWindow("cam", CV_WINDOW_NORMAL);
 	image_count = 0;
+	//TODO: add a loop flag to exit
 	while (1)
 	{
 		get_a_frame(dev);
 	}
-
+	/* unmap all the variables after stream ends */
 	munmap(save_bmp, sizeof *save_bmp);
 	munmap(save_raw, sizeof *save_raw);
 	munmap(shift_flag, sizeof *shift_flag);
@@ -585,7 +592,7 @@ void get_a_frame(struct device *dev)
 			char buf_name[16];
 			snprintf(buf_name, sizeof(buf_name), "captures_%d.raw", image_count);
 			v4l2_core_save_data_to_file(buf_name,
-										dev->buffers->start, dev->imagesize);
+				dev->buffers->start, dev->imagesize);
 			image_count++;
 			set_save_raw_flag(0);
 		}
