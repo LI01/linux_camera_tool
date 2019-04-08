@@ -52,6 +52,7 @@ static int *save_bmp;   /* flag for saving bmp */
 static int *save_raw;   /* flag for saving raw */
 static int *bayer_flag; /* flag for choosing bayer pattern */
 static int *shift_flag; /* flag for shift raw data */
+static int *awb_flag; /* flag for enable/disable software awb*/
 float *gamma_val;
 
 static int image_count;
@@ -177,6 +178,14 @@ int set_shift(int *shift_flag)
 	return 2;
 }
 
+void awb_enable (int enable)
+{
+	if (enable == 1) *awb_flag = 1;
+
+	if (enable == 0) *awb_flag = 0;
+	
+}
+
 void add_gamma_val(float gamma_val_from_gui)
 {
 	*gamma_val = gamma_val_from_gui;
@@ -241,7 +250,7 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = 4;
 }
 
-//only apply gamma curve for lower 8-bit data
+/*only apply gamma curve for lower 8-bit data */
 void apply_gamma(const void *p, float *gamma_val, int height, int width)
 {
 	uint16_t *inptr = (uint16_t *)p;
@@ -262,6 +271,7 @@ void apply_gamma(const void *p, float *gamma_val, int height, int width)
 	}
 }
 
+/* apply white balance for the given mat*/
 static cv::Mat apply_white_balance(cv::Mat opencvImage)
 {
 
@@ -273,19 +283,23 @@ static cv::Mat apply_white_balance(cv::Mat opencvImage)
 	G = mean(splitChannelRGB[1])[0];
 	R = mean(splitChannelRGB[2])[0];
 
-	//gain for adjusting each color channel
+	/* gain for adjusting each color channel */
 	double KR, KG, KB;
 	KB = (R + G + B) / (3 * B);
 	KG = (R + G + B) / (3 * G);
 	KR = (R + G + B) / (3 * R);
 
+	/* adjust rgb channel values */
 	splitChannelRGB[0] = splitChannelRGB[0] * KB;
 	splitChannelRGB[1] = splitChannelRGB[1] * KG;
 	splitChannelRGB[2] = splitChannelRGB[2] * KR;
 
+	/* merge three RGB channels back together */
 	merge(splitChannelRGB, 3, opencvImage);
 	return opencvImage;
 }
+
+
 // static __THREAD_TYPE capture_thread;
 
 // /*video buffer data mutex*/
@@ -325,6 +339,8 @@ int open_v4l2_device(char *device_name, struct device *dev)
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	awb_flag = (int *)mmap(NULL, sizeof *awb_flag, PROT_READ | PROT_WRITE,
+							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
@@ -606,6 +622,7 @@ int streaming_loop(struct device *dev)
 	munmap(save_raw, sizeof *save_raw);
 	munmap(shift_flag, sizeof *shift_flag);
 	munmap(bayer_flag, sizeof *bayer_flag);
+	munmap(awb_flag, sizeof *awb_flag);
 	munmap(gamma_val, sizeof *gamma_val);
 }
 
@@ -690,7 +707,9 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
 		//apply_gamma(p, gamma_val, height, width);
-		img = apply_white_balance(img);
+		if (*(awb_flag) == 1) {
+			img = apply_white_balance(img);
+		}
 
 		if (*(save_bmp))
 		{

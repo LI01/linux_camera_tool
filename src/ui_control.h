@@ -6,7 +6,10 @@ void radio_bayerpattern(GtkWidget *widget, gpointer data);
 
 void hscale_exposure_up(GtkRange *widget);
 void hscale_gain_up(GtkRange *widget);
+
 void enable_ae(GtkToggleButton *toggle_button);
+void enable_awb(GtkToggleButton *toggle_button);
+void enable_ag(GtkToggleButton *toggle_button);
 
 void toggled_addr_length(GtkWidget* widget, gpointer data);
 int addr_width_for_rw(int address_width_flag);

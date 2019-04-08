@@ -7,6 +7,7 @@
 GtkWidget *label_device, *label_hw_rev, *label_fw_rev;
 GtkWidget *label_datatype, *vbox2, *radio01, *radio02, *radio03;
 GtkWidget *label_bayer, *vbox3, *radio_bg, *radio_gb, *radio_rg, *radio_gr;
+GtkWidget *check_button_auto_exposure,*check_button_awb,*check_button_auto_gain ;
 GtkWidget *label_exposure, *label_gain;
 GtkWidget *hscale_exposure, *hscale_gain;
 GtkWidget *label_i2c_addr, *entry_i2c_addr;
@@ -15,7 +16,6 @@ GtkWidget *label_reg_addr, *entry_reg_addr;
 GtkWidget *label_reg_val, *entry_reg_val;
 GtkWidget *button_read, *button_write;
 GtkWidget *check_button_just_sensor;
-GtkWidget *check_button_auto_exposure;
 GtkWidget *label_capture, *button_capture_bmp, *button_capture_raw;
 GtkWidget *label_gamma, *entry_gamma, *button_apply_gamma;
 GtkWidget *label_trig, *check_button_trig_en, *button_trig;
@@ -52,7 +52,7 @@ extern void video_capture_save_raw();
 
 
 extern void add_gamma_val(float gamma_val_from_gui);
-
+extern void awb_enable (int enable);
 extern void soft_trigger(int fd);
 extern void trigger_enable(int fd, int ena, int enb);
 
@@ -93,6 +93,29 @@ void hscale_gain_up(GtkRange *widget)
 
 /* callback for enabling/disabling auto exposure */
 void enable_ae(GtkToggleButton *toggle_button)
+{
+    if (gtk_toggle_button_get_active(toggle_button))
+        set_exposure_auto(v4l2_dev, 0);
+    else
+        set_exposure_auto(v4l2_dev, 1);
+}
+
+/* callback for enabling/disabling auto white balance */
+void enable_awb(GtkToggleButton *toggle_button)
+{
+    if (gtk_toggle_button_get_active(toggle_button)) {
+        g_print("awb enable\n");
+        awb_enable(1);
+    }
+    else 
+    {
+        g_print("awb disable\n");
+        awb_enable(0);
+    }
+}
+
+/* callback for enabling/disabling auto exposure */
+void enable_ag(GtkToggleButton *toggle_button)
 {
     if (gtk_toggle_button_get_active(toggle_button))
         set_exposure_auto(v4l2_dev, 0);
@@ -201,7 +224,8 @@ void capture_raw(GtkWidget *widget)
     (void)widget;
     video_capture_save_raw();
 }
-//TODO: callback for gamma correction
+
+
 void gamma_correction(GtkWidget)
 {
     float gamma = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_gamma)));
@@ -325,6 +349,19 @@ int init_control_gui(int argc, char *argv[])
     g_signal_connect(radio_gr, "toggled", G_CALLBACK(radio_bayerpattern),
                      (gpointer) "4");
 
+    /* --- row 3 --- */
+    check_button_auto_exposure = gtk_check_button_new_with_label("Enable auto exposure");
+    g_signal_connect(GTK_TOGGLE_BUTTON(check_button_auto_exposure), "toggled",
+                     G_CALLBACK(enable_ae), NULL);
+
+    check_button_awb = gtk_check_button_new_with_label("Enable auto white balance");
+    g_signal_connect(GTK_TOGGLE_BUTTON(check_button_awb), "toggled",
+                     G_CALLBACK(enable_awb), NULL);
+
+    check_button_auto_gain = gtk_check_button_new_with_label("Enable auto white balance");
+    g_signal_connect(GTK_TOGGLE_BUTTON(check_button_auto_gain), "toggled",
+                     G_CALLBACK(enable_ag), NULL);
+
     /* --- row 3 and row 4 --- */
     label_exposure = gtk_label_new("Exposure:");
     gtk_label_set_text(GTK_LABEL(label_exposure), "Exposure:");
@@ -362,14 +399,13 @@ int init_control_gui(int argc, char *argv[])
     radio2 = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio1)), "16 bit");
     gtk_box_pack_start(GTK_BOX(vbox), radio2, 0, 0, 0);
-    check_button_auto_exposure = gtk_check_button_new_with_label("Enable auto exposure");
+    // check_button_auto_exposure = gtk_check_button_new_with_label("Enable auto exposure");
 
     g_signal_connect(radio1, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "1");
     g_signal_connect(radio2, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "2");
-    g_signal_connect(GTK_TOGGLE_BUTTON(check_button_auto_exposure), "toggled",
-                     G_CALLBACK(enable_ae), NULL);
+
 
     /* --- row 7--- */
     label_reg_addr = gtk_label_new("Reg Addr:");
@@ -437,6 +473,13 @@ int init_control_gui(int argc, char *argv[])
     gtk_grid_attach(GTK_GRID(grid), label_bayer, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), vbox3, col++, row, 2, 1);
 
+
+    // third row: ae, awb, ag(not af...)
+    row++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), check_button_auto_exposure, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), check_button_awb, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), check_button_auto_gain, col++, row, 1, 1);
     // third row: exposure
     row++;
     col = 0;
@@ -461,7 +504,7 @@ int init_control_gui(int argc, char *argv[])
     col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_addr_width, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), vbox, col++, row, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), check_button_auto_exposure, col++, row, 1, 1);
+    //gtk_grid_attach(GTK_GRID(grid), check_button_auto_exposure, col++, row, 1, 1);
 
     // seventh row: reg addr
     row++;
