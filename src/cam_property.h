@@ -1,39 +1,32 @@
+/****************************************************************************
+  This sample is released as public domain.  It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  
+  This is the sample code for Leopard USB3.0 camera, mainly uses v4l2 system 
+  call to obtain camera information on: exposure, gain, pan, tilt, zoom etc.
+  Most bayer camera won't support PTZ control, some may have the ability of 
+  enable auto exposure some may not. Please check with Leopard for detailed
+  driver support.
+
+  Author: Danyu L
+  Last edit: 2019/04
+*****************************************************************************/
 #pragma once
 #define MIN_EXPOSURE 1
-#define MAX_EXPOSURE 65535
+#define MAX_EXPOSURE 4000
 
-/*
- * handle the error for camera control
- * args:
- * 		none
- * returns:
- * 		none
- */
+
 void error_handle_cam_ctrl();
 
-/*
- * helper function for camera control getter
- * args: 
- * 		int fd - put buffers in
- * 		control id
- */
 void uvc_get_control(int fd, unsigned int id);
-
-/*
- * helper function for camera control setter
- * args: 
- * 		int fd - put buffers in
- * 		control id
- * 		value - value you want to set into
- */
 void uvc_set_control(int fd, unsigned int id, int value);
 
 void set_frame_rate(int fd, int fps);
 int get_frame_rate(int fd);
 
-
-void set_auto_gain (int fd, int auto_gain);
-void get_auto_gain (int fd);
+void set_gain_auto (int fd, int auto_gain);
+void get_gain_auto (int fd);
 void set_gain(int fd, int analog_gain);
 void get_gain(int fd);
 void set_exposure_absolute(int fd, int exposure_absolute);

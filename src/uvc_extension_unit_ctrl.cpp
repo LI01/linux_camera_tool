@@ -18,7 +18,7 @@
 **                      	Global data 
 *****************************************************************************/
 struct uvc_xu_control_query xu_query;
-//struct device_info device_info1;
+
 // define the buffer for storage
 unsigned char buf1[LI_XU_SENSOR_MODES_SWITCH_SIZE] = {0}; 
 unsigned char buf2[LI_XU_SENSOR_WINDOW_REPOSITION_SIZE] = {0}; 
@@ -43,7 +43,7 @@ unsigned int m_gbGain = 0x1;
 unsigned int m_bGain = 0x1;
 
 extern int fw_rev;
- int hw_rev;
+int hw_rev;
  char uuid[64];
 
 /*****************************************************************************

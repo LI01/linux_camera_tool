@@ -46,7 +46,6 @@ struct buffer
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
-
 int v4l2_core_save_data_to_file(const char *filename, const void *data, int size);
 void set_save_raw_flag(int flag);
 void video_capture_save_raw();
@@ -65,6 +64,9 @@ void awb_enable (int enable);
 
 int open_v4l2_device(char *device_name, struct device *dev);
 int check_dev_cap(struct device *dev);
+
+void mmap_variables();
+void unmap_variables();
 
 void start_camera(struct device *dev);
 void stop_Camera(struct device *dev);

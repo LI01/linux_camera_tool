@@ -97,12 +97,12 @@ int get_frame_rate(int fd)
 }
 
 /*--------------------------------------------------------------------------- */
-void set_auto_gain (int fd, int auto_gain)
+void set_gain_auto (int fd, int auto_gain)
 {
     uvc_set_control(fd, V4L2_CID_AUTOGAIN, auto_gain);
 }
 
-void get_auto_gain (int fd)
+void get_gain_auto (int fd)
 {
     uvc_get_control(fd, V4L2_CID_AUTOGAIN);
 }

@@ -52,7 +52,7 @@ static int *save_bmp;   /* flag for saving bmp */
 static int *save_raw;   /* flag for saving raw */
 static int *bayer_flag; /* flag for choosing bayer pattern */
 static int *shift_flag; /* flag for shift raw data */
-static int *awb_flag; /* flag for enable/disable software awb*/
+static int *awb_flag;   /* flag for enable/disable software awb*/
 float *gamma_val;
 
 static int image_count;
@@ -178,12 +178,13 @@ int set_shift(int *shift_flag)
 	return 2;
 }
 
-void awb_enable (int enable)
+void awb_enable(int enable)
 {
-	if (enable == 1) *awb_flag = 1;
+	if (enable == 1)
+		*awb_flag = 1;
 
-	if (enable == 0) *awb_flag = 0;
-	
+	if (enable == 0)
+		*awb_flag = 0;
 }
 
 void add_gamma_val(float gamma_val_from_gui)
@@ -299,7 +300,6 @@ static cv::Mat apply_white_balance(cv::Mat opencvImage)
 	return opencvImage;
 }
 
-
 // static __THREAD_TYPE capture_thread;
 
 // /*video buffer data mutex*/
@@ -330,7 +330,14 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	}
 	dev->fd = v4l2_dev;
 
-	/* mmap the variables for processes share */
+	mmap_variables();
+
+	return v4l2_dev;
+}
+
+/* mmap the variables for processes share */
+void mmap_variables()
+{
 	save_bmp = (int *)mmap(NULL, sizeof *save_bmp, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	save_raw = (int *)mmap(NULL, sizeof *save_raw, PROT_READ | PROT_WRITE,
@@ -340,11 +347,9 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	awb_flag = (int *)mmap(NULL, sizeof *awb_flag, PROT_READ | PROT_WRITE,
-							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	return v4l2_dev;
 }
 
 /* 
@@ -610,14 +615,21 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 */
 int streaming_loop(struct device *dev)
 {
-	cv::namedWindow("cam", CV_WINDOW_NORMAL);
+	cv::namedWindow("cam", CV_WINDOW_FREERATIO);
 	image_count = 0;
 	//TODO: add a loop flag to exit
 	while (1)
 	{
 		get_a_frame(dev);
 	}
-	/* unmap all the variables after stream ends */
+	unmap_variables();
+
+}
+
+/* unmap all the variables after stream ends */
+void unmap_variables()
+{
+	
 	munmap(save_bmp, sizeof *save_bmp);
 	munmap(save_raw, sizeof *save_raw);
 	munmap(shift_flag, sizeof *shift_flag);
@@ -625,7 +637,6 @@ int streaming_loop(struct device *dev)
 	munmap(awb_flag, sizeof *awb_flag);
 	munmap(gamma_val, sizeof *gamma_val);
 }
-
 /* 
  * Typically start two loops:
  * 1. runs for as long as you want to
@@ -642,12 +653,14 @@ void get_a_frame(struct device *dev)
 	{
 
 		queuebuffer.index = i;
-		// The buffer's waiting in the outgoing queue.
+		/* The buffer's waiting in the outgoing queue. */
 		if (ioctl(dev->fd, VIDIOC_DQBUF, &queuebuffer) < 0)
 		{
 			perror("VIDIOC_DQBUF");
 			return;
 		}
+
+		/* check the capture raw image flag, do this before decode a frame */
 		if (*(save_raw))
 		{
 			printf("save a raw\n");
@@ -658,6 +671,7 @@ void get_a_frame(struct device *dev)
 			image_count++;
 			set_save_raw_flag(0);
 		}
+
 		decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
 
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
@@ -707,10 +721,14 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
 		//apply_gamma(p, gamma_val, height, width);
-		if (*(awb_flag) == 1) {
+
+		/* check awb flag, awb functionality, only available for bayer camera */
+		if (*(awb_flag) == 1)
+		{
 			img = apply_white_balance(img);
 		}
 
+		/* check for save capture bmp flag, after decode the image */
 		if (*(save_bmp))
 		{
 			printf("save a bmp\n");
@@ -729,6 +747,8 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		cv::Mat img(height, width, CV_8UC2, (void *)p);
 		//apply_gamma(p, gamma_val, height, width);
 		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
+		
+		/* check for save capture bmp flag, after decode the image */
 		if (*(save_bmp))
 		{
 			printf("save a bmp\n");

@@ -7,10 +7,10 @@
 #include "../src/cam_property.h"
 #include "../src/v4l2_devices.h"
 
-int v4l2_dev;
-int fw_rev;
+int v4l2_dev; /* global variable, file descriptor for camera device */
+int fw_rev; /* global variable, firmware revision for the camera */
 
-// for testing
+/* main function */
 int main(int argc, char ** argv)
 {
 	struct device dev;
@@ -24,18 +24,16 @@ int main(int argc, char ** argv)
 		return 0;
 	}
 
+	/* try to get all the static camera info before fork */
 	fw_rev = read_cam_uuid_hwfw_rev(v4l2_dev);
-
 	check_dev_cap(&dev);
 	video_get_format(&dev);
 	video_alloc_buffers(&dev, 1);
 	
-	sensor_reg_read(v4l2_dev, 0x55d7);
+	//sensor_reg_read(v4l2_dev, 0x55d7);
 	//generic_I2C_read(v4l2_dev, 0x02, 8, 0x20, 0x0210);
-	
-	//set_sensor_gain_rgb(v4l2_dev, 0x555, 0x0, 0x0, 0x0);
-	
-	//run a v4l2-ctl --list-formats-ext to see the resolution
+
+	/* run a v4l2-ctl --list-formats-ext to see the resolution */
 	//video_set_format(v4l2_dev, 3840, 2050, V4L2_PIX_FMT_YUYV);
 
 
@@ -43,25 +41,19 @@ int main(int argc, char ** argv)
 	start_camera(&dev);
 	pid_t pid;
 	pid = fork();
-	if (pid == 0) {
+	if (pid == 0) {				/* child process */
 		init_control_gui(argc, argv);
-	} else if (pid > 0) {
-		
+	} else if (pid > 0) { 		/* parent process */
 		streaming_loop(&dev);
-
 		/* Deactivate streaming */
 		stop_Camera(&dev);
 		video_free_buffers(&dev);
-		
-		
 	} else {
 		fprintf(stderr, "ERROR:fork() failed\n");
 	}
 	
-	
 
-
-//test
+/* individual camera tests, detail info is in uvc_extension_unit_ctrl.h */
 #ifdef AP0202_WRITE_REG_ON_THE_FLY
 	unsigned int i;
 	for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)

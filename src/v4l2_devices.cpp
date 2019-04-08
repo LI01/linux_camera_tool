@@ -66,11 +66,13 @@ char* enum_v4l2_device(char *dev_name)
         path = udev_list_entry_get_name(dev_list_entry);
         dev = udev_device_new_from_syspath(udev, path);
         char dev_name_tmp[64];
+        
         /* usb_device_get_devnode() returns the path to the device node
 		   itself in /dev. */
         printf("Device Node Path: %s\n", udev_device_get_devnode(dev));
         strcpy(dev_name_tmp, udev_device_get_devnode(dev));
         printf("%s\n", dev_name_tmp);
+
         /* The device pointed to by dev contains information about
 		   the hidraw device. In order to get information about the
 		   USB device, get the parent device with the
