@@ -50,6 +50,9 @@ extern int generic_I2C_read(int fd, int rw_flag, int bufCnt,
 extern void video_capture_save_bmp();
 extern void video_capture_save_raw();
 
+
+extern void add_gamma_val(float gamma_val_from_gui);
+
 extern void soft_trigger(int fd);
 extern void trigger_enable(int fd, int ena, int enb);
 
@@ -202,10 +205,29 @@ void capture_raw(GtkWidget *widget)
 void gamma_correction(GtkWidget)
 {
     float gamma = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_gamma)));
+    add_gamma_val(gamma);
     g_print("gamma = %f\n", gamma);
 }
+
 /* callback for triggering sensor functionality */
 void send_trigger(GtkWidget *widget)
+{
+    (void)widget;
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_trig_en)))
+    {
+        g_print("trigger enabled\n");
+        soft_trigger(v4l2_dev);
+        g_print("send one trigger\n");
+    }
+    else
+    {
+
+        g_print("trigger disabled\n");
+    }
+}
+
+/* callback for enabling/disablign sensor trigger */
+void enable_trig(GtkWidget *widget)
 {
     (void)widget;
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_trig_en)))
@@ -214,15 +236,13 @@ void send_trigger(GtkWidget *widget)
         trigger_enable(v4l2_dev, 1, 1);
         // /* negative edge */
         // trigger_enable(v4l2_dev, 1, 0);
-        g_print("trigger enabled\n");
-        soft_trigger(v4l2_dev);
-        g_print("send one trigger\n");
+
     }
-    else
-    {
+    else 
+    {        
         /* disable trigger */
         trigger_enable(v4l2_dev, 0, 0);
-        g_print("trigger disabled\n");
+
     }
 }
 
@@ -394,6 +414,8 @@ int init_control_gui(int argc, char *argv[])
     label_trig = gtk_label_new("Trigger Sensor:");
     check_button_trig_en = gtk_check_button_new_with_label("Enable");
     button_trig = gtk_button_new_with_label("Shot 1 trigger");
+    g_signal_connect(GTK_TOGGLE_BUTTON(check_button_trig_en), "toggled",
+             G_CALLBACK(enable_trig), NULL);
     g_signal_connect(button_trig, "clicked", G_CALLBACK(send_trigger), NULL);
 
     /* ---------------- Layout, don't change ---------------------------- */

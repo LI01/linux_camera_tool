@@ -48,10 +48,11 @@
  * Since we use fork, variables btw two processes are not shared
  * use mmap for all the variables you need to share between gui and videostreaming
  */
-static int *save_bmp; 	/* flag for saving bmp */
-static int *save_raw; 	/* flag for saving raw */
+static int *save_bmp;   /* flag for saving bmp */
+static int *save_raw;   /* flag for saving raw */
 static int *bayer_flag; /* flag for choosing bayer pattern */
 static int *shift_flag; /* flag for shift raw data */
+float *gamma_val;
 
 static int image_count;
 
@@ -78,7 +79,6 @@ void set_save_bmp_flag(int flag)
 {
 	*save_bmp = flag;
 }
-
 
 /*
  * save data to bitmap using opencv
@@ -176,6 +176,11 @@ int set_shift(int *shift_flag)
 		return 0;
 	return 2;
 }
+
+void add_gamma_val(float gamma_val_from_gui)
+{
+	*gamma_val = gamma_val_from_gui;
+}
 /*
  * callback for change sensor datatype shift flag
  * args:
@@ -192,7 +197,6 @@ void change_datatype(void *datatype)
 	if (strcmp((char *)datatype, "3") == 0)
 		*shift_flag = 3;
 }
-
 
 /*
  * determine the sensor bayer pattern to correctly debayer the image
@@ -238,17 +242,55 @@ void change_bayerpattern(void *bayer)
 }
 
 //only apply gamma curve for lower 8-bit data
-void apply_gamma(void *p, float gamma_val)
+void apply_gamma(const void *p, float *gamma_val, int height, int width)
+{
+	uint16_t *inptr = (uint16_t *)p;
+	uint8_t tmp_low, tmp_high;
+	float illuminance_gamma, illuminance_tmp;
+#pragma omp for
+	for (int i = 0; i < height; i++)
+	{
+		for (int j = 0; j < width; j++)
+		{
+			tmp_low = inptr[i * width + j] & 0xff;
+			tmp_high = (inptr[i * width + j] >> 8) & 0xff;
+			illuminance_tmp = (float)tmp_low / 256;
+			illuminance_gamma = 256 * pow(illuminance_tmp, *gamma_val);
+			tmp_low = (uint8_t)illuminance_gamma;
+			inptr[i * width + j] = ((tmp_high << 8) | tmp_low);
+		}
+	}
+}
+
+static cv::Mat apply_white_balance(cv::Mat opencvImage)
 {
 
+	cv::Mat splitChannelRGB[3];
+	split(opencvImage, splitChannelRGB);
+
+	double R, G, B;
+	B = mean(splitChannelRGB[0])[0];
+	G = mean(splitChannelRGB[1])[0];
+	R = mean(splitChannelRGB[2])[0];
+
+	//gain for adjusting each color channel
+	double KR, KG, KB;
+	KB = (R + G + B) / (3 * B);
+	KG = (R + G + B) / (3 * G);
+	KR = (R + G + B) / (3 * R);
+
+	splitChannelRGB[0] = splitChannelRGB[0] * KB;
+	splitChannelRGB[1] = splitChannelRGB[1] * KG;
+	splitChannelRGB[2] = splitChannelRGB[2] * KR;
+
+	merge(splitChannelRGB, 3, opencvImage);
+	return opencvImage;
 }
 // static __THREAD_TYPE capture_thread;
 
 // /*video buffer data mutex*/
 // static __MUTEX_TYPE mutex = __STATIC_MUTEX_INIT;
 // #define __PMUTEX &mutex
-
-
 
 /* 
  * open the /dev/video* uvc camera device
@@ -283,6 +325,8 @@ int open_v4l2_device(char *device_name, struct device *dev)
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
+							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	return v4l2_dev;
 }
@@ -562,6 +606,7 @@ int streaming_loop(struct device *dev)
 	munmap(save_raw, sizeof *save_raw);
 	munmap(shift_flag, sizeof *shift_flag);
 	munmap(bayer_flag, sizeof *bayer_flag);
+	munmap(gamma_val, sizeof *gamma_val);
 }
 
 /* 
@@ -592,7 +637,7 @@ void get_a_frame(struct device *dev)
 			char buf_name[16];
 			snprintf(buf_name, sizeof(buf_name), "captures_%d.raw", image_count);
 			v4l2_core_save_data_to_file(buf_name,
-				dev->buffers->start, dev->imagesize);
+										dev->buffers->start, dev->imagesize);
 			image_count++;
 			set_save_raw_flag(0);
 		}
@@ -606,7 +651,6 @@ void get_a_frame(struct device *dev)
 	}
 	return;
 }
-
 
 /* 
  * opencv only support debayering 8 and 16 bits 
@@ -630,21 +674,23 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	/* --- for bayer camera ---*/
 	if (shift != 0)
 	{
-	 	/* shift bits for 16-bit stream and get lower 8-bit for opencv 
+/* shift bits for 16-bit stream and get lower 8-bit for opencv 
 	 	 * debayering */
-		/* use openmp loop parallelism to accelate shifting */
-		#pragma omp for
+/* use openmp loop parallelism to accelate shifting */
+#pragma omp for
 		for (int i = 0; i < height; i++)
 		{
 			for (int j = 0; j < width; j++)
 			{
-				tmp = *(srcShort++) >> shift; 
+				tmp = *(srcShort++) >> shift;
 				*(dst++) = (unsigned char)tmp;
 			}
 		}
 
-		cv::Mat img(height, width, 0, (void *)p);
+		cv::Mat img(height, width, CV_8UC1, (void *)p);
 		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		//apply_gamma(p, gamma_val, height, width);
+		img = apply_white_balance(img);
 
 		if (*(save_bmp))
 		{
@@ -660,7 +706,9 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	/* --- for yuv camera ---*/
 	else
 	{
+
 		cv::Mat img(height, width, CV_8UC2, (void *)p);
+		//apply_gamma(p, gamma_val, height, width);
 		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
 		if (*(save_bmp))
 		{

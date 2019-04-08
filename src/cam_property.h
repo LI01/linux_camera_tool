@@ -1,6 +1,6 @@
 #pragma once
 #define MIN_EXPOSURE 1
-#define MAX_EXPOSURE 4000
+#define MAX_EXPOSURE 65535
 
 /*
  * handle the error for camera control

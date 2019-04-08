@@ -60,6 +60,8 @@ int set_shift(int *shift_flag);
 void change_bayerpattern(void *bayer); 
 int add_bayer_forcv(int *bayer_flag);
 
+void add_gamma_val(float gamma_val_from_gui);
+
 int open_v4l2_device(char *device_name, struct device *dev);
 int check_dev_cap(struct device *dev);
 

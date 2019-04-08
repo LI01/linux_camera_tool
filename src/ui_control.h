@@ -18,5 +18,5 @@ void capture_bmp(GtkWidget *widget);
 void capture_raw(GtkWidget *widget);
 
 void send_trigger(GtkWidget *widget);
-
+void enable_trig(GtkWidget *widget);
 int init_control_gui(int argc, char* argv[]);
