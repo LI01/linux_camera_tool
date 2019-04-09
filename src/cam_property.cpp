@@ -1,3 +1,17 @@
+/****************************************************************************
+  This sample is released as public domain.  It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  
+  This is the sample code for Leopard USB3.0 camera, mainly uses v4l2 system 
+  call to obtain camera information on: exposure, gain, pan, tilt, zoom etc.
+  Most bayer camera won't support PTZ control, some may have the ability of 
+  enable auto exposure some may not. Please check with Leopard for detailed
+  driver support.
+
+  Author: Danyu L
+  Last edit: 2019/04
+*****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "cam_property.h"
 /*
@@ -83,18 +97,22 @@ void set_frame_rate(int fd, int fps)
     param.parm.capture.timeperframe.denominator = fps;
     if(ioctl(fd, VIDIOC_S_PARM, &param) < 0)
         error_handle_cam_ctrl();
-    printf("Set frame rate to %d", fps);
+    printf("Set frame rate = %d\n", fps);
 }
 
 int get_frame_rate(int fd)
 {
     struct v4l2_streamparm param;
     CLEAR(param);
+    param.type =  (v4l2_buf_type) V4L2_CAP_VIDEO_CAPTURE;
     if(ioctl(fd, VIDIOC_G_PARM, &param) < 0)
         error_handle_cam_ctrl();
-    printf("Set frame rate to %d", param.parm.capture.timeperframe.denominator);
-    return param.parm.capture.timeperframe.denominator;
+    printf("Get frame rate = %d\n", param.parm.capture.timeperframe.denominator);
+    //printf("Get frame rate num= %d\n", param.parm.capture.timeperframe.numerator);
+    //return param.parm.capture.timeperframe.denominator;
+    return 0;
 }
+
 
 /*--------------------------------------------------------------------------- */
 void set_gain_auto (int fd, int auto_gain)

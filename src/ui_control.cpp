@@ -1,3 +1,16 @@
+/****************************************************************************
+  This sample is released as public domain.  It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  
+  This is the sample code for Leopard USB3.0 camera, mainly for the camera tool
+  control GUI using Gtk3. Gtk3 asnd Gtk2 don't live together paceful. If you 
+  have problem running Gtk3 with your current compiled openCV, please refer to
+  README.md guide to rebuild your opencv for supporting Gtk3.
+  
+  Author: Danyu L
+  Last edit: 2019/04
+*****************************************************************************/
 #include <gdk/gdkkeysyms.h>
 #include "../includes/shortcuts.h"
 #include "ui_control.h"

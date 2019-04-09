@@ -500,7 +500,7 @@ void video_get_format(struct device *dev)
 	dev->bytesperline = fmt.fmt.pix.bytesperline;
 	dev->imagesize = fmt.fmt.pix.bytesperline ? fmt.fmt.pix.sizeimage : 0;
 
-	printf("Get Video format: %c%c%c%c (%08x) %ux%u\nbyte per line:%d\nsize image:%ud\n",
+	printf("Get Current Video Format: %c%c%c%c (%08x) %ux%u\nbyte per line:%d\nsize image:%ud\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 8) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 16) & 0xff,
@@ -629,7 +629,6 @@ int streaming_loop(struct device *dev)
 /* unmap all the variables after stream ends */
 void unmap_variables()
 {
-	
 	munmap(save_bmp, sizeof *save_bmp);
 	munmap(save_raw, sizeof *save_raw);
 	munmap(shift_flag, sizeof *shift_flag);
@@ -637,6 +636,7 @@ void unmap_variables()
 	munmap(awb_flag, sizeof *awb_flag);
 	munmap(gamma_val, sizeof *gamma_val);
 }
+
 /* 
  * Typically start two loops:
  * 1. runs for as long as you want to
@@ -767,6 +767,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		exit(0);
 	}
 }
+
 /*
  * free, unmap buffers
  * 

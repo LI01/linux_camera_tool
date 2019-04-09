@@ -266,7 +266,7 @@ int read_cam_uuid_hwfw_rev(int fd)
 {
     CLEAR(buf7);
 	
-    char uuidBuf[45];
+    char uuidBuf[80];
     read_from_UVC_extension(fd, LI_XU_SENSOR_UUID_HWFW_REV,
         LI_XU_SENSOR_UUID_HWFW_REV_SIZE, buf7);
     hw_rev = buf7[0] | (buf7[1] << 8);

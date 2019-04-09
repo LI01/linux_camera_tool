@@ -24,6 +24,13 @@ int main(int argc, char ** argv)
 		return 0;
 	}
 
+	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'");
+	/* run a v4l2-ctl --list-formats-ext to see the resolution */
+	//video_set_format(&dev, 1344, 972, V4L2_PIX_FMT_YUYV);
+	//set_frame_rate(v4l2_dev, 15);
+	
+	get_frame_rate(v4l2_dev);
+	
 	/* try to get all the static camera info before fork */
 	fw_rev = read_cam_uuid_hwfw_rev(v4l2_dev);
 	check_dev_cap(&dev);
@@ -33,8 +40,7 @@ int main(int argc, char ** argv)
 	//sensor_reg_read(v4l2_dev, 0x55d7);
 	//generic_I2C_read(v4l2_dev, 0x02, 8, 0x20, 0x0210);
 
-	/* run a v4l2-ctl --list-formats-ext to see the resolution */
-	//video_set_format(v4l2_dev, 3840, 2050, V4L2_PIX_FMT_YUYV);
+	
 
 
 	/* Activate streaming */

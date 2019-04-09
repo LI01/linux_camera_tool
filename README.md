@@ -31,7 +31,7 @@ in order to disable Gtk2 from OpenCV.
 rm -rf build/
 mkdir build && cd build/
 cmake -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local -D WITH_TBB=ON -D BUILD_NEW_PYTHON_EXAMPLES=ON -D BUILD_EXAMPLES=ON -D WITH_QT=ON -D WITH_OPENGL=ON -D WITH_GTK=ON -D WITH_GTK3=ON -D WITH_GTK_2_X=OFF ..
-make -j6            #do a lscpu to see how many cores for CPU
+make -j6            #do a $lscpu to see how many cores for CPU
 sudo make install -j6
 
 #link opencv
@@ -52,6 +52,16 @@ make
 ### Exit Camera Tool
 Use __ESC__ on both of the gui.
 
+### Kill Camera Tool Windows Left Over
+If you forget to exit both windows and tried to run the camera tool again, it will give you the error of 
+```sh
+VIDIOC_DQBUF: Invalid argument
+```
+Please check your available processes and kill leopard_cam, then restart the camera tool application
+```sh
+ps
+killall -9 leopard_cam
+```
 
 ## Test Platform
 - __4.18.0-17-generic #18~18.04.1-Ubuntu SMP__ 
