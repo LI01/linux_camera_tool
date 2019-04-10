@@ -35,6 +35,9 @@
 #define _1MS    1
 #define _ESC_KEY 27
 
+#define V4L_BUFFERS_DEFAULT	1
+#define V4L_BUFFERS_MAX	32
+
 struct device
 {
     int fd;

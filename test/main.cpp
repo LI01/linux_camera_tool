@@ -1,6 +1,6 @@
 
 #include "../includes/shortcuts.h"
-
+#include <getopt.h>
 #include "../src/uvc_extension_unit_ctrl.h"
 #include "../src/extend_cam_ctrl.h"
 #include "../src/ui_control.h"
@@ -8,13 +8,35 @@
 #include "../src/v4l2_devices.h"
 
 int v4l2_dev; /* global variable, file descriptor for camera device */
-int fw_rev; /* global variable, firmware revision for the camera */
+int fw_rev;   /* global variable, firmware revision for the camera */
+struct v4l2_fract time_per_frame = {1, 15};
+static struct option opts[] = {
 
+	{"nbufs", 1, 0, 'n'},
+	{"size", 1, 0, 's'},
+	{"time-per-frame", 1, 0, 't'},
+	{0, 0, 0, 0}};
+
+static void usage( const char *argv0)
+{
+	printf("Usage: %s [options]\n", argv0);
+	printf("Supported options:\n");
+	printf("-n, --nbufs n			Set the number of video buffers\n");
+	printf("-s, --size WxH			Set the frame size\n");
+	printf("-t, --time-per-frame	Set the time per frame (eg. 25 = 25 fps)\n");
+}
 /* main function */
-int main(int argc, char ** argv)
+int main(int argc, char **argv)
 {
 	struct device dev;
 	char dev_name[64] = "/dev/video0";
+
+	int do_set_format = 0;
+	int do_set_time_per_frame = 0;
+	char *endptr;
+	dev.nbufs = V4L_BUFFERS_DEFAULT;
+	int c;
+
 	char *ret_dev_name = enum_v4l2_device(dev_name);
 	v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
 
@@ -24,40 +46,100 @@ int main(int argc, char ** argv)
 		return 0;
 	}
 
-	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'");
-	/* run a v4l2-ctl --list-formats-ext to see the resolution */
+	/* list all the resolutions */
+	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\
+		sed 's/Size/Resolution/g'");
+
+
+	while ((c = getopt_long(argc, argv, "n:s:t:", opts, NULL)) != -1)
+	{
+		switch (c)
+		{
+		case 'n':
+			dev.nbufs = atoi(optarg);
+			if (dev.nbufs > V4L_BUFFERS_MAX)
+				dev.nbufs = V4L_BUFFERS_MAX;
+			printf("device nbuf %d\n", dev.nbufs);
+			break;
+		case 's':
+			do_set_format = 1;
+			dev.width = strtol(optarg, &endptr, 10);
+			if (*endptr != 'x' || endptr == optarg)
+			{
+				printf("Invalid size '%s'\n", optarg);
+				return 1;
+			}
+			dev.height = strtol(endptr + 1, &endptr, 10);
+			if (*endptr != 0)
+			{
+				printf("Invalid size '%s'\n", optarg);
+				return 1;
+			}
+			break;
+		case 't':
+			do_set_time_per_frame = 1;
+			time_per_frame.denominator = atoi(optarg);
+			break;
+		default:
+			printf("Invalid option -%c\n", c);
+			printf("Run %s -h for help.\n", argv[0]);
+			return 1;
+		}
+	}
+
+	if (optind >= argc) {
+		usage(argv[0]);
+	}
+	/* Set the video format. */
+	if (do_set_format)
+	{
+		video_set_format(&dev, dev.width, dev.height, V4L2_PIX_FMT_YUYV);
+	}
+	/* Set the frame rate. */
+	if (do_set_time_per_frame)
+	{
+		set_frame_rate(v4l2_dev, time_per_frame.denominator);
+	}
+
+
+	/* 
+	 * run a v4l2-ctl --list-formats-ext 
+	 * to see the resolution and available frame rate 
+	 */
 	//video_set_format(&dev, 1344, 972, V4L2_PIX_FMT_YUYV);
-	//set_frame_rate(v4l2_dev, 15);
-	
+	//set_frame_rate(v4l2_dev, 5);
+
+	/* list the current frame rate */
 	get_frame_rate(v4l2_dev);
-	
+
 	/* try to get all the static camera info before fork */
 	fw_rev = read_cam_uuid_hwfw_rev(v4l2_dev);
 	check_dev_cap(&dev);
 	video_get_format(&dev);
-	video_alloc_buffers(&dev, 1);
-	
+	video_alloc_buffers(&dev, dev.nbufs);
+
 	//sensor_reg_read(v4l2_dev, 0x55d7);
 	//generic_I2C_read(v4l2_dev, 0x02, 8, 0x20, 0x0210);
-
-	
-
 
 	/* Activate streaming */
 	start_camera(&dev);
 	pid_t pid;
 	pid = fork();
-	if (pid == 0) {				/* child process */
+	if (pid == 0)
+	{ /* child process */
 		init_control_gui(argc, argv);
-	} else if (pid > 0) { 		/* parent process */
+	}
+	else if (pid > 0)
+	{ /* parent process */
 		streaming_loop(&dev);
 		/* Deactivate streaming */
 		stop_Camera(&dev);
 		video_free_buffers(&dev);
-	} else {
+	}
+	else
+	{
 		fprintf(stderr, "ERROR:fork() failed\n");
 	}
-	
 
 /* individual camera tests, detail info is in uvc_extension_unit_ctrl.h */
 #ifdef AP0202_WRITE_REG_ON_THE_FLY
@@ -69,8 +151,8 @@ int main(int argc, char ** argv)
 
 	for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)
 	{
-		generic_I2C_read(v4l2_dev, 0x02, ChangConfig[i].reg_data_width,
-						 AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
+		generic_I2C_read(v4l2_dev, 0x02, ChangConfig[i].reg_data_width
+			 AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
 	}
 
 	generic_I2C_read(v4l2_dev, 0x02, 1, MAX9295_SER_I2C_ADDR, 0x0000);
@@ -118,9 +200,7 @@ int main(int argc, char ** argv)
 	set_gain(v4l2_dev, 5);
 	get_gain(v4l2_dev);
 #endif
-	
-	
+
 	close(v4l2_dev);
 	return 0;
 }
-

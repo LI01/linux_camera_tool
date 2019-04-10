@@ -262,8 +262,8 @@ void apply_gamma(const void *p, float *gamma_val, int height, int width)
 	{
 		for (int j = 0; j < width; j++)
 		{
-			tmp_low = inptr[i * width + j] & 0xff;
-			tmp_high = (inptr[i * width + j] >> 8) & 0xff;
+			tmp_low = CLIP (inptr[i * width + j]) ;
+			tmp_high = CLIP(inptr[i * width + j] >> 8);
 			illuminance_tmp = (float)tmp_low / 256;
 			illuminance_gamma = 256 * pow(illuminance_tmp, *gamma_val);
 			tmp_low = (uint8_t)illuminance_gamma;
@@ -564,6 +564,8 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 			printf("Unable to query buffer %u (%d).\n", i, errno);
 			return ret;
 		}
+		printf("length: %u offset: %u\n", querybuffer.length, 
+				querybuffer.m.offset);
 
 		buffers[i].length = querybuffer.length; /* remember for munmap() */
 
@@ -595,7 +597,6 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 		}
 	}
 	dev->buffers = buffers;
-
 	return 0;
 }
 
