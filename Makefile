@@ -1,15 +1,9 @@
+# tool macros
 CROSS_COMPILE ?=
-
-CPP            := $(CROSS_COMPILE)g++
-CFLAGS	?= -O2 -W -Wall `pkg-config --cflags opencv gtk+-3.0` 
-#CPPFLAGS := -g -Wall -Wextra $(LIB_PATH) $(INC_PATH)
-CPPFLAGS := -g -Wall -Wextra `pkg-config --cflags opencv gtk+-3.0` 
-
-# OpenCV trunk
-# LIB_PATH = -L/home/danyu/libs/opencv-trunk/release/installed/libs \
-# 			-Wl, -rpath=/home/danyu/libs/opencv-trunk/release/installed/libs 
-
-# INC_PATH = -I/home/danyu/libs/opencv-trunk/release/installed/include
+CPP      	:= $(CROSS_COMPILE)g++
+DBGFLAGS 	:= -g
+CPPFLAGS 	:= -Wall -Wextra `pkg-config --cflags opencv gtk+-3.0` 
+CPPOBJFLAGS	:= $(CPPFLAGS) -c 
 
 LDLIBS = $(shell pkg-config --libs gtk+-3.0)
 LDLIBCV = $(shell pkg-config --libs opencv)
@@ -21,26 +15,28 @@ LDFLAGS	+= \
 		$(LDLIBS) \
 		$(LDLIBCV)
 
+# path marcros
+SRC_PATH := src
+
 APP := leopard_cam
 
 SRCS := \
 	test/main.cpp \
-	src/uvc_extension_unit_ctrl.cpp \
-	src/extend_cam_ctrl.cpp \
-	src/ui_control.cpp \
-	src/v4l2_devices.cpp \
-	src/cam_property.cpp
-	
+	$(foreach x, $(SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
 
 OBJS := $(SRCS:.cpp=.o)
 
 all: $(APP)
 
-%.o: %.cpp
-	$(CPP) $(CPPFLAGS) -c -o $@ $< -fopenmp
+# dependencies
+%.o: %.c*
+	@echo -e "\t" $(CPP) $(CPPOBJFLAGS) $< -o $@
+	$(CPP) $(CPPOBJFLAGS) $(DBGFLAG) -o $@ $< -fopenmp
+
 
 $(APP): $(OBJS)
 	$(CPP) -o $@ $(OBJS) $(CPPFLAGS) $(LDFLAGS)
+
 clean:
 	-rm -f *.o $(OBJS)
 	-rm -f $(APP)

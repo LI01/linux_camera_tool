@@ -251,27 +251,19 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = 4;
 }
 
-/*only apply gamma curve for lower 8-bit data */
-void apply_gamma(const void *p, float *gamma_val, int height, int width)
+/* apply gamma correction for the given mat*/
+static cv::Mat apply_gamma_correction(cv::Mat opencvImage)
 {
-	uint16_t *inptr = (uint16_t *)p;
-	uint8_t tmp_low, tmp_high;
-	float illuminance_gamma, illuminance_tmp;
-#pragma omp for
-	for (int i = 0; i < height; i++)
+	cv::Mat look_up_table(1, 256, CV_8U);
+	uchar *p = look_up_table.ptr();
+	for(int i=0; i < 256; i++)
 	{
-		for (int j = 0; j < width; j++)
-		{
-			tmp_low = CLIP (inptr[i * width + j]) ;
-			tmp_high = CLIP(inptr[i * width + j] >> 8);
-			illuminance_tmp = (float)tmp_low / 256;
-			illuminance_gamma = 256 * pow(illuminance_tmp, *gamma_val);
-			tmp_low = (uint8_t)illuminance_gamma;
-			inptr[i * width + j] = ((tmp_high << 8) | tmp_low);
-		}
+		 p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, *gamma_val) * 255.0);
 	}
-}
+	LUT(opencvImage, look_up_table, opencvImage);
+	return opencvImage;
 
+}
 /* apply white balance for the given mat*/
 static cv::Mat apply_white_balance(cv::Mat opencvImage)
 {
@@ -331,7 +323,7 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	dev->fd = v4l2_dev;
 
 	mmap_variables();
-
+	*gamma_val = 1.0;
 	return v4l2_dev;
 }
 
@@ -721,8 +713,10 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		//flip(img, img, 0); //mirror vertically
+		//flip(img, img, 1); //mirror horizontally
 		//apply_gamma(p, gamma_val, height, width);
-
+		img = apply_gamma_correction(img);
 		/* check awb flag, awb functionality, only available for bayer camera */
 		if (*(awb_flag) == 1)
 		{
@@ -737,8 +731,12 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 			image_count++;
 			set_save_bmp_flag(0);
 		}
-
-		cv::resizeWindow("cam", 640, 480);
+		//if image larger than 720p by any dimension, reszie the window
+		if (width >= 1280 || height >= 720) 
+		{
+			cv::resizeWindow("cam", 1280, 720);
+		}
+		
 		cv::imshow("cam", img);
 	}
 	/* --- for yuv camera ---*/
@@ -817,3 +815,4 @@ int video_free_buffers(struct device *dev)
 
 	return 0;
 }
+

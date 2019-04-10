@@ -85,6 +85,11 @@
 #define TI954_DESER_I2C_ADDR (0x30)
 
 
+#define RAW_8_MODE					(0x1000)
+#define RAW_10_MODE					(0x2000)
+#define RAW_12_MODE					(0x3000)
+#define YUY2_MODE					(0x4000)
+
 
 
 typedef struct reg_pair

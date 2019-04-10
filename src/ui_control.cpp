@@ -7,7 +7,7 @@
   control GUI using Gtk3. Gtk3 asnd Gtk2 don't live together paceful. If you 
   have problem running Gtk3 with your current compiled openCV, please refer to
   README.md guide to rebuild your opencv for supporting Gtk3.
-  
+
   Author: Danyu L
   Last edit: 2019/04
 *****************************************************************************/
@@ -66,7 +66,7 @@ extern void video_capture_save_raw();
 
 
 extern void add_gamma_val(float gamma_val_from_gui);
-extern void awb_enable (int enable);
+extern void awb_enable(int enable);
 
 extern void soft_trigger(int fd);
 extern void trigger_enable(int fd, int ena, int enb);

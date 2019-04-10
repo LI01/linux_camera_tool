@@ -148,7 +148,7 @@ void set_sensor_mode(int fd, int mode)
     buf1[0] = mode;
     write_to_UVC_extension(fd, LI_XU_SENSOR_MODES_SWITCH, 
         LI_XU_SENSOR_MODES_SWITCH_SIZE, buf1);
-    printf("set sensor mode to %d\n", mode);
+    printf("V4L2_CORE: set sensor mode to %d\n", mode);
 }
 
 /*
@@ -169,7 +169,7 @@ void set_pos(int fd, int start_x, int start_y)
     buf2[3] = (start_y >> 8) & 0xff;
     write_to_UVC_extension(fd, LI_XU_SENSOR_WINDOW_REPOSITION,
         LI_XU_SENSOR_WINDOW_REPOSITION_SIZE, buf2);
-    printf("set pos for start_x=%d, start_y=%d", start_x, start_y);
+    printf("V4L2_CORE: set pos for start_x=%d, start_y=%d", start_x, start_y);
 }
 
 
@@ -185,7 +185,7 @@ void get_led_status(int fd)
     CLEAR(buf3);
     read_from_UVC_extension(fd, LI_XU_LED_MODES,
         LI_XU_LED_MODES_SIZE, buf3);
-    printf("led status is %d", buf3[0]);
+    printf("V4L2_CORE: led status is %d", buf3[0]);
 }
 
 /*
@@ -210,7 +210,8 @@ void set_led(int fd, int left_0, int left_1, int right_0, int right_1)
     buf3[0] = val;
     write_to_UVC_extension(fd, LI_XU_LED_MODES,
         LI_XU_LED_MODES_SIZE, buf3);
-    printf("set left led 0=%d,\r set left led 1=%d,\r\nset right led 0=%d\rset right led 1=%d\n",
+    printf("V4L2_CORE: set left led 0=%d,\r set left led 1=%d,\r\n	\
+			set right led 0=%d\rset right led 1=%d\n",
         left_0, left_1, right_0, right_1);
 }
 
@@ -252,10 +253,10 @@ void set_sensor_gain_rgb(int fd,unsigned int rGain,
 	
 	write_to_UVC_extension(fd, LI_XU_SENSOR_GAIN_CONTROL_RGB, 
         LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE, buf4);
-	printf("setter get rGain = 0x%x\r\n", m_rGain);
-	printf("setter get grGain = 0x%x\r\n", m_grGain);
-	printf("setter get gbGain = 0x%x\r\n", m_gbGain);
-	printf("setter get bGain = 0x%x\r\n", m_bGain);
+	printf("V4L2_CORE: setter get rGain = 0x%x\r\n", m_rGain);
+	printf("V4L2_CORE: setter get grGain = 0x%x\r\n", m_grGain);
+	printf("V4L2_CORE: setter get gbGain = 0x%x\r\n", m_gbGain);
+	printf("V4L2_CORE: setter get bGain = 0x%x\r\n", m_bGain);
 }
 
 /* 
@@ -269,14 +270,16 @@ int read_cam_uuid_hwfw_rev(int fd)
     char uuidBuf[80];
     read_from_UVC_extension(fd, LI_XU_SENSOR_UUID_HWFW_REV,
         LI_XU_SENSOR_UUID_HWFW_REV_SIZE, buf7);
+	/* upper 4 bits are for camera datatype, clear that flags */
     hw_rev = buf7[0] | (buf7[1] << 8);
+	hw_rev &= ~(0xf000); 
     fw_rev = buf7[2] | (buf7[3] << 8);
     for (int i=0; i < (36+9); i++)
     {
         uuidBuf[i] = buf7[4+i];
     }
     strcpy(uuid, uuidBuf);
-    printf("hardware rev=%d\n", hw_rev);
+    printf("hardware rev=%x\n", hw_rev);
     printf("firmware rev=%d\n", fw_rev);
     printf("uuid=%s\n", uuid);
 	return fw_rev;
@@ -311,7 +314,7 @@ void get_pts(int fd)
         LI_XU_PTS_QUERY_SIZE, buf8);
 	
 	unsigned long pts = buf8[0] | buf8[1] << 8 | buf8[2] << 16 | buf8[3] << 24;
-	printf("get PTS = %lu\r\n", pts);
+	printf("V4L2_CORE: get PTS = %lu\r\n", pts);
 }
 
 /* set PTS counter initial value
@@ -329,7 +332,7 @@ void set_pts(int fd,unsigned long initVal)
 	buf8[3] = initVal & 0xff;
 	write_to_UVC_extension(fd, LI_XU_PTS_QUERY, 
         LI_XU_PTS_QUERY_SIZE, buf8);
-	printf("set init count value of PTS to %lu\r\n", initVal);
+	printf("V4L2_CORE: set init count value of PTS to %lu\r\n", initVal);
 }
 
 
@@ -344,7 +347,7 @@ void soft_trigger(int fd)
     CLEAR(buf9);
     write_to_UVC_extension(fd, LI_XU_SOFT_TRIGGER, 
         LI_XU_SOFT_TRIGGER_SIZE, buf9);
-    //printf("send one trigger\n");
+    printf("V4L2_CORE: send one trigger\n");
 }
 
 
@@ -357,7 +360,7 @@ void trigger_delay_time(int fd, unsigned int delay_time)
     buf10[3] = (delay_time >> 24) & 0xff;
     write_to_UVC_extension(fd, LI_XU_TRIGGER_DELAY,
         LI_XU_TRIGGER_DELAY_SIZE, buf10);
-    printf("trigger delay time %x", delay_time);
+    printf("V4L2_CORE: trigger delay time %x", delay_time);
 }
 
 //TODO: add comments
@@ -392,7 +395,7 @@ void load_register_setting_from_configuration(int fd,int regCount,
 {
 	int i;
 	CLEAR(buf12);
-	printf("save to flash\r\n");
+	printf("V4L2_CORE: save to flash\r\n");
 	//set flags to match definition in firmware
 	buf12[0] = 0x11;
 	buf12[1] = 0x22;
@@ -451,7 +454,7 @@ void load_register_setting_from_configuration(int fd,int regCount,
 void load_register_setting_from_flash_manually(int fd)
 {
 	int reg_flash_length, addr, val, i;
-	printf("load from flash\r\n");
+	printf("V4L2_CORE: load from flash\r\n");
 	CLEAR(buf12);
 	read_from_UVC_extension(fd, LI_XU_SENSOR_REGISTER_CONFIGURATION,
 		LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE, buf12);
@@ -496,7 +499,7 @@ void sensor_reg_write(int fd,int regAddr, int regVal)
 	write_to_UVC_extension(fd, LI_XU_SENSOR_REG_RW, 
         LI_XU_SENSOR_REG_RW_SIZE, buf14);
 
-	printf("Write Sensor REG[0x%x]: 0x%x\r\n", regAddr, regVal);
+	printf("V4L2_CORE: Write Sensor REG[0x%x]: 0x%x\r\n", regAddr, regVal);
 }
 
 /* 
@@ -525,7 +528,7 @@ int sensor_reg_read(int fd,int regAddr)
         LI_XU_SENSOR_REG_RW_SIZE, buf14);
 
 	regVal = (buf14[3] << 8) + buf14[4];
-	printf("Read Sensor REG[0x%x] = 0x%x\r\n", regAddr, regVal);
+	printf("V4L2_CORE: Read Sensor REG[0x%x] = 0x%x\r\n", regAddr, regVal);
 	return regVal;
 }
 
@@ -578,7 +581,7 @@ void generic_I2C_write(int fd,int rw_flag, int bufCnt,
 
 	write_to_UVC_extension(fd, LI_XU_GENERIC_I2C_RW, 
         LI_XU_GENERIC_I2C_RW_SIZE, buf16);
-	printf("I2C slave ADDR[0x%x], Write REG[0x%x]: 0x%x\r\n",
+	printf("V4L2_CORE: I2C slave ADDR[0x%x], Write REG[0x%x]: 0x%x\r\n",
 		   slaveAddr, regAddr, regVal);
 }
 
@@ -621,7 +624,7 @@ int generic_I2C_read(int fd,int rw_flag, int bufCnt,
 	{
 		regVal = (buf16[6] << 8) + buf16[7];
 	}
-	printf("I2C slave ADDR[0x%x], Read REG[0x%x]: 0x%x\r\n",
+	printf("V4L2_CORE: I2C slave ADDR[0x%x], Read REG[0x%x]: 0x%x\r\n",
 		   slaveAddr, regAddr, regVal);
 	return regVal;
 }

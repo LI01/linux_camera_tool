@@ -10,6 +10,7 @@
 int v4l2_dev; /* global variable, file descriptor for camera device */
 int fw_rev;   /* global variable, firmware revision for the camera */
 struct v4l2_fract time_per_frame = {1, 15};
+
 static struct option opts[] = {
 
 	{"nbufs", 1, 0, 'n'},
@@ -17,14 +18,7 @@ static struct option opts[] = {
 	{"time-per-frame", 1, 0, 't'},
 	{0, 0, 0, 0}};
 
-static void usage( const char *argv0)
-{
-	printf("Usage: %s [options]\n", argv0);
-	printf("Supported options:\n");
-	printf("-n, --nbufs n			Set the number of video buffers\n");
-	printf("-s, --size WxH			Set the frame size\n");
-	printf("-t, --time-per-frame	Set the time per frame (eg. 25 = 25 fps)\n");
-}
+
 /* main function */
 int main(int argc, char **argv)
 {
@@ -56,6 +50,7 @@ int main(int argc, char **argv)
 		switch (c)
 		{
 		case 'n':
+			/* set buffer number */
 			dev.nbufs = atoi(optarg);
 			if (dev.nbufs > V4L_BUFFERS_MAX)
 				dev.nbufs = V4L_BUFFERS_MAX;
@@ -90,6 +85,7 @@ int main(int argc, char **argv)
 	if (optind >= argc) {
 		usage(argv[0]);
 	}
+
 	/* Set the video format. */
 	if (do_set_format)
 	{

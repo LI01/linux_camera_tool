@@ -48,6 +48,39 @@ make
 ```
 ./leopard_cam
 ```
+### Examples
+__Original streaming for IMX477__ -> image is dark and blue
+<img src="pic/477orig.jpg" width="1000">
+__Modified streaming for IMX477:__
+1. enabled software AWB
+2. increase exposure
+3. read & write register from IMX477
+
+<img src="pic/477regCtrl.jpg" width="1000">
+
+__Modified streaming for OS05A20 full resolution__
+1. change bayer pattern to GRBG
+2. enable software AWB
+3. increase exposure, gain
+
+<img src="pic/os05a20.jpg" width="1000">
+
+__Modified OS05A20 resolution to an available one__
+1. binning mode
+2. capture raw and bmp, save them in the camera tool directory
+<img src="pic/changeResOS05A20.jpg" width="1000">
+
+
+
+
+__Original streaming for AR1335 ICP3 YUV cam:__
+Default ae enabled -> change exposure&gain takes no effects
+<img src="pic/aeEnableNotChangeExp.jpg" width="1000">
+
+__Disable ae:__
+Being able to change exposure & gain taking effective
+<img src="pic/aeDisable.jpg" width="1000">
+
 
 ### Exit Camera Tool
 Use __ESC__ on both of the gui.
@@ -86,3 +119,6 @@ The included "shot 1 trigger" function is only a demonstration on generating one
 ### Detect Two Video Devices
 __FIXME:__ 
 After add udev, this thing happen, the workaround now is to exit the udev list loop once we get one video device that is from Leopard.
+
+
+

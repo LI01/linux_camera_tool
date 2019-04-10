@@ -41,3 +41,5 @@ void set_tilt_absolute(int fd, int tilt_absolute);
 void get_tilt_absolute(int fd);
 void set_focus_absolute(int fd, int focus_absolute);
 void get_focus_absolute(int fd);
+
+void usage( const char *argv0);

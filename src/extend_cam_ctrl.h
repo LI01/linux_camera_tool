@@ -60,7 +60,7 @@ void change_bayerpattern(void *bayer);
 int add_bayer_forcv(int *bayer_flag);
 
 void add_gamma_val(float gamma_val_from_gui);
-void awb_enable (int enable);
+void awb_enable(int enable);
 
 int open_v4l2_device(char *device_name, struct device *dev);
 int check_dev_cap(struct device *dev);
@@ -71,11 +71,9 @@ void unmap_variables();
 void start_camera(struct device *dev);
 void stop_Camera(struct device *dev);
 
-
+void video_set_format(struct device *dev, int width,
+					  int height, int pixelformat);
 void video_get_format(struct device *dev);
-void video_set_format(struct device *dev, 
-                      int width, int height, int pixelformat);
-
 
 int streaming_loop(struct device *dev);
 
