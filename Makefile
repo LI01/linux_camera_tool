@@ -22,6 +22,7 @@ APP := leopard_cam
 
 SRCS := \
 	test/main.cpp \
+	test/ui_control.cpp \
 	$(foreach x, $(SRC_PATH), $(wildcard $(addprefix $(x)/*,.c*)))
 
 OBJS := $(SRCS:.cpp=.o)
