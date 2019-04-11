@@ -55,6 +55,9 @@ make
 ### Add to your project(CMake)
 ```sh
 add_subdirectory(linux_camera_tool)
+include_directories(
+	linux_camera_tool/src/
+)
 
 ...
 

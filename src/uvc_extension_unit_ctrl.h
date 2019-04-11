@@ -168,10 +168,10 @@ const reg_seq IMX334_MIPI_REG_TESTING[] =
 /* --- helper function ---*/
 void error_handle_extension_unit();
 
-void write_to_UVC_extension(int fd, int property_id,
+int write_to_UVC_extension(int fd, int property_id,
                             int length, unsigned char *buffer);
 
-void read_from_UVC_extension(int fd, int property_id,
+int read_from_UVC_extension(int fd, int property_id,
                              int length, unsigned char *buffer);
 
 /*--------------------------------------------------------------------------- */
@@ -188,9 +188,9 @@ void set_sensor_gain_rgb(int fd,unsigned int rGain,
 int read_cam_uuid_hwfw_rev(int fd);
 
 void get_pts(int fd);
-void soft_trigger(int fd);
-void trigger_delay_time(int fd, unsigned int delay_time);
-void trigger_enable(int fd, int ena, int enb);
+int soft_trigger(int fd);
+int trigger_delay_time(int fd, unsigned int delay_time);
+int trigger_enable(int fd, int ena, int enb);
 void load_register_setting_from_configuration(int fd,int regCount,
 											  const struct reg_pair *buffer);
 void load_register_setting_from_flash_manually(int fd);                                              

@@ -94,7 +94,7 @@ void error_handle_extension_unit()
  * 		buffer		- pointer for buffer data
  *  
  */
-void write_to_UVC_extension(int fd,int property_id,
+int write_to_UVC_extension(int fd,int property_id,
 							int length, unsigned char *buffer)
 {
 
@@ -105,8 +105,12 @@ void write_to_UVC_extension(int fd,int property_id,
 	xu_query.selector = property_id;
 	xu_query.data = buffer; //control buffer
 
-	if (ioctl(fd, UVCIOC_CTRL_QUERY, &xu_query) != 0)
+	int ret = 0;
+
+	if ((ret = ioctl(fd, UVCIOC_CTRL_QUERY, &xu_query)) != 0)
 		error_handle_extension_unit();
+
+	return ret;
 }
 
 /*
@@ -118,7 +122,7 @@ void write_to_UVC_extension(int fd,int property_id,
  * 		buffer		- pointer for buffer data
  *  
  */
-void read_from_UVC_extension(int fd,int property_id,
+int read_from_UVC_extension(int fd,int property_id,
 							 int length, unsigned char *buffer)
 {
 	CLEAR(xu_query);
@@ -342,29 +346,35 @@ void set_pts(int fd,unsigned long initVal)
  * args:
  *      fd  - file descriptor
  */
-void soft_trigger(int fd)
+int soft_trigger(int fd)
 {
     CLEAR(buf9);
-    write_to_UVC_extension(fd, LI_XU_SOFT_TRIGGER, 
-        LI_XU_SOFT_TRIGGER_SIZE, buf9);
+
     printf("V4L2_CORE: send one trigger\n");
+
+    return write_to_UVC_extension(fd, LI_XU_SOFT_TRIGGER, 
+        LI_XU_SOFT_TRIGGER_SIZE, buf9);
+    
 }
 
 
-void trigger_delay_time(int fd, unsigned int delay_time)
+int trigger_delay_time(int fd, unsigned int delay_time)
 {
     CLEAR(buf10);
     buf10[0] = delay_time & 0xff;
     buf10[1] = (delay_time >> 8) & 0xff;
     buf10[2] = (delay_time >> 16) & 0xff;
     buf10[3] = (delay_time >> 24) & 0xff;
-    write_to_UVC_extension(fd, LI_XU_TRIGGER_DELAY,
-        LI_XU_TRIGGER_DELAY_SIZE, buf10);
+
     printf("V4L2_CORE: trigger delay time %x", delay_time);
+
+    return write_to_UVC_extension(fd, LI_XU_TRIGGER_DELAY,
+        LI_XU_TRIGGER_DELAY_SIZE, buf10);
+    
 }
 
 //TODO: add comments
-void trigger_enable(int fd, int ena, int enb)
+int trigger_enable(int fd, int ena, int enb)
 {
     CLEAR(buf11);
     if(ena)
@@ -377,7 +387,7 @@ void trigger_enable(int fd, int ena, int enb)
     else
         buf11[0] = 0x00;
     buf11[1] = 0x00;
-    write_to_UVC_extension(fd, LI_XU_TRIGGER_MODE,
+    return write_to_UVC_extension(fd, LI_XU_TRIGGER_MODE,
         LI_XU_TRIGGER_MODE_SIZE, buf11);
     //printf("trigger mode enable\n");
 }
