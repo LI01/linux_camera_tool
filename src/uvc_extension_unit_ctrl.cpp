@@ -42,7 +42,6 @@ unsigned int m_grGain = 0x1;
 unsigned int m_gbGain = 0x1;
 unsigned int m_bGain = 0x1;
 
-extern int fw_rev;
 int hw_rev;
  char uuid[64];
 
@@ -277,16 +276,16 @@ int read_cam_uuid_hwfw_rev(int fd)
 	/* upper 4 bits are for camera datatype, clear that flags */
     hw_rev = buf7[0] | (buf7[1] << 8);
 	hw_rev &= ~(0xf000); 
-    fw_rev = buf7[2] | (buf7[3] << 8);
+    int local_fw_rev = buf7[2] | (buf7[3] << 8);
     for (int i=0; i < (36+9); i++)
     {
         uuidBuf[i] = buf7[4+i];
     }
     strcpy(uuid, uuidBuf);
     printf("hardware rev=%x\n", hw_rev);
-    printf("firmware rev=%d\n", fw_rev);
+    printf("firmware rev=%d\n", local_fw_rev);
     printf("uuid=%s\n", uuid);
-	return fw_rev;
+	return local_fw_rev;
 }
 
 /*
