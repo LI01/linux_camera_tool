@@ -17,7 +17,7 @@
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-GtkWidget *label_device, *label_hw_rev, *label_fw_rev;
+GtkWidget *label_device, *label_hw_rev, *label_fw_rev, *button_exit_streaming;
 GtkWidget *label_datatype, *vbox2, *radio01, *radio02, *radio03;
 GtkWidget *label_bayer, *vbox3, *radio_bg, *radio_gb, *radio_rg, *radio_gr;
 GtkWidget *check_button_auto_exposure,*check_button_awb,*check_button_auto_gain;
@@ -32,6 +32,7 @@ GtkWidget *check_button_just_sensor;
 GtkWidget *label_capture, *button_capture_bmp, *button_capture_raw;
 GtkWidget *label_gamma, *entry_gamma, *button_apply_gamma;
 GtkWidget *label_trig, *check_button_trig_en, *button_trig;
+GtkWidget *label_blc, *entry_blc, *button_apply_blc;
 
 int address_width_flag;
 extern int v4l2_dev;
@@ -66,12 +67,15 @@ extern void video_capture_save_raw();
 
 
 extern void add_gamma_val(float gamma_val_from_gui);
+extern void add_black_level_correction(int blc_val_from_gui);
+
 extern void awb_enable(int enable);
 extern void abc_enable(int enable);
 
 extern void soft_trigger(int fd);
 extern void trigger_enable(int fd, int ena, int enb);
 
+extern void set_loop(int exit);
 /****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
@@ -248,7 +252,7 @@ void capture_raw(GtkWidget *widget)
 }
 
 
-void gamma_correction(GtkWidget)
+void gamma_correction(GtkWidget *widget)
 {
     float gamma = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_gamma)));
     add_gamma_val(gamma);
@@ -291,6 +295,22 @@ void enable_trig(GtkWidget *widget)
     }
 }
 
+void black_level_correction(GtkWidget *widget)
+{
+    (void)widget;
+    int black_level = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_blc)));
+    add_black_level_correction(black_level);
+    g_print("black level correction = %d\n", black_level);
+}
+
+void exit_loop(GtkWidget *widget)
+{
+    (void)widget;
+    set_loop(0);
+    g_print("exit\n");
+}
+
+/* escape gui from pressing ESC */
 static gboolean check_escape(GtkWidget *widget, GdkEventKey *event)
 {
     (void)widget;
@@ -335,6 +355,9 @@ int init_control_gui(int argc, char *argv[])
              fw_rev);
     label_fw_rev = gtk_label_new("Firmware Rev:");
     gtk_label_set_text(GTK_LABEL(label_fw_rev), fw_rev_buf);
+
+    button_exit_streaming = gtk_button_new_with_label("EXIT");
+    g_signal_connect(button_exit_streaming, "clicked", G_CALLBACK(exit_loop), NULL);
 
     /* --- row 1 --- */
     label_datatype = gtk_label_new("Sensor Datatype:");
@@ -487,12 +510,23 @@ int init_control_gui(int argc, char *argv[])
              G_CALLBACK(enable_trig), NULL);
     g_signal_connect(button_trig, "clicked", G_CALLBACK(send_trigger), NULL);
 
+    /* --- row 13 ---*/
+    label_blc = gtk_label_new("Black Level Correction:");
+    gtk_label_set_text(GTK_LABEL(label_blc), "Black Level Correction:");
+    entry_blc = gtk_entry_new();
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_blc), -1);
+    button_apply_blc = gtk_button_new_with_label("Apply");
+
+    g_signal_connect(button_apply_blc, "clicked", G_CALLBACK(black_level_correction), 
+            NULL);
+
     /* ---------------- Layout, don't change ---------------------------- */
     // zero row: device info, fw revision
     int row = 0;
     int col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_device, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), label_fw_rev, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_exit_streaming, col++, row, 1, 1);
 
     //first row: choose sensor datatype for data shift
     row++;
@@ -538,7 +572,6 @@ int init_control_gui(int argc, char *argv[])
     col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_addr_width, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), vbox, col++, row, 1, 1);
-    //gtk_grid_attach(GTK_GRID(grid), check_button_auto_exposure, col++, row, 1, 1);
 
     // eighth row: reg addr
     row++;
@@ -574,6 +607,13 @@ int init_control_gui(int argc, char *argv[])
     gtk_grid_attach(GTK_GRID(grid), label_trig, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), check_button_trig_en, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), button_trig, col++, row, 1, 1);
+
+    // thirteenth row: black level correction
+    row++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_blc, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), entry_blc, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), button_apply_blc, col++, row, 1, 1);
 
     /* --- Grid Setup --- */
     gtk_grid_set_column_homogeneous(GTK_GRID(grid), FALSE);

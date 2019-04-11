@@ -48,59 +48,31 @@
  * Since we use fork, variables btw two processes are not shared
  * use mmap for all the variables you need to share between gui and videostreaming
  */
-static int *save_bmp;   /* flag for saving bmp */
-static int *save_raw;   /* flag for saving raw */
-static int *bayer_flag; /* flag for choosing bayer pattern */
-static int *shift_flag; /* flag for shift raw data */
-static int *awb_flag;   /* flag for enable/disable software awb*/
-static int *abc_flag;   /* flag for enable/disable software brightness & contrast optimization */
-float *gamma_val;
-
+static int *save_bmp;   			/* flag for saving bmp */
+static int *save_raw;   			/* flag for saving raw */
+static int *bayer_flag; 			/* flag for choosing bayer pattern */
+static int *shift_flag; 			/* flag for shift raw data */
+static int *awb_flag;   			/* flag for enable software awb*/
+static int *abc_flag;   			/* flag for enable brightness & contrast opt */
+static float *gamma_val; 			/* gamma correction value from gui */
+static int *black_level_correction; /* white balance value from gui */
+static int *loop;
+double t = 0;						/* time measured in opencv for caculating fps */
+double fps;							/* frame rate */
+char string_frame_rate[10]; 		/* string to save the frame rate */
 static int image_count;
 
 struct v4l2_buffer queuebuffer;
+
+extern char *get_product();
 /*****************************************************************************
 **                           Function definition
 *****************************************************************************/
 
-/*
- * callback for save bmp image from gui
- */
-void video_capture_save_bmp()
+void set_loop(int exit)
 {
-	set_save_bmp_flag(1);
+	*loop = exit;
 }
-
-/*
- * set save raw image flag 
- * args:
- * 		flag - set the flag when get capture button clicked,
- * 			   reset flag to zero once image is saved
- */
-void set_save_bmp_flag(int flag)
-{
-	*save_bmp = flag;
-}
-
-/*
- * save data to bitmap using opencv
- * args:
- *	 opencv mat image to be captured
- *
- * asserts:
- *   none
- */
-static int save_frame_image_bmp(cv::Mat opencvImage)
-{
-
-	printf("save one capture bmp\n");
-	cv::imwrite(cv::format("captures_%d.bmp",
-						   image_count),
-				opencvImage);
-
-	return 0;
-}
-
 /*
  * callback for save raw image from gui
  */
@@ -161,6 +133,44 @@ int v4l2_core_save_data_to_file(const char *filename, const void *data, int size
 }
 
 /*
+ * callback for save bmp image from gui
+ */
+void video_capture_save_bmp()
+{
+	set_save_bmp_flag(1);
+}
+
+/*
+ * set save raw image flag 
+ * args:
+ * 		flag - set the flag when get capture button clicked,
+ * 			   reset flag to zero once image is saved
+ */
+void set_save_bmp_flag(int flag)
+{
+	*save_bmp = flag;
+}
+
+/*
+ * save data to bitmap using opencv
+ * args:
+ *	 opencv mat image to be captured
+ *
+ * asserts:
+ *   none
+ */
+static int save_frame_image_bmp(cv::Mat opencvImage)
+{
+
+	printf("save one capture bmp\n");
+	cv::imwrite(cv::format("captures_%s_%d.bmp",
+						   get_product(), image_count),
+				opencvImage);
+
+	return 0;
+}
+
+/*
  * return the shift value for choiced sensor datatype
  * RAW10 - shift 2 bits
  * RAW12 - shift 4 bits
@@ -179,28 +189,6 @@ int set_shift(int *shift_flag)
 	return 2;
 }
 
-void awb_enable(int enable)
-{
-	if (enable == 1)
-		*awb_flag = 1;
-
-	if (enable == 0)
-		*awb_flag = 0;
-}
-
-void abc_enable(int enable)
-{
-	if (enable == 1)
-		*abc_flag = 1;
-
-	if (enable == 0)
-		*abc_flag = 0;
-}
-
-void add_gamma_val(float gamma_val_from_gui)
-{
-	*gamma_val = gamma_val_from_gui;
-}
 /*
  * callback for change sensor datatype shift flag
  * args:
@@ -261,6 +249,22 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = 4;
 }
 
+/*
+ * callback for set black_level_correction for black level correction from gui
+ */
+void add_black_level_correction(int blc_val_from_gui)
+{
+	*black_level_correction = blc_val_from_gui;
+}
+
+/*
+ * callback for set gamma_val for gamma correction from gui
+ */
+void add_gamma_val(float gamma_val_from_gui)
+{
+	*gamma_val = gamma_val_from_gui;
+}
+
 /* 
  *  apply gamma correction for the given mat
  *  When *gamma_val < 1, the original dark regions will be brighter 
@@ -279,162 +283,219 @@ static cv::Mat apply_gamma_correction(cv::Mat opencvImage)
 	LUT(opencvImage, look_up_table, opencvImage);
 	return opencvImage;
 }
- double rgb2rgb_param[3][3] = {
- 	409.0, -137.0, -15.0, // + - -
- 	-136.0, 468.0, -77.0, // - + -
- 	4.0, -303.0, 554.0   // + - +
- };
 
- double rr = 409.0, rg = -137.0, rb = -15.0;
- double gr = -136.0, gg = 468.0, gb = -77.0;
- double br = 4.0, bg = -303.0, bb = 554.0;
+/*
+ * set awb flag 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void awb_enable(int enable)
+{
+	if (enable == 1)
+		*awb_flag = 1;
 
-// int rgb2rgb_param[3][3] = {
-// 	256, 0, 0, // + - -
-// 	0, 256, 0, // - + -
-// 	0, 0, 256   // + - +
-// };
+	if (enable == 0)
+		*awb_flag = 0;
+}
 
-int rgb2rgb_param_2[3][3] = {
-	256, 1, -1,
-	2, 256, -1,
-	2, -1, 256
-};
 /* 
  *  apply white balance for the given mat
  *  the basic idea of Leopard AWB algorithm is to find the gray area of the image and apply
  *  Red, Green and Blue gains to make it gray, and then use the gray area to estimate the
  *  color temperature.
+ *  ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
  */
 static cv::Mat apply_white_balance(cv::Mat opencvImage)
 {
+	// method 1
+	// cv::Mat splitChannelRGB[3];
 
-	cv::Mat splitChannelRGB[3];
-	cv::Mat floatImage(4056, 3040, CV_32FC1);
-	floatImage = opencvImage.clone();
-	//floatImage = opencvImage;
-	split(floatImage, splitChannelRGB);
+	// split(opencvImage, splitChannelRGB);
 
-	double R, G, B;
-	B = mean(splitChannelRGB[0])[0];
-	G = mean(splitChannelRGB[1])[0];
-	R = mean(splitChannelRGB[2])[0];
-	double RGB_ORIG[3] = {B, G, R};
+	// double R, G, B;
+	// B = mean(splitChannelRGB[0])[0];
+	// G = mean(splitChannelRGB[1])[0];
+	// R = mean(splitChannelRGB[2])[0];
+	// double RGB_ORIG[3] = {B, G, R};
 	// /* gain for adjusting each color channel */
-	double KR = 1, KG = 1, KB = 1;
-	double RGB_UPDATE[3] = {KB, KG, KR};
-	KB = 267.0/256;//(R + G + B) / (3 * B);
-	KG = 403.0/256;//(R + G + B) / (3 * G);
-	KR = 471.0/256;//(R + G + B) / (3 * R);
-	// printf("KB = %f\n", KB);
-	// printf("KG = %f\n", KG);
-	// printf("KR = %f\n", KR);
+	// double KR = 1, KG = 1, KB = 1;
+	// KB = (R + G + B) / (3 * B);
+	// KG = (R + G + B) / (3 * G);
+	// KR = (R + G + B) / (3 * R);
 
-	splitChannelRGB[0] = splitChannelRGB[0] * KB;
-	splitChannelRGB[1] = splitChannelRGB[1] * KG;
-	splitChannelRGB[2] = splitChannelRGB[2] * KR;
+	// splitChannelRGB[0] = splitChannelRGB[0] * KB;
+	// splitChannelRGB[1] = splitChannelRGB[1] * KG;
+	// splitChannelRGB[2] = splitChannelRGB[2] * KR;
 
-	// printf("B = %f\n", RGB_ORIG[0]);
-	// printf("G = %f\n", RGB_ORIG[1]);
-	// printf("R = %f\n", RGB_ORIG[2]);
-	// for (int i =0; i < 3; i++) {
-	// 	for (int j=0; j < 3; j++) {
-	// 		RGB_UPDATE[i] +=  (rgb2rgb_param[i][j]* RGB_ORIG[i] / 256);
-	// 	}
-	// }
-	// printf("KB = %f\n", RGB_UPDATE[0]);
-	// printf("KG = %f\n", RGB_UPDATE[1]);
-	// printf("KR = %f\n", RGB_UPDATE[2]);
-	// /* adjust rgb channel values */
-	 splitChannelRGB[2] = splitChannelRGB[2] * rr / 256 
-	 					+ splitChannelRGB[1] * rg / 256
-						+ splitChannelRGB[0] * rb / 256;
+	// /* merge three RGB channels back together */
+	// merge(splitChannelRGB, 3, opencvImage);
 
-	 splitChannelRGB[1] = splitChannelRGB[2] * gr / 256 
-	 					+ splitChannelRGB[1] * gg / 256
-						+ splitChannelRGB[0] * gb / 256;
+	// method 2
+	double discard_ratio = 0.05;
+	int hists[3][256];
+	CLEAR(hists);
 
-	 splitChannelRGB[0] = splitChannelRGB[2] * br / 256 
-	 					+ splitChannelRGB[1] * bg / 256
-						+ splitChannelRGB[0] * bb / 256;
+	for (int y = 0; y < opencvImage.rows; ++y)
+	{
+		uchar *ptr = opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < opencvImage.cols; ++x)
+		{
+			for (int j = 0; j < 3; ++j)
+			{
+				hists[j][ptr[x * 3 + j]] += 1;
+			}
+		}
+	}
 
-	/* merge three RGB channels back together */
-	merge(splitChannelRGB, 3, opencvImage);
+	// cumulative hist
+	int total = opencvImage.cols * opencvImage.rows;
+	int vmin[3], vmax[3];
+	for (int i = 0; i < 3; ++i)
+	{
+		for (int j = 0; j < 255; ++j)
+		{
+			hists[i][j + 1] += hists[i][j];
+		}
+		vmin[i] = 0;
+		vmax[i] = 255;
+		while (hists[i][vmin[i]] < discard_ratio * total)
+			vmin[i] += 1;
+		while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
+			vmax[i] -= 1;
+		if (vmax[i] < 255 - 1)
+			vmax[i] += 1;
+	}
+
+	for (int y = 0; y < opencvImage.rows; ++y)
+	{
+		uchar *ptr = opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < opencvImage.cols; ++x)
+		{
+			for (int j = 0; j < 3; ++j)
+			{
+				int val = ptr[x * 3 + j];
+				if (val < vmin[j])
+					val = vmin[j];
+				if (val > vmax[j])
+					val = vmax[j];
+				ptr[x * 3 + j] = static_cast<uchar>((val - vmin[j]) * 255.0 / (vmax[j] - vmin[j]));
+			}
+		}
+	}
 	return opencvImage;
 }
 
 /*
- * Automatic brightness and contrast optimization with optional histogram clipping
- * Looking at histogram, alpha operates as color range amplifier, beta operates as range shift.
- * O(x,y) = alpha * I(x,y) + beta
- * Automatic brightness and contrast optimization calculates alpha and beta so that the output range is 0..255.
- * Ref: http://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
+ * set abc flag 
  * args:
- * 	 clipHistPercent - cut wings of histogram at given percent 
- * 		typical=>1, 0=>Disabled
+ * 		flag - set/reset the flag when get check button toggle
  */
+void abc_enable(int enable)
+{
+	if (enable == 1)
+		*abc_flag = 1;
+
+	if (enable == 0)
+		*abc_flag = 0;
+}
+
 static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
 												  float clipHistPercent = 0)
 {
-	int hist_size = 256;
-	float alpha, beta;
-	double min_gray = 0, max_gray = 0;
+	// /* Method 1:
+	//  * Automatic brightness and contrast optimization with optional histogram clipping
+	//  * Looking at histogram, alpha operates as color range amplifier, beta operates as range shift.
+	//  * O(x,y) = alpha * I(x,y) + beta
+	//  * Automatic brightness and contrast optimization calculates alpha and beta so that the output range is 0..255.
+	//  * Ref: http://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
+	//  * args:
+	//  * 	 clipHistPercent - cut wings of histogram at given percent
+	//  * 		typical=>1, 0=>Disabled
+	//  */
+	// int hist_size = 256;
+	// float alpha, beta;
+	// double min_gray = 0, max_gray = 0;
 
-	/* to calculate grayscale histogram */
-	cv::Mat gray;
-	cv::cvtColor(opencvImage, gray, CV_BGR2GRAY);
+	// /* to calculate grayscale histogram */
+	// cv::Mat gray;
+	// cv::cvtColor(opencvImage, gray, CV_BGR2GRAY);
 
-	if (clipHistPercent == 0)
-	{
-		/* keep full available range */
-		cv::minMaxLoc(gray, &min_gray, &max_gray);
-	}
-	else
-	{
-		/* the grayscale histogram */
-		cv::Mat hist;
+	// if (clipHistPercent == 0)
+	// {
+	// 	/* keep full available range */
+	// 	cv::minMaxLoc(gray, &min_gray, &max_gray);
+	// }
+	// else
+	// {
+	// 	/* the grayscale histogram */
+	// 	cv::Mat hist;
 
-		float range[] = {0, 256};
-		const float *histRange = {range};
-		bool uniform = true;
-		bool accumulate = false;
-		calcHist(&gray, 1, 0, cv::Mat(), hist, 1, &hist_size, &histRange, uniform, accumulate);
+	// 	float range[] = {0, 256};
+	// 	const float *histRange = {range};
+	// 	bool uniform = true;
+	// 	bool accumulate = false;
+	// 	// void calcHist(img_orig, n_images, channels(gray=0), mask,
+	//     //               mat hist, dimemsion, histSize=bins=256,
+	//     //               ranges_for_pixel, bool uniform, bool accumulate);
+	// 	calcHist(&gray, 1, 0, cv::Mat(), hist, 1, &hist_size, &histRange, uniform, accumulate);
 
-		/* calculate cumulative distribution from the histogram */
-		std::vector<float> accumulator(hist_size);
-		accumulator[0] = hist.at<float>(0);
-		for (int i = 1; i < hist_size; i++)
-		{
-			accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
-		}
+	// 	/* calculate cumulative distribution from the histogram */
+	// 	std::vector<float> accumulator(hist_size);
+	// 	accumulator[0] = hist.at<float>(0);
+	// 	for (int i = 1; i < hist_size; i++)
+	// 	{
+	// 		accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
+	// 	}
 
-		/* locate points that cuts at required value */
-		float max = accumulator.back();
-		clipHistPercent *= (max / 100.0); //make percent as absolute
-		clipHistPercent /= 2.0;			  // left and right wings
-		/* locate left cut */
-		min_gray = 0;
-		while (accumulator[min_gray] < clipHistPercent)
-			min_gray++;
+	// 	/* locate points that cuts at required value */
+	// 	float max = accumulator.back();
+	// 	clipHistPercent *= (max / 100.0); //make percent as absolute
+	// 	clipHistPercent /= 2.0;			  // left and right wings
+	// 	/* locate left cut */
+	// 	min_gray = 0;
+	// 	while (accumulator[min_gray] < clipHistPercent)
+	// 		min_gray++;
 
-		/* locate right cut */
-		max_gray = hist_size - 1;
-		while (accumulator[max_gray] >= (max - clipHistPercent))
-			max_gray--;
-	}
+	// 	/* locate right cut */
+	// 	max_gray = hist_size - 1;
+	// 	while (accumulator[max_gray] >= (max - clipHistPercent))
+	// 		max_gray--;
+	// }
 
-	/* current range */
-	float input_range = max_gray - min_gray;
+	// /* current range */
+	// float input_range = max_gray - min_gray;
 
-	alpha = (hist_size - 1) / input_range; // alpha expands current range to histsize range
-	beta = -min_gray * alpha;			   // beta shifts current range so that minGray will go to 0
+	// alpha = (hist_size - 1) / input_range; // alpha expands current range to histsize range
+	// beta = -min_gray * alpha;			   // beta shifts current range so that minGray will go to 0
 
-	/*
-	* Apply brightness and contrast normalization
-	* convertTo operates with saurate_cast
-	*/
-	opencvImage.convertTo(opencvImage, -1, alpha, beta);
+	// /*
+	// * Apply brightness and contrast normalization
+	// * convertTo operates with saurate_cast
+	// */
+	// opencvImage.convertTo(opencvImage, -1, alpha, beta);
 
+	/* Method 2:
+	 * Contrast Limited Adaptive Histogram Equalization) algorithm
+	 * ref: https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
+	 */
+	cv::Mat lab_image;
+	cv::cvtColor(opencvImage, lab_image, CV_BGR2Lab);
+	/* Extract the L channel */
+	std::vector<cv::Mat> lab_planes(3);
+	cv::split(lab_image, lab_planes); // now we have the L image in lab_planes[0]
+
+	/* apply the CLAHE algorithm to the L channel */
+	cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+	clahe->setClipLimit(4);
+	cv::Mat dst;
+	clahe->apply(lab_planes[0], dst);
+
+	/* Merge the the color planes back into an Lab image */
+	dst.copyTo(lab_planes[0]);
+	cv::merge(lab_planes, lab_image);
+
+	// convert back to RGB
+	cv::cvtColor(lab_image, opencvImage, CV_Lab2BGR);
 	return opencvImage;
 }
 
@@ -470,26 +531,8 @@ int open_v4l2_device(char *device_name, struct device *dev)
 
 	mmap_variables();
 	*gamma_val = 1.0;
+	*black_level_correction = 0;
 	return v4l2_dev;
-}
-
-/* mmap the variables for processes share */
-void mmap_variables()
-{
-	save_bmp = (int *)mmap(NULL, sizeof *save_bmp, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	save_raw = (int *)mmap(NULL, sizeof *save_raw, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	shift_flag = (int *)mmap(NULL, sizeof *shift_flag, PROT_READ | PROT_WRITE,
-							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
-							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	awb_flag = (int *)mmap(NULL, sizeof *awb_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	abc_flag = (int *)mmap(NULL, sizeof *abc_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
-							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 }
 
 /* 
@@ -531,6 +574,43 @@ int check_dev_cap(struct device *dev)
 	return 0;
 }
 
+/* mmap the variables for processes share */
+void mmap_variables()
+{
+	save_bmp = (int *)mmap(NULL, sizeof *save_bmp, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	save_raw = (int *)mmap(NULL, sizeof *save_raw, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	shift_flag = (int *)mmap(NULL, sizeof *shift_flag, PROT_READ | PROT_WRITE,
+							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
+							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	awb_flag = (int *)mmap(NULL, sizeof *awb_flag, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	abc_flag = (int *)mmap(NULL, sizeof *abc_flag, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
+							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	black_level_correction = (int *)mmap(NULL, sizeof *black_level_correction,
+										 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	loop = (int *)mmap(NULL, sizeof *loop, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+}
+
+/* unmap all the variables after stream ends */
+void unmap_variables()
+{
+	munmap(save_bmp, sizeof *save_bmp);
+	munmap(save_raw, sizeof *save_raw);
+	munmap(shift_flag, sizeof *shift_flag);
+	munmap(bayer_flag, sizeof *bayer_flag);
+	munmap(awb_flag, sizeof *awb_flag);
+	munmap(abc_flag, sizeof *abc_flag);
+	munmap(gamma_val, sizeof *gamma_val);
+	munmap(black_level_correction, sizeof *black_level_correction);
+	munmap(loop, sizeof *loop);
+}
+
 /*
  * activate streaming 
  * 
@@ -568,6 +648,7 @@ void stop_Camera(struct device *dev)
 	}
 	return;
 }
+
 /*
  * video set format - Leopard camera format is YUYV
  * need to do a v4l2-ctl --list-formats-ext to see the resolution
@@ -640,7 +721,8 @@ void video_get_format(struct device *dev)
 	dev->bytesperline = fmt.fmt.pix.bytesperline;
 	dev->imagesize = fmt.fmt.pix.bytesperline ? fmt.fmt.pix.sizeimage : 0;
 
-	printf("Get Current Video Format: %c%c%c%c (%08x) %ux%u\nbyte per line:%d\nsize image:%ud\n",
+	printf("Get Current Video Format: %c%c%c%c (%08x) %ux%u\n 		\
+			byte per line:%d\nsize image:%ud\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 8) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 16) & 0xff,
@@ -651,6 +733,221 @@ void video_get_format(struct device *dev)
 		   fmt.fmt.pix.bytesperline,
 		   fmt.fmt.pix.sizeimage);
 	return;
+}
+
+/* 
+ * To get frames in few steps
+ * 1. prepare information about the buffer you are queueing
+ * 	  (done in video_allocate_buffers)
+ * 2. activate the device streaming capability
+ * 3. queue the buffer,  handling your buffer over to the device,
+ *    put it into the incoming queue, wait for it to write stuff in
+ * 4. decode the frame
+ * 5. dequeue the buffer, the device is done, you may read the buffer
+ * 6. put 3-5 in a for loop
+ * 
+ * args: 
+ * 		struct device *dev - every infomation for camera
+*/
+int streaming_loop(struct device *dev)
+{
+	cv::namedWindow("cam", CV_GUI_NORMAL);
+	image_count = 0;
+	*loop = 1;
+	//TODO: add a loop flag to exit
+	while (*loop)
+	{
+		t = (double)cv::getTickCount();
+		get_a_frame(dev);
+	}
+	unmap_variables();
+}
+
+/* 
+ * Typically start two loops:
+ * 1. runs for as long as you want to
+ *    capture frames (shoot the video).
+ * 2. iterates over your buffers everytime. 
+ *
+ * args: 
+ * 		struct device *dev - every infomation for camera
+ */
+void get_a_frame(struct device *dev)
+{
+
+	for (unsigned int i = 0; i < dev->nbufs; i++)
+	{
+
+		queuebuffer.index = i;
+		/* The buffer's waiting in the outgoing queue. */
+		if (ioctl(dev->fd, VIDIOC_DQBUF, &queuebuffer) < 0)
+		{
+			perror("VIDIOC_DQBUF");
+			return;
+		}
+
+		/* check the capture raw image flag, do this before decode a frame */
+		if (*(save_raw))
+		{
+			printf("save a raw\n");
+			char buf_name[24];
+			snprintf(buf_name, sizeof(buf_name), "captures_%s_%d.raw",
+					 get_product(), image_count);
+			v4l2_core_save_data_to_file(buf_name,
+										dev->buffers->start, dev->imagesize);
+			image_count++;
+			set_save_raw_flag(0);
+		}
+
+		decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
+
+		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
+		{
+			perror("VIDIOC_QBUF");
+			return;
+		}
+	}
+
+	return;
+}
+
+/* shift bits for 16-bit stream and get lower 8-bit for opencv debayering */
+void perform_shift(struct device *dev, const void *p, int shift)
+{
+	unsigned char tmp;
+	unsigned short *srcShort = (unsigned short *)p;
+	unsigned char *dst = (unsigned char *)p;
+	unsigned short ts;
+
+/* use openmp loop parallelism to accelate shifting */
+#pragma omp for
+	for (unsigned int i = 0; i < dev->height; i++)
+	{
+		for (unsigned int j = 0; j < dev->width; j++)
+		{
+			ts = *(srcShort++);
+			if (ts > *black_level_correction) 
+				tmp = (ts - *black_level_correction) >> shift;
+			else
+			{
+				tmp = 0;
+			}
+
+			*(dst++) = (unsigned char)tmp;
+		}
+	}
+}
+
+/* 
+ * opencv only support debayering 8 and 16 bits 
+ * 
+ * decode the frame, move each pixel by certain bits,
+ * and mask it for 8 bits, render a frame using opencv
+ * args: 
+ * 		struct device *dev - every infomation for camera
+ * 		const void *p - pointer for the buffer
+ * 		int shift - values to shift(RAW10 - 2, RAW12 - 4, YUV422 - 0) 
+ * 
+ */
+void decode_a_frame(struct device *dev, const void *p, int shift)
+{
+	int height = dev->height;
+	int width = dev->width;
+
+	cv::Mat share_img;
+	/* --- for bayer camera ---*/
+	if (shift != 0)
+	{
+		perform_shift(dev, p, shift);
+		cv::Mat img(height, width, CV_8UC1, (void *)p);
+		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		//flip(img, img, 0); //mirror vertically
+		//flip(img, img, 1); //mirror horizontally
+
+		/* gamma correction functionality, only available for bayer camera */
+		img = apply_gamma_correction(img);
+		/* check awb flag, awb functionality, only available for bayer camera */
+		if (*(awb_flag) == 1)
+		{
+			img = apply_white_balance(img);
+		}
+		/* check abc flag, abc functionality, only available for bayer camera */
+		if (*(abc_flag) == 1)
+		{
+			img = apply_auto_brightness_and_contrast(img, 1);
+		}
+
+		share_img = img;
+	}
+	/* --- for yuv camera ---*/
+	else
+	{
+		cv::Mat img(height, width, CV_8UC2, (void *)p);
+		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
+		share_img = img;
+	}
+
+	/* check for save capture bmp flag, after decode the image */
+	if (*(save_bmp))
+	{
+		printf("save a bmp\n");
+		save_frame_image_bmp(share_img);
+		image_count++;
+		set_save_bmp_flag(0);
+	}
+
+	/* if image larger than 720p by any dimension, reszie the window */
+	if (width >= 1280 || height >= 720)
+	{
+		cv::resizeWindow("cam", 1280, 720);
+	}
+
+	cv::putText(share_img,
+				"ESC: close streaming window",
+				cv::Point(100, 100),	   // Coordinates
+				cv::FONT_HERSHEY_SIMPLEX,  // Font
+				2.0,					   // Scale. 2.0 = 2x bigger
+				cv::Scalar(255, 255, 255), // BGR Color
+				2						   // Line Thickness (Optional)
+	);									   // Anti-alias (Optional)
+	char resolution[25];
+	sprintf(resolution, "Current Res:%dx%d", width, height);
+
+	cv::putText(share_img,
+				resolution,
+				cv::Point(100, 200),
+				cv::FONT_HERSHEY_SIMPLEX,
+				2.0,
+				cv::Scalar(255, 255, 255),
+				2);
+	/* 
+  * getTickcount: return number of ticks from OS
+	* getTickFrequency: returns the number of ticks per second
+	* t = ((double)getTickCount() - t)/getTickFrequency();
+	* fps is t's reciprocal
+	*/
+	t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
+	fps = 1.0 / t;
+	sprintf(string_frame_rate, "%.2f", fps); // correct to two decimal places
+	std::string fpsString("Current Fps:");
+	fpsString += string_frame_rate; //put the frame rate string after FPS
+
+	/* display frame rate on img */
+	cv::putText(share_img,
+				fpsString,
+				cv::Point(100, 300),
+				cv::FONT_HERSHEY_SIMPLEX,
+				2.0,
+				cv::Scalar(255, 255, 255),
+				2);
+
+	cv::imshow("cam", share_img);
+
+	if (cv::waitKey(_1MS) == _ESC_KEY)
+	{
+		cv::destroyWindow("cam");
+		exit(0);
+	}
 }
 
 /*
@@ -738,192 +1035,6 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 	}
 	dev->buffers = buffers;
 	return 0;
-}
-
-/* 
- * To get frames in few steps
- * 1. prepare information about the buffer you are queueing
- * 	  (done in video_allocate_buffers)
- * 2. activate the device streaming capability
- * 3. queue the buffer,  handling your buffer over to the device,
- *    put it into the incoming queue, wait for it to write stuff in
- * 4. decode the frame
- * 5. dequeue the buffer, the device is done, you may read the buffer
- * 6. put 3-5 in a for loop
- * 
- * args: 
- * 		struct device *dev - every infomation for camera
-*/
-int streaming_loop(struct device *dev)
-{
-	cv::namedWindow("cam", CV_WINDOW_FREERATIO);
-	image_count = 0;
-	//TODO: add a loop flag to exit
-	while (1)
-	{
-		get_a_frame(dev);
-	}
-	unmap_variables();
-}
-
-/* unmap all the variables after stream ends */
-void unmap_variables()
-{
-	munmap(save_bmp, sizeof *save_bmp);
-	munmap(save_raw, sizeof *save_raw);
-	munmap(shift_flag, sizeof *shift_flag);
-	munmap(bayer_flag, sizeof *bayer_flag);
-	munmap(awb_flag, sizeof *awb_flag);
-	munmap(abc_flag, sizeof *abc_flag);
-	munmap(gamma_val, sizeof *gamma_val);
-}
-
-/* 
- * Typically start two loops:
- * 1. runs for as long as you want to
- *    capture frames (shoot the video).
- * 2. iterates over your buffers everytime. 
- *
- * args: 
- * 		struct device *dev - every infomation for camera
- */
-void get_a_frame(struct device *dev)
-{
-
-	for (unsigned int i = 0; i < dev->nbufs; i++)
-	{
-
-		queuebuffer.index = i;
-		/* The buffer's waiting in the outgoing queue. */
-		if (ioctl(dev->fd, VIDIOC_DQBUF, &queuebuffer) < 0)
-		{
-			perror("VIDIOC_DQBUF");
-			return;
-		}
-
-		/* check the capture raw image flag, do this before decode a frame */
-		if (*(save_raw))
-		{
-			printf("save a raw\n");
-			char buf_name[16];
-			snprintf(buf_name, sizeof(buf_name), "captures_%d.raw", image_count);
-			v4l2_core_save_data_to_file(buf_name,
-										dev->buffers->start, dev->imagesize);
-			image_count++;
-			set_save_raw_flag(0);
-		}
-
-		decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
-
-		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
-		{
-			perror("VIDIOC_QBUF");
-			return;
-		}
-	}
-	return;
-}
-
-/* 
- * opencv only support debayering 8 and 16 bits 
- * 
- * decode the frame, move each pixel by certain bits,
- * and mask it for 8 bits, render a frame using opencv
- * args: 
- * 		struct device *dev - every infomation for camera
- * 		const void *p - pointer for the buffer
- * 		int shift - values to shift(RAW10 - 2, RAW12 - 4, YUV422 - 0) 
- * 
- */
-void decode_a_frame(struct device *dev, const void *p, int shift)
-{
-	int height = dev->height;
-	int width = dev->width;
-	unsigned char tmp;
-	unsigned short *srcShort = (unsigned short *)p;
-	unsigned char *dst = (unsigned char *)p;
-	unsigned short ts;
-
-	/* --- for bayer camera ---*/
-	if (shift != 0)
-	{
-/* shift bits for 16-bit stream and get lower 8-bit for opencv 
-	 	 * debayering */
-/* use openmp loop parallelism to accelate shifting */
-#pragma omp for
-		for (int i = 0; i < height; i++)
-		{
-			for (int j = 0; j < width; j++)
-			{
-				ts = *(srcShort++);
-				if (ts > 64)
-					tmp = (ts - 64) >> shift;
-				else
-				{
-					tmp = 0;
-				}
-				
-				*(dst++) = (unsigned char)tmp;
-			}
-		}
-
-		cv::Mat img(height, width, CV_8UC1, (void *)p);
-		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-		//flip(img, img, 0); //mirror vertically
-		//flip(img, img, 1); //mirror horizontally
-		//apply_gamma(p, gamma_val, height, width);
-		img = apply_gamma_correction(img);
-		/* check awb flag, awb functionality, only available for bayer camera */
-		if (*(awb_flag) == 1)
-		{
-			img = apply_white_balance(img);
-		}
-		if (*(abc_flag) == 1)
-		{
-			img = apply_auto_brightness_and_contrast(img, 1);
-		}
-		/* check for save capture bmp flag, after decode the image */
-		if (*(save_bmp))
-		{
-			printf("save a bmp\n");
-			save_frame_image_bmp(img);
-			image_count++;
-			set_save_bmp_flag(0);
-		}
-		//if image larger than 720p by any dimension, reszie the window
-		if (width >= 1280 || height >= 720)
-		{
-			cv::resizeWindow("cam", 1280, 720);
-		}
-
-		cv::imshow("cam", img);
-	}
-	/* --- for yuv camera ---*/
-	else
-	{
-
-		cv::Mat img(height, width, CV_8UC2, (void *)p);
-		//apply_gamma(p, gamma_val, height, width);
-		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
-
-		/* check for save capture bmp flag, after decode the image */
-		if (*(save_bmp))
-		{
-			printf("save a bmp\n");
-			save_frame_image_bmp(img);
-			image_count++;
-			set_save_bmp_flag(0);
-		}
-
-		cv::resizeWindow("cam", 640, 480);
-		cv::imshow("cam", img);
-	}
-
-	if (cv::waitKey(_1MS) == _ESC_KEY)
-	{
-		cv::destroyWindow("cam");
-		exit(0);
-	}
 }
 
 /*

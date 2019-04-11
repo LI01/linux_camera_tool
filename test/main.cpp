@@ -16,7 +16,8 @@ static struct option opts[] = {
 	{"nbufs", 1, 0, 'n'},
 	{"size", 1, 0, 's'},
 	{"time-per-frame", 1, 0, 't'},
-	{0, 0, 0, 0}};
+	{0, 0, 0, 0}
+};
 
 
 /* main function */

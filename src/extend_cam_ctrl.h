@@ -53,15 +53,18 @@ void video_capture_save_raw();
 void set_save_bmp_flag(int flag);
 void video_capture_save_bmp();
 
-void change_datatype(void* datatype); 
 int set_shift(int *shift_flag);
+void change_datatype(void* datatype); 
 
-void change_bayerpattern(void *bayer); 
 int add_bayer_forcv(int *bayer_flag);
+void change_bayerpattern(void *bayer); 
 
 void add_gamma_val(float gamma_val_from_gui);
+void add_black_level_correction(int blc_val_from_gui);
+
 void awb_enable(int enable);
 void abc_enable(int enable);
+
 
 int open_v4l2_device(char *device_name, struct device *dev);
 int check_dev_cap(struct device *dev);
@@ -79,12 +82,14 @@ void video_get_format(struct device *dev);
 int streaming_loop(struct device *dev);
 
 void get_a_frame(struct device *dev);
+ void perform_shift(struct device *dev, const void *p, int shift);
 void decode_a_frame(struct device *dev, const void *p, int shift);
+
  
 int video_alloc_buffers(struct device *dev, int nbufs);
 int video_free_buffers(struct device *dev);
 
 
-
+void set_loop(int exit);
 
 
