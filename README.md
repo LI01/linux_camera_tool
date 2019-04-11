@@ -49,29 +49,41 @@ make
 ./leopard_cam
 ```
 ### Examples
-__Original streaming for IMX477__ -> image is dark and blue
+#### FYI 
+_Auto white balance_, _gamma correction_ and _auto brightness and contrast_ are done by mainly using opencv, since histogram matrix calculations are involved, enabling these features will slow down the streaming a lot.
+_Auto exposure_ is usually implemented on sensor/isp, which when enabled, won't further slow down the streaming, need to check with camera driver for auto exposure support.
+
+#### Test on RAW sensor 12 Megapixel IMX477
+__Original streaming for IMX477:__ 
+image is dark and blue
 <img src="pic/477orig.jpg" width="1000">
+
 __Modified streaming for IMX477:__
-1. enabled software AWB
-2. increase exposure
-3. read & write register from IMX477
+1. enabled software AWB, gamma correction
+2. read & write register from IMX477
 
-<img src="pic/477regCtrl.jpg" width="1000">
+<img src="pic/imx477regCtrl.jpg" width="1000">
 
+3. enable software auto brightness and contrast
+
+<img src="pic/imx477Abc.jpg" width="1000">
+
+#### Test on RAW sensor 5 Megapixel OS05A20
 __Modified streaming for OS05A20 full resolution__
 1. change bayer pattern to GRBG
-2. enable software AWB
+2. enable software AWB, gamma correction
 3. increase exposure, gain
 
 <img src="pic/os05a20.jpg" width="1000">
 
+
 __Modified OS05A20 resolution to an available one__
 1. binning mode
 2. capture raw and bmp, save them in the camera tool directory
+
 <img src="pic/changeResOS05A20.jpg" width="1000">
 
-
-
+#### Test on AR1335-ICP3 YUV 12 Megapixel Cam
 
 __Original streaming for AR1335 ICP3 YUV cam:__
 Default ae enabled -> change exposure&gain takes no effects

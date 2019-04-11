@@ -22,7 +22,7 @@ void hscale_gain_up(GtkRange *widget);
 
 void enable_ae(GtkToggleButton *toggle_button);
 void enable_awb(GtkToggleButton *toggle_button);
-void enable_ag(GtkToggleButton *toggle_button);
+void enable_abc(GtkToggleButton *toggle_button);
 
 void toggled_addr_length(GtkWidget* widget, gpointer data);
 int addr_width_for_rw(int address_width_flag);
@@ -33,6 +33,12 @@ void register_read(GtkWidget *widget);
 void capture_bmp(GtkWidget *widget);
 void capture_raw(GtkWidget *widget);
 
+void gamma_correction(GtkWidget *widget);
+void black_level_correction(GtkWidget *widget);
+
 void send_trigger(GtkWidget *widget);
 void enable_trig(GtkWidget *widget);
+
+void exit_loop(GtkWidget *widget);
+
 int init_control_gui(int argc, char* argv[]);

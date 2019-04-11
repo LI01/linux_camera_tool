@@ -13,7 +13,7 @@
 #include <linux/uvcvideo.h>
 #include <sys/fcntl.h> /* for open() syscall */ 
 #include <sys/mman.h> /* for using mmap */
-
+#include <math.h>       /* pow */
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 #define SIZE(a) (sizeof(a) / sizeof(*a))
 

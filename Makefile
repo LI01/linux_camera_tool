@@ -1,6 +1,6 @@
 # tool macros
 CROSS_COMPILE ?=
-CPP      	:= $(CROSS_COMPILE)g++
+CPP      	:= $(CROSS_COMPILE)g++ #clang++ is better for debug but slower on compile
 DBGFLAGS 	:= -g
 CPPFLAGS 	:= -Wall -Wextra `pkg-config --cflags opencv gtk+-3.0` 
 CPPOBJFLAGS	:= $(CPPFLAGS) -c 
@@ -12,6 +12,7 @@ LDFLAGS	+= \
 		-fopenmp \
 		-lv4l2 \
 		-ludev \
+		-lm \
 		$(LDLIBS) \
 		$(LDLIBCV)
 
