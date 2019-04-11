@@ -61,6 +61,7 @@ int add_bayer_forcv(int *bayer_flag);
 
 void add_gamma_val(float gamma_val_from_gui);
 void awb_enable(int enable);
+void abc_enable(int enable);
 
 int open_v4l2_device(char *device_name, struct device *dev);
 int check_dev_cap(struct device *dev);

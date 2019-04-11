@@ -67,6 +67,7 @@ extern void video_capture_save_raw();
 
 extern void add_gamma_val(float gamma_val_from_gui);
 extern void awb_enable(int enable);
+extern void abc_enable(int enable);
 
 extern void soft_trigger(int fd);
 extern void trigger_enable(int fd, int ena, int enb);
@@ -129,13 +130,19 @@ void enable_awb(GtkToggleButton *toggle_button)
     }
 }
 
-/* callback for enabling/disabling auto gain */
-void enable_ag(GtkToggleButton *toggle_button)
+/* callback for enabling/disabling auto brightness and contrast optimization */
+void enable_abc(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-        set_gain_auto(v4l2_dev, 0);
+    if (gtk_toggle_button_get_active(toggle_button)) 
+    {
+        g_print("auto brighness and contrast optimization enable\n");
+        abc_enable(1);
+    }
     else
-        set_gain_auto(v4l2_dev, 1);
+    {
+        g_print("auto brighness and contrast optimization disable\n");
+        abc_enable(0);
+    }
 }
 
 /* callback for updating register address length 8/16 bits */
@@ -384,9 +391,9 @@ int init_control_gui(int argc, char *argv[])
     g_signal_connect(GTK_TOGGLE_BUTTON(check_button_awb), "toggled",
                      G_CALLBACK(enable_awb), NULL);
 
-    check_button_auto_gain = gtk_check_button_new_with_label("Enable auto gain");
+    check_button_auto_gain = gtk_check_button_new_with_label("Enable auto brightness&contrast");
     g_signal_connect(GTK_TOGGLE_BUTTON(check_button_auto_gain), "toggled",
-                     G_CALLBACK(enable_ag), NULL);
+                     G_CALLBACK(enable_abc), NULL);
 
     /* --- row 4 and row 5 --- */
     label_exposure = gtk_label_new("Exposure:");
