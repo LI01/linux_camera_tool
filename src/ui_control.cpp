@@ -254,6 +254,7 @@ void capture_raw(GtkWidget *widget)
 
 void gamma_correction(GtkWidget *widget)
 {
+    (void) widget;
     float gamma = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_gamma)));
     add_gamma_val(gamma);
     g_print("gamma = %f\n", gamma);

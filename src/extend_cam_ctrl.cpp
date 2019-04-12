@@ -38,7 +38,7 @@
 
 #include <string.h>
 #include <omp.h> //for openmp
-
+#include <math.h>       /* pow */
 #include "../includes/shortcuts.h"
 #include "extend_cam_ctrl.h"
 /****************************************************************************
@@ -592,7 +592,7 @@ void mmap_variables()
 	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	black_level_correction = (int *)mmap(NULL, sizeof *black_level_correction,
-										 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+							 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	loop = (int *)mmap(NULL, sizeof *loop, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 }
@@ -761,6 +761,7 @@ int streaming_loop(struct device *dev)
 		get_a_frame(dev);
 	}
 	unmap_variables();
+	return 0;
 }
 
 /* 
@@ -972,6 +973,8 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 	bufrequest.memory = V4L2_MEMORY_MMAP;
 	bufrequest.count = nbufs;
 	dev->nbufs = nbufs;
+	dev->memtype = V4L2_MEMORY_MMAP;
+	dev->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
 	int ret;
 	ret = ioctl(dev->fd, VIDIOC_REQBUFS, &bufrequest);

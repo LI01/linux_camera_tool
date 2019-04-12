@@ -363,7 +363,16 @@ void trigger_delay_time(int fd, unsigned int delay_time)
     printf("V4L2_CORE: trigger delay time %x", delay_time);
 }
 
-//TODO: add comments
+/*
+ * Change camera sensor from free running master mode to trigger mode.
+ * Different sensors will have different triggering mode configurations.
+ * Need to check with the sensor and driver support for triggering functionality.
+ * Once trigger_enable is called, streaming will freeze.
+ * There will be frames coming out for each trigger pulse you've been sent.
+ * soft_trigger will generate one trigger for each call.
+ * However, a dedicated triggering pin to generate the desired frame rate is prefered 
+ * to sync with more than one camera.
+ */
 void trigger_enable(int fd, int ena, int enb)
 {
     CLEAR(buf11);

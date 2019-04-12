@@ -16,9 +16,7 @@ static struct option opts[] = {
 	{"nbufs", 1, 0, 'n'},
 	{"size", 1, 0, 's'},
 	{"time-per-frame", 1, 0, 't'},
-	{0, 0, 0, 0}
-};
-
+	{0, 0, 0, 0}};
 
 /* main function */
 int main(int argc, char **argv)
@@ -44,7 +42,6 @@ int main(int argc, char **argv)
 	/* list all the resolutions */
 	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\
 		sed 's/Size/Resolution/g'");
-
 
 	while ((c = getopt_long(argc, argv, "n:s:t:", opts, NULL)) != -1)
 	{
@@ -83,7 +80,8 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (optind >= argc) {
+	if (optind >= argc)
+	{
 		usage(argv[0]);
 	}
 
@@ -97,7 +95,6 @@ int main(int argc, char **argv)
 	{
 		set_frame_rate(v4l2_dev, time_per_frame.denominator);
 	}
-
 
 	/* 
 	 * run a v4l2-ctl --list-formats-ext 
@@ -129,9 +126,6 @@ int main(int argc, char **argv)
 	else if (pid > 0)
 	{ /* parent process */
 		streaming_loop(&dev);
-		/* Deactivate streaming */
-		stop_Camera(&dev);
-		video_free_buffers(&dev);
 	}
 	else
 	{
@@ -148,8 +142,7 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)
 	{
-		generic_I2C_read(v4l2_dev, 0x02, ChangConfig[i].reg_data_width
-			 AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
+		generic_I2C_read(v4l2_dev, 0x02, ChangConfig[i].reg_data_width AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
 	}
 
 	generic_I2C_read(v4l2_dev, 0x02, 1, MAX9295_SER_I2C_ADDR, 0x0000);
@@ -158,7 +151,7 @@ int main(int argc, char **argv)
 
 #ifdef AP0202_WRITE_REG_IN_FLASH
 	load_register_setting_from_configuration(v4l2_dev,
-		SIZE(ChangConfigFromFlash), ChangConfigFromFlash);
+											 SIZE(ChangConfigFromFlash), ChangConfigFromFlash);
 
 	sleep(1);
 	//generic_I2C_read(v4l2_dev, 0x02, 2, AP020X_I2C_ADDR, 0x0058);
@@ -198,6 +191,10 @@ int main(int argc, char **argv)
 	get_gain(v4l2_dev);
 #endif
 
+	/* Deactivate streaming */
+	stop_Camera(&dev);
+	video_free_buffers(&dev);
 	close(v4l2_dev);
+	system("killall -9 leopard_cam"); //FIXME:why when close the window, it won't kill the process 
 	return 0;
 }
