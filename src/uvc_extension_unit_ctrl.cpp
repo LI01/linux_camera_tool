@@ -42,7 +42,6 @@ unsigned int m_grGain = 0x1;
 unsigned int m_gbGain = 0x1;
 unsigned int m_bGain = 0x1;
 
-extern int fw_rev;
 int hw_rev;
  char uuid[64];
 
@@ -105,8 +104,12 @@ void write_to_UVC_extension(int fd,int property_id,
 	xu_query.selector = property_id;
 	xu_query.data = buffer; //control buffer
 
-	if (ioctl(fd, UVCIOC_CTRL_QUERY, &xu_query) != 0)
+
+
+	if ((ioctl(fd, UVCIOC_CTRL_QUERY, &xu_query)) != 0)
 		error_handle_extension_unit();
+
+	
 }
 
 /*
@@ -273,16 +276,16 @@ int read_cam_uuid_hwfw_rev(int fd)
 	/* upper 4 bits are for camera datatype, clear that flags */
     hw_rev = buf7[0] | (buf7[1] << 8);
 	hw_rev &= ~(0xf000); 
-    fw_rev = buf7[2] | (buf7[3] << 8);
+    int local_fw_rev = buf7[2] | (buf7[3] << 8);
     for (int i=0; i < (36+9); i++)
     {
         uuidBuf[i] = buf7[4+i];
     }
     strcpy(uuid, uuidBuf);
     printf("hardware rev=%x\n", hw_rev);
-    printf("firmware rev=%d\n", fw_rev);
+    printf("firmware rev=%d\n", local_fw_rev);
     printf("uuid=%s\n", uuid);
-	return fw_rev;
+	return local_fw_rev;
 }
 
 /*
@@ -345,9 +348,12 @@ void set_pts(int fd,unsigned long initVal)
 void soft_trigger(int fd)
 {
     CLEAR(buf9);
+
+    printf("V4L2_CORE: send one trigger\n");
+
     write_to_UVC_extension(fd, LI_XU_SOFT_TRIGGER, 
         LI_XU_SOFT_TRIGGER_SIZE, buf9);
-    printf("V4L2_CORE: send one trigger\n");
+    
 }
 
 
@@ -358,9 +364,12 @@ void trigger_delay_time(int fd, unsigned int delay_time)
     buf10[1] = (delay_time >> 8) & 0xff;
     buf10[2] = (delay_time >> 16) & 0xff;
     buf10[3] = (delay_time >> 24) & 0xff;
+
+    printf("V4L2_CORE: trigger delay time %x", delay_time);
+
     write_to_UVC_extension(fd, LI_XU_TRIGGER_DELAY,
         LI_XU_TRIGGER_DELAY_SIZE, buf10);
-    printf("V4L2_CORE: trigger delay time %x", delay_time);
+    
 }
 
 /*
@@ -386,7 +395,7 @@ void trigger_enable(int fd, int ena, int enb)
     else
         buf11[0] = 0x00;
     buf11[1] = 0x00;
-    write_to_UVC_extension(fd, LI_XU_TRIGGER_MODE,
+   	write_to_UVC_extension(fd, LI_XU_TRIGGER_MODE,
         LI_XU_TRIGGER_MODE_SIZE, buf11);
     //printf("trigger mode enable\n");
 }
