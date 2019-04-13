@@ -3,7 +3,7 @@
 #include <getopt.h>
 #include "../src/uvc_extension_unit_ctrl.h"
 #include "../src/extend_cam_ctrl.h"
-#include "../src/ui_control.h"
+#include "./ui_control.h"
 #include "../src/cam_property.h"
 #include "../src/v4l2_devices.h"
 

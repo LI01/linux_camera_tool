@@ -39,10 +39,33 @@ sudo sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf'
 sudo ldconfig
 ```
 
-### Build Camera Tool
+### Build Camera Tool(Makefile)
 ```sh
 make
 ```
+
+### Build Camera Tool(CMake)
+```sh
+mkdir build
+cd build
+cmake ../
+make
+```
+
+### Add to your project(CMake)
+```sh
+add_subdirectory(linux_camera_tool)
+include_directories(
+	linux_camera_tool/src/
+)
+
+...
+
+target_link_libraries(<Your Target>
+	leopard_tools
+)
+```
+
 
 ### Run Camera Tool
 ```

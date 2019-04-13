@@ -41,6 +41,8 @@
 #include <math.h>       /* pow */
 #include "../includes/shortcuts.h"
 #include "extend_cam_ctrl.h"
+
+
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -479,7 +481,7 @@ static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
 	 * ref: https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
 	 */
 	cv::Mat lab_image;
-	cv::cvtColor(opencvImage, lab_image, CV_BGR2Lab);
+	cv::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
 	/* Extract the L channel */
 	std::vector<cv::Mat> lab_planes(3);
 	cv::split(lab_image, lab_planes); // now we have the L image in lab_planes[0]
@@ -495,7 +497,7 @@ static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
 	cv::merge(lab_planes, lab_image);
 
 	// convert back to RGB
-	cv::cvtColor(lab_image, opencvImage, CV_Lab2BGR);
+	cv::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
 	return opencvImage;
 }
 
@@ -751,7 +753,7 @@ void video_get_format(struct device *dev)
 */
 int streaming_loop(struct device *dev)
 {
-	cv::namedWindow("cam", CV_GUI_NORMAL);
+	cv::namedWindow("cam", cv::WINDOW_NORMAL);
 	image_count = 0;
 	*loop = 1;
 	//TODO: add a loop flag to exit
@@ -791,7 +793,7 @@ void get_a_frame(struct device *dev)
 		if (*(save_raw))
 		{
 			printf("save a raw\n");
-			char buf_name[24];
+			char buf_name[30];
 			snprintf(buf_name, sizeof(buf_name), "captures_%s_%d.raw",
 					 get_product(), image_count);
 			v4l2_core_save_data_to_file(buf_name,
@@ -861,7 +863,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	{
 		perform_shift(dev, p, shift);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
-		cv::cvtColor(img, img, CV_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
 		//flip(img, img, 0); //mirror vertically
 		//flip(img, img, 1); //mirror horizontally
 
