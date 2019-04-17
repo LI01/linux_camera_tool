@@ -30,7 +30,7 @@ char *get_serial()
 {
     return serial;
 }
-char* enum_v4l2_device(char *dev_name)
+char *enum_v4l2_device(char *dev_name)
 {
 
     struct udev *udev;
@@ -38,6 +38,7 @@ char* enum_v4l2_device(char *dev_name)
     struct udev_list_entry *devices;
     struct udev_list_entry *dev_list_entry;
     struct udev_device *dev;
+    printf("********************udev device start************************\n");
     /* Create the udev object */
     udev = udev_new();
     if (!udev)
@@ -66,7 +67,7 @@ char* enum_v4l2_device(char *dev_name)
         path = udev_list_entry_get_name(dev_list_entry);
         dev = udev_device_new_from_syspath(udev, path);
         char dev_name_tmp[64];
-        
+
         /* usb_device_get_devnode() returns the path to the device node
 		   itself in /dev. */
         printf("Device Node Path: %s\n", udev_device_get_devnode(dev));
@@ -95,31 +96,31 @@ char* enum_v4l2_device(char *dev_name)
         if ((strcmp("2a0b", udev_device_get_sysattr_value(dev, "idVendor"))) == 0)
         {
             strcpy(dev_name, dev_name_tmp);
+            /* From here, we can call get_sysattr_value() for each file
+		     * in the device's /sys entry. The strings passed into these
+		     * functions (idProduct, idVendor, serial, etc.) correspond
+		     * directly to the files in the directory which represents
+		     * the USB device. Note that USB strings are Unicode, UCS2
+		     * encoded, but the strings returned from
+		     * udev_device_get_sysattr_value() are UTF-8 encoded. */
+            printf("  VID/PID: %s %s\n",
+                   udev_device_get_sysattr_value(dev, "idVendor"),
+                   udev_device_get_sysattr_value(dev, "idProduct"));
+
+            strcpy(manufacturer, udev_device_get_sysattr_value(dev, "manufacturer"));
+            strcpy(product, udev_device_get_sysattr_value(dev, "product"));
+            strcpy(serial, udev_device_get_sysattr_value(dev, "serial"));
+            printf("  %s\n  %s\n",
+                   manufacturer,
+                   product);
+            // printf("  serial: %s\n",
+            //        serial);
+
+            //TODO:delete this for other computer?
+            return dev_name;
         }
 
-        /* From here, we can call get_sysattr_value() for each file
-		   in the device's /sys entry. The strings passed into these
-		   functions (idProduct, idVendor, serial, etc.) correspond
-		   directly to the files in the directory which represents
-		   the USB device. Note that USB strings are Unicode, UCS2
-		   encoded, but the strings returned from
-		   udev_device_get_sysattr_value() are UTF-8 encoded. */
-        printf("  VID/PID: %s %s\n",
-               udev_device_get_sysattr_value(dev, "idVendor"),
-               udev_device_get_sysattr_value(dev, "idProduct"));
-
-        strcpy(manufacturer, udev_device_get_sysattr_value(dev, "manufacturer"));
-        strcpy(product, udev_device_get_sysattr_value(dev, "product"));
-        strcpy(serial, udev_device_get_sysattr_value(dev, "serial"));
-        printf("  %s\n  %s\n",
-               manufacturer,
-               product);
-        // printf("  serial: %s\n",
-        //        serial);
-
         udev_device_unref(dev);
-        //TODO:delete this for other computer?
-        return dev_name;
     }
     /* Free the enumerator object */
     udev_enumerate_unref(enumerate);

@@ -39,10 +39,12 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+	printf("********************list resolutions*************************\n");
 	/* list all the resolutions */
 	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\
 		sed 's/Size/Resolution/g'");
 
+	printf("********************camera tool usages***********************\n");
 	while ((c = getopt_long(argc, argv, "n:s:t:", opts, NULL)) != -1)
 	{
 		switch (c)
@@ -105,7 +107,7 @@ int main(int argc, char **argv)
 
 	/* list the current frame rate */
 	get_frame_rate(v4l2_dev);
-
+	printf("********************device infomation************************\n");
 	/* try to get all the static camera info before fork */
 	fw_rev = read_cam_uuid_hwfw_rev(v4l2_dev);
 	check_dev_cap(&dev);
@@ -114,7 +116,7 @@ int main(int argc, char **argv)
 
 	//sensor_reg_read(v4l2_dev, 0x55d7);
 	//generic_I2C_read(v4l2_dev, 0x02, 8, 0x20, 0x0210);
-
+	printf("********************control logs*****************************\n");
 	/* Activate streaming */
 	start_camera(&dev);
 	pid_t pid;

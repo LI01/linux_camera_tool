@@ -403,6 +403,7 @@ void abc_enable(int enable)
 
 static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
 												  float clipHistPercent = 0)
+												  
 {
 	// /* Method 1:
 	//  * Automatic brightness and contrast optimization with optional histogram clipping
@@ -723,8 +724,8 @@ void video_get_format(struct device *dev)
 	dev->bytesperline = fmt.fmt.pix.bytesperline;
 	dev->imagesize = fmt.fmt.pix.bytesperline ? fmt.fmt.pix.sizeimage : 0;
 
-	printf("Get Current Video Format: %c%c%c%c (%08x) %ux%u\n 		\
-			byte per line:%d\nsize image:%ud\n",
+	printf("\nGet Current Video Format:%c%c%c%c (%08x)%ux%u\n"
+	"byte per line:%d\nsize image:%ud\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 8) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 16) & 0xff,
@@ -756,7 +757,6 @@ int streaming_loop(struct device *dev)
 	cv::namedWindow("cam", cv::WINDOW_NORMAL);
 	image_count = 0;
 	*loop = 1;
-	//TODO: add a loop flag to exit
 	while (*loop)
 	{
 		t = (double)cv::getTickCount();
