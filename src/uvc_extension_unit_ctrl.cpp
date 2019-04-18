@@ -256,10 +256,6 @@ void set_sensor_gain_rgb(int fd,unsigned int rGain,
 	
 	write_to_UVC_extension(fd, LI_XU_SENSOR_GAIN_CONTROL_RGB, 
         LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE, buf4);
-	printf("V4L2_CORE: setter get rGain = 0x%x\r\n", m_rGain);
-	printf("V4L2_CORE: setter get grGain = 0x%x\r\n", m_grGain);
-	printf("V4L2_CORE: setter get gbGain = 0x%x\r\n", m_gbGain);
-	printf("V4L2_CORE: setter get bGain = 0x%x\r\n", m_bGain);
 }
 
 /* 
@@ -302,6 +298,10 @@ int read_cam_uuid_hwfw_rev(int fd)
  *  
  * PTS info:
  * currently on FX3, PTS counter is sampling at frequency 403M/16 ~ 25MHz
+ * 
+ * Clock frequency can be read off from usb descriptor: 25187500Hz 
+ * e.g.	lsusb -D /dev/bus/usb/002/019 | grep dwClockFrequency
+ * 
  * for different camera boards, crystall will slightly drift over time
  * PTS increments over time can be calculated by 
  * 		(1/frame_rate)/(1/25MHz) = 25MHz/frame_rate

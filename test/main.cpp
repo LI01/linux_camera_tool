@@ -39,12 +39,16 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	printf("********************list resolutions*************************\n");
+	printf("********************List Available Resolutions***************\n");
 	/* list all the resolutions */
 	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\
 		sed 's/Size/Resolution/g'");
+	/* 
+	 * run a v4l2-ctl --list-formats-ext 
+	 * to see the resolution and available frame rate 
+	 */
 
-	printf("********************camera tool usages***********************\n");
+	printf("********************Camera Tool Usages***********************\n");
 	while ((c = getopt_long(argc, argv, "n:s:t:", opts, NULL)) != -1)
 	{
 		switch (c)
@@ -98,25 +102,18 @@ int main(int argc, char **argv)
 		set_frame_rate(v4l2_dev, time_per_frame.denominator);
 	}
 
-	/* 
-	 * run a v4l2-ctl --list-formats-ext 
-	 * to see the resolution and available frame rate 
-	 */
-	//video_set_format(&dev, 1344, 972, V4L2_PIX_FMT_YUYV);
-	//set_frame_rate(v4l2_dev, 5);
 
-	/* list the current frame rate */
-	get_frame_rate(v4l2_dev);
-	printf("********************device infomation************************\n");
+	printf("********************Device Infomation************************\n");
 	/* try to get all the static camera info before fork */
 	fw_rev = read_cam_uuid_hwfw_rev(v4l2_dev);
 	check_dev_cap(&dev);
-	video_get_format(&dev);
+	video_get_format(&dev); /* list the current resolution etc */
+	get_frame_rate(v4l2_dev); /* list the current frame rate */
+
+	printf("********************Allocate Buffer for Capturing************\n");
 	video_alloc_buffers(&dev, dev.nbufs);
 
-	//sensor_reg_read(v4l2_dev, 0x55d7);
-	//generic_I2C_read(v4l2_dev, 0x02, 8, 0x20, 0x0210);
-	printf("********************control logs*****************************\n");
+	printf("********************Control Logs*****************************\n");
 	/* Activate streaming */
 	start_camera(&dev);
 	pid_t pid;
@@ -144,7 +141,8 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)
 	{
-		generic_I2C_read(v4l2_dev, 0x02, ChangConfig[i].reg_data_width AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
+		generic_I2C_read(v4l2_dev, 0x02, ChangConfig[i].reg_data_width,
+						 AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
 	}
 
 	generic_I2C_read(v4l2_dev, 0x02, 1, MAX9295_SER_I2C_ADDR, 0x0000);
@@ -153,7 +151,7 @@ int main(int argc, char **argv)
 
 #ifdef AP0202_WRITE_REG_IN_FLASH
 	load_register_setting_from_configuration(v4l2_dev,
-											 SIZE(ChangConfigFromFlash), ChangConfigFromFlash);
+		SIZE(ChangConfigFromFlash), ChangConfigFromFlash);
 
 	sleep(1);
 	//generic_I2C_read(v4l2_dev, 0x02, 2, AP020X_I2C_ADDR, 0x0058);
@@ -189,14 +187,14 @@ int main(int argc, char **argv)
 
 		sensor_reg_read(v4l2_dev, IMX334_MIPI_REG_TESTING[i].reg_addr);
 	}
-	set_gain(v4l2_dev, 5);
-	get_gain(v4l2_dev);
 #endif
 
 	/* Deactivate streaming */
 	stop_Camera(&dev);
 	video_free_buffers(&dev);
 	close(v4l2_dev);
-	system("killall -9 leopard_cam"); //FIXME:why when close the window, it won't kill the process 
+
+	//FIXME:why when close the window, it won't kill the process
+	system("killall -9 leopard_cam"); 
 	return 0;
 }

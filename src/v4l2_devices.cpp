@@ -38,7 +38,8 @@ char *enum_v4l2_device(char *dev_name)
     struct udev_list_entry *devices;
     struct udev_list_entry *dev_list_entry;
     struct udev_device *dev;
-    printf("********************udev device start************************\n");
+
+    printf("********************Udev Device Start************************\n");
     /* Create the udev object */
     udev = udev_new();
     if (!udev)
@@ -54,32 +55,32 @@ char *enum_v4l2_device(char *dev_name)
     devices = udev_enumerate_get_list_entry(enumerate);
 
     /* For each item enumerated, print out its information.
-	   udev_list_entry_foreach is a macro which expands to
-	   a loop. The loop will be executed for each member in
-	   devices, setting dev_list_entry to a list entry
-	   which contains the device's path in /sys. */
+	 * udev_list_entry_foreach is a macro which expands to
+	 * a loop. The loop will be executed for each member in
+	 * devices, setting dev_list_entry to a list entry
+	 * which contains the device's path in /sys. */
     udev_list_entry_foreach(dev_list_entry, devices)
     {
         const char *path;
 
         /* Get the filename of the /sys entry for the device
-		   and create a udev_device object (dev) representing it */
+		 * and create a udev_device object (dev) representing it */
         path = udev_list_entry_get_name(dev_list_entry);
         dev = udev_device_new_from_syspath(udev, path);
         char dev_name_tmp[64];
 
         /* usb_device_get_devnode() returns the path to the device node
-		   itself in /dev. */
+		 * itself in /dev. */
         printf("Device Node Path: %s\n", udev_device_get_devnode(dev));
         strcpy(dev_name_tmp, udev_device_get_devnode(dev));
         printf("%s\n", dev_name_tmp);
 
         /* The device pointed to by dev contains information about
-		   the hidraw device. In order to get information about the
-		   USB device, get the parent device with the
-		   subsystem/devtype pair of "usb"/"usb_device". This will
-		   be several levels up the tree, but the function will find
-		   it.*/
+		 * the hidraw device. In order to get information about the
+		 * USB device, get the parent device with the
+		 * subsystem/devtype pair of "usb"/"usb_device". This will
+		 * be several levels up the tree, but the function will find
+		 * it.*/
         dev = udev_device_get_parent_with_subsystem_devtype(
             dev,
             "usb",
@@ -113,6 +114,8 @@ char *enum_v4l2_device(char *dev_name)
             printf("  %s\n  %s\n",
                    manufacturer,
                    product);
+            /* Add serial number in usb descriptor will need to request
+               a firmware updates, values will get from FX3 and sensor fuse id */
             // printf("  serial: %s\n",
             //        serial);
 

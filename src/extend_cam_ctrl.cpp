@@ -37,8 +37,9 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <string.h>
-#include <omp.h> //for openmp
-#include <math.h>       /* pow */
+#include <omp.h> 		/*for openmp */
+#include <math.h>       /*for pow gamma correction*/
+
 #include "../includes/shortcuts.h"
 #include "extend_cam_ctrl.h"
 
@@ -58,7 +59,7 @@ static int *awb_flag;   			/* flag for enable software awb*/
 static int *abc_flag;   			/* flag for enable brightness & contrast opt */
 static float *gamma_val; 			/* gamma correction value from gui */
 static int *black_level_correction; /* white balance value from gui */
-static int *loop;
+static int *loop;					/* while (*loop) */
 double t = 0;						/* time measured in opencv for caculating fps */
 double fps;							/* frame rate */
 char string_frame_rate[10]; 		/* string to save the frame rate */
@@ -66,7 +67,7 @@ static int image_count;
 
 struct v4l2_buffer queuebuffer;
 
-extern char *get_product();
+extern char *get_product();			/* put product name into captured image name */
 /*****************************************************************************
 **                           Function definition
 *****************************************************************************/
@@ -309,30 +310,6 @@ void awb_enable(int enable)
  */
 static cv::Mat apply_white_balance(cv::Mat opencvImage)
 {
-	// method 1
-	// cv::Mat splitChannelRGB[3];
-
-	// split(opencvImage, splitChannelRGB);
-
-	// double R, G, B;
-	// B = mean(splitChannelRGB[0])[0];
-	// G = mean(splitChannelRGB[1])[0];
-	// R = mean(splitChannelRGB[2])[0];
-	// double RGB_ORIG[3] = {B, G, R};
-	// /* gain for adjusting each color channel */
-	// double KR = 1, KG = 1, KB = 1;
-	// KB = (R + G + B) / (3 * B);
-	// KG = (R + G + B) / (3 * G);
-	// KR = (R + G + B) / (3 * R);
-
-	// splitChannelRGB[0] = splitChannelRGB[0] * KB;
-	// splitChannelRGB[1] = splitChannelRGB[1] * KG;
-	// splitChannelRGB[2] = splitChannelRGB[2] * KR;
-
-	// /* merge three RGB channels back together */
-	// merge(splitChannelRGB, 3, opencvImage);
-
-	// method 2
 	double discard_ratio = 0.05;
 	int hists[3][256];
 	CLEAR(hists);
@@ -502,12 +479,6 @@ static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
 	return opencvImage;
 }
 
-// static __THREAD_TYPE capture_thread;
-
-// /*video buffer data mutex*/
-// static __MUTEX_TYPE mutex = __STATIC_MUTEX_INIT;
-// #define __PMUTEX &mutex
-
 /* 
  * open the /dev/video* uvc camera device
  * 
@@ -535,6 +506,7 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	mmap_variables();
 	*gamma_val = 1.0;
 	*black_level_correction = 0;
+
 	return v4l2_dev;
 }
 
@@ -565,13 +537,13 @@ int check_dev_cap(struct device *dev)
 	}
 	if (!(cap.capabilities & V4L2_CAP_STREAMING))
 	{
-		printf("does not support streaming\n");
+		printf("Does not support streaming\n");
 
 		return -1;
 	}
 	if (!(cap.capabilities & V4L2_CAP_READWRITE))
 	{
-		printf("does not support read, try with mmap\n");
+		printf("Does not support read, try with mmap\n");
 		return -1;
 	}
 	return 0;
@@ -627,7 +599,7 @@ void start_camera(struct device *dev)
 	ret = (ioctl(dev->fd, VIDIOC_STREAMON, &type));
 	if (ret < 0)
 	{
-		printf("couldn't start camera streaming\n");
+		printf("Couldn't start camera streaming\n");
 		return;
 	}
 	return;
@@ -646,7 +618,7 @@ void stop_Camera(struct device *dev)
 	ret = ioctl(dev->fd, VIDIOC_STREAMOFF, &type);
 	if (ret < 0)
 	{
-		printf("couldn't stop camera streaming\n");
+		printf("Couldn't stop camera streaming\n");
 		return;
 	}
 	return;
@@ -682,8 +654,8 @@ void video_set_format(struct device *dev, int width,
 			   errno);
 		return;
 	}
-	printf("Get Video format: %c%c%c%c (%08x) %ux%u\n 	\
-			byte per line:%d\nsize image:%ud\n",
+	printf("Get Video Format: %c%c%c%c (%08x) %ux%u\n"
+			"byte per line:%d\nsize image:%u\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 8) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 16) & 0xff,
@@ -795,9 +767,9 @@ void get_a_frame(struct device *dev)
 			printf("save a raw\n");
 			char buf_name[30];
 			snprintf(buf_name, sizeof(buf_name), "captures_%s_%d.raw",
-					 get_product(), image_count);
+				get_product(), image_count);
 			v4l2_core_save_data_to_file(buf_name,
-										dev->buffers->start, dev->imagesize);
+				dev->buffers->start, dev->imagesize);
 			image_count++;
 			set_save_raw_flag(0);
 		}
@@ -864,22 +836,22 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		perform_shift(dev, p, shift);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 		cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+
 		//flip(img, img, 0); //mirror vertically
 		//flip(img, img, 1); //mirror horizontally
 
 		/* gamma correction functionality, only available for bayer camera */
-		img = apply_gamma_correction(img);
+		if (*(gamma_val) != (float)1) 
+			img = apply_gamma_correction(img);
+	
 		/* check awb flag, awb functionality, only available for bayer camera */
 		if (*(awb_flag) == 1)
-		{
 			img = apply_white_balance(img);
-		}
+		
 		/* check abc flag, abc functionality, only available for bayer camera */
 		if (*(abc_flag) == 1)
-		{
 			img = apply_auto_brightness_and_contrast(img, 1);
-		}
-
+		
 		share_img = img;
 	}
 	/* --- for yuv camera ---*/
@@ -901,9 +873,8 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 
 	/* if image larger than 720p by any dimension, reszie the window */
 	if (width >= 1280 || height >= 720)
-	{
 		cv::resizeWindow("cam", 1280, 720);
-	}
+	
 
 	cv::putText(share_img,
 				"ESC: close streaming window",

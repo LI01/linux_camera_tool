@@ -1,4 +1,4 @@
-#Change Log
+# Change Log
 
 All notable changes to __linux camera tool__ will be documented in this file
 

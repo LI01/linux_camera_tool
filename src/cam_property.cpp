@@ -97,7 +97,7 @@ void set_frame_rate(int fd, int fps)
     param.parm.capture.timeperframe.denominator = fps;
     if(ioctl(fd, VIDIOC_S_PARM, &param) < 0)
         error_handle_cam_ctrl();
-    printf("Set frame rate = %d\n", fps);
+    printf("Set Frame Rate = %d\n", fps);
 }
 
 int get_frame_rate(int fd)
@@ -107,10 +107,9 @@ int get_frame_rate(int fd)
     param.type =  (v4l2_buf_type) V4L2_CAP_VIDEO_CAPTURE;
     if(ioctl(fd, VIDIOC_G_PARM, &param) < 0)
         error_handle_cam_ctrl();
-    printf("Get frame rate = %d\n", param.parm.capture.timeperframe.denominator);
+    printf("Get Current Frame Rate = %d\n", param.parm.capture.timeperframe.denominator);
     //printf("Get frame rate num= %d\n", param.parm.capture.timeperframe.numerator);
-    //return param.parm.capture.timeperframe.denominator;
-    return 0;
+    return param.parm.capture.timeperframe.denominator;
 }
 
 

@@ -1,0 +1,24 @@
+# This file contains some commands, including I2C access, capture
+# A line starting with a # is a comment line
+# The first word of each line is a command, each line supports only one command
+# Support for the following commands
+#   Read, Write, SubAddress, RegAddress, RegAddressWidth
+
+# command syntax:
+# Read byte_count
+# Write byte0 byte1 byte2 ... max 256 bytes
+# SubAddress i2c_sub_address
+# RegAddress register_address
+# RegAddrWidth register_address_width(8 or 16)
+# Capture frame_number file_name
+
+# examples:
+# SubAddress 0x6C # device 8-bit I2C sub address is 0x6C
+# RegAddrWidth 16 # 16-bit address
+# RegAddress 0x000A # register address 0x000A
+# Read 2 # read 2 bytes
+# Write 0xA3 0x30 # write 0xA330 to register 0x000A
+# Display no # Disable display to avoid frame drop during image capture
+# Capture 3 CapturedImage # capture 3 frames, the file name is CapturedImage_1.bmp, CapturedImage_2.bmp, CapturedImage_3.bmp
+# Delay 100 # delay 100ms
+# Display yes # enable Display
