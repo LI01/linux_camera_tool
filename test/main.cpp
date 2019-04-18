@@ -120,7 +120,7 @@ int main(int argc, char **argv)
 	pid = fork();
 	if (pid == 0)
 	{ /* child process */
-		init_control_gui(argc, argv);
+		init_control_gui();
 	}
 	else if (pid > 0)
 	{ /* parent process */

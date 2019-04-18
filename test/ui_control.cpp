@@ -18,8 +18,12 @@
 **                      	Global data 
 *****************************************************************************/
 GtkWidget *label_device, *label_hw_rev, *label_fw_rev, *button_exit_streaming;
+
 GtkWidget *label_datatype, *vbox2, *radio01, *radio02, *radio03;
-GtkWidget *label_bayer, *vbox3, *radio_bg, *radio_gb, *radio_rg, *radio_gr, *radio_mono;
+
+GtkWidget *label_bayer, *vbox3;
+GtkWidget *radio_bg, *radio_gb, *radio_rg, *radio_gr, *radio_mono;
+
 GtkWidget *check_button_auto_exposure,*check_button_awb,*check_button_auto_gain;
 GtkWidget *label_exposure, *label_gain;
 GtkWidget *hscale_exposure, *hscale_gain;
@@ -329,11 +333,12 @@ static gboolean check_escape(GtkWidget *widget, GdkEventKey *event)
 //g++ ui_control.cpp -o test2 `gtk-config --cflags --libs`
 //pass
 //g++ ui_control.cpp -o test `pkg-config --cflags gtk+-3.0` `pkg-config --libs gtk+-3.0`
-int init_control_gui(int argc, char *argv[])
+//int init_control_gui(int argc, char *argv[])
+void init_control_gui()
 {
 
     /* --- GTK initialization --- */
-    gtk_init(&argc, &argv);
+    gtk_init(NULL, NULL);
     GtkWidget *window;
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Camera Control");
@@ -460,7 +465,6 @@ int init_control_gui(int argc, char *argv[])
     radio2 = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio1)), "16 bit");
     gtk_box_pack_start(GTK_BOX(vbox), radio2, 0, 0, 0);
-    // check_button_auto_exposure = gtk_check_button_new_with_label("Enable auto exposure");
 
     g_signal_connect(radio1, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "1");
@@ -634,5 +638,5 @@ int init_control_gui(int argc, char *argv[])
 
     gtk_widget_show_all(window);
     gtk_main();
-    return 0;
+    //return 0;
 }

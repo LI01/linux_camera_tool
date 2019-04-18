@@ -34,7 +34,7 @@ all: $(APP)
 # dependencies
 %.o: %.c*
 	@echo -e "\t" $(CPP) $(CPPOBJFLAGS) $< -o $@
-	$(CPP) $(CPPOBJFLAGS) $(DBGFLAG) -o $@ $< -fopenmp
+	$(CPP) $(CPPOBJFLAGS) $(DBGFLAG) -o $@ $< -fopenmp -O3
 
 
 $(APP): $(OBJS)

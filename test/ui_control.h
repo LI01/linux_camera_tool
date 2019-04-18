@@ -13,7 +13,7 @@
 *****************************************************************************/
 #pragma once
 #include <gtk/gtk.h>
-
+#include <gdk/gdkkeysyms.h>
 void radio_datatype(GtkWidget *widget, gpointer data);
 void radio_bayerpattern(GtkWidget *widget, gpointer data);
 
@@ -41,4 +41,4 @@ void enable_trig(GtkWidget *widget);
 
 void exit_loop(GtkWidget *widget);
 
-int init_control_gui(int argc, char* argv[]);
+void init_control_gui();

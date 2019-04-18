@@ -47,16 +47,17 @@ struct buffer
 **							 Function declaration
 *****************************************************************************/
 int v4l2_core_save_data_to_file(const char *filename, const void *data, int size);
-void set_save_raw_flag(int flag);
+
+inline void set_save_raw_flag(int flag);
 void video_capture_save_raw();
 
-void set_save_bmp_flag(int flag);
+inline void set_save_bmp_flag(int flag);
 void video_capture_save_bmp();
 
-int set_shift(int *shift_flag);
+inline int set_shift(int *shift_flag);
 void change_datatype(void* datatype); 
 
-int add_bayer_forcv(int *bayer_flag);
+inline int add_bayer_forcv(int *bayer_flag);
 void change_bayerpattern(void *bayer); 
 
 void add_gamma_val(float gamma_val_from_gui);
@@ -79,10 +80,10 @@ void video_set_format(struct device *dev, int width,
 					  int height, int pixelformat);
 void video_get_format(struct device *dev);
 
-int streaming_loop(struct device *dev);
+void streaming_loop(struct device *dev);
 
 void get_a_frame(struct device *dev);
- void perform_shift(struct device *dev, const void *p, int shift);
+void perform_shift(struct device *dev, const void *p, int shift);
 void decode_a_frame(struct device *dev, const void *p, int shift);
 
  

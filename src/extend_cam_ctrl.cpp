@@ -60,18 +60,21 @@ static int *abc_flag;   			/* flag for enable brightness & contrast opt */
 static float *gamma_val; 			/* gamma correction value from gui */
 static int *black_level_correction; /* white balance value from gui */
 static int *loop;					/* while (*loop) */
+static int image_count;				/* image count number printed to captures name */
 double t = 0;						/* time measured in opencv for caculating fps */
 double fps;							/* frame rate */
 char string_frame_rate[10]; 		/* string to save the frame rate */
-static int image_count;
 
-struct v4l2_buffer queuebuffer;
+
+struct v4l2_buffer queuebuffer;		/* queuebuffer query for enqueue, dequeue buffers*/
 
 extern char *get_product();			/* put product name into captured image name */
 /*****************************************************************************
 **                           Function definition
 *****************************************************************************/
-
+/*
+ * callback for exit streaming from gui
+ */
 void set_loop(int exit)
 {
 	*loop = exit;
@@ -90,7 +93,7 @@ void video_capture_save_raw()
  * 		flag - set the flag when get capture button clicked,
  * 			   reset flag to zero once image is saved
  */
-void set_save_raw_flag(int flag)
+inline void set_save_raw_flag(int flag)
 {
 	*save_raw = flag;
 }
@@ -149,7 +152,7 @@ void video_capture_save_bmp()
  * 		flag - set the flag when get capture button clicked,
  * 			   reset flag to zero once image is saved
  */
-void set_save_bmp_flag(int flag)
+inline void set_save_bmp_flag(int flag)
 {
 	*save_bmp = flag;
 }
@@ -181,15 +184,15 @@ static int save_frame_image_bmp(cv::Mat opencvImage)
  * Crosslink doesn't support decode RAW14, RAW16 so far,
  * these two datatypes weren't used in USB3 camera
  */
-int set_shift(int *shift_flag)
+inline int set_shift(int *shift_flag)
 {
-	if (*shift_flag == 1)
-		return 2;
-	if (*shift_flag == 2)
-		return 4;
-	if (*shift_flag == 3)
-		return 0;
-	return 2;
+	int cmp = *shift_flag;
+	switch(cmp) {
+		case 1: return 2;
+		case 2: return 4;
+		case 3: return 0;
+		default: return 2;
+	}
 }
 
 /*
@@ -207,6 +210,7 @@ void change_datatype(void *datatype)
 		*shift_flag = 2;
 	if (strcmp((char *)datatype, "3") == 0)
 		*shift_flag = 3;
+
 }
 
 /*
@@ -221,19 +225,18 @@ void change_datatype(void *datatype)
  * returns:
  * 		bayer pattern flag increment
  */
-int add_bayer_forcv(int *bayer_flag)
+inline int add_bayer_forcv(int *bayer_flag)
 {
-	if (*bayer_flag == 1)
-		return 0;
-	if (*bayer_flag == 2)
-		return 1;
-	if (*bayer_flag == 3)
-		return 2;
-	if (*bayer_flag == 4)
-		return 3;
-	if (*bayer_flag == 5)
-		return 4;
-	return 2;
+
+	int cmp = *bayer_flag;
+	switch(cmp) {
+		case 1: return 0;
+		case 2: return 1;
+		case 3: return 2;
+		case 4: return 3;
+		case 5: return 4;
+		default: return 2;
+	}
 }
 
 /*
@@ -254,6 +257,7 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = 4;
 	if (strcmp((char *)bayer, "5") == 0)
 		*bayer_flag = 5;
+
 }
 
 /*
@@ -298,11 +302,17 @@ static cv::Mat apply_gamma_correction(cv::Mat opencvImage)
  */
 void awb_enable(int enable)
 {
-	if (enable == 1)
-		*awb_flag = 1;
-
-	if (enable == 0)
-		*awb_flag = 0;
+	switch (enable) {
+		case 1: 
+			*awb_flag = 1;
+			break;
+		case 0:
+			*awb_flag = 0;
+			break;
+		default:
+			*awb_flag = 0;
+			break;
+	}
 }
 
 /* 
@@ -375,11 +385,17 @@ static cv::Mat apply_white_balance(cv::Mat opencvImage)
  */
 void abc_enable(int enable)
 {
-	if (enable == 1)
-		*abc_flag = 1;
-
-	if (enable == 0)
-		*abc_flag = 0;
+	switch (enable) {
+		case 1: 
+			*abc_flag = 1;
+			break;
+		case 0:
+			*abc_flag = 0;
+			break;
+		default:
+			*abc_flag = 0;
+			break;
+	}
 }
 
 static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
@@ -728,7 +744,7 @@ void video_get_format(struct device *dev)
  * args: 
  * 		struct device *dev - every infomation for camera
 */
-int streaming_loop(struct device *dev)
+void streaming_loop(struct device *dev)
 {
 	cv::namedWindow("cam", cv::WINDOW_NORMAL);
 	image_count = 0;
@@ -739,7 +755,6 @@ int streaming_loop(struct device *dev)
 		get_a_frame(dev);
 	}
 	unmap_variables();
-	return 0;
 }
 
 /* 
@@ -800,7 +815,11 @@ void perform_shift(struct device *dev, const void *p, int shift)
 	unsigned short ts;
 
 /* use openmp loop parallelism to accelate shifting */
-#pragma omp for
+/* If there is no speed up, that is because this operation is heavily memory bound. 
+ * All the cores share one memory bus, so using more threads does not give you more 
+ * bandwidth and speedup.
+ * This will change if the resolution is smaller so buffer size is smaller */
+#pragma omp for nowait
 	for (unsigned int i = 0; i < dev->height; i++)
 	{
 		for (unsigned int j = 0; j < dev->width; j++)
@@ -1025,7 +1044,6 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 			return ret;
 		}
 	}
-	//dev->buffers = buffers;
 	return 0;
 }
 

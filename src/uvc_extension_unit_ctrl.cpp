@@ -273,7 +273,7 @@ int read_cam_uuid_hwfw_rev(int fd)
     hw_rev = buf7[0] | (buf7[1] << 8);
 	hw_rev &= ~(0xf000); 
     int local_fw_rev = buf7[2] | (buf7[3] << 8);
-    for (int i=0; i < (36+9); i++)
+    for (int i=0; i < (36+9); ++i)
     {
         uuidBuf[i] = buf7[4+i];
     }

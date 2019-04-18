@@ -151,9 +151,6 @@ When use triggering mode instead of master free running mode for USB3 SerDes cam
 
 The included "shot 1 trigger" function is only a demonstration on generating one pulse and let camera output one frame after "shot 1 trigger" is clicked once. User should not fully rely on this software generated trigger but use a hardware trigger for sync the camera streaming.
 
-### Detect Two Video Devices
-__FIXME:__ 
-After add udev, this thing happen, the workaround now is to exit the udev list loop once we get one video device that is from Leopard.
 
 
 

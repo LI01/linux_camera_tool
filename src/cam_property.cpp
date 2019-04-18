@@ -112,7 +112,6 @@ int get_frame_rate(int fd)
     return param.parm.capture.timeperframe.denominator;
 }
 
-
 /*--------------------------------------------------------------------------- */
 void set_gain_auto (int fd, int auto_gain)
 {
