@@ -19,7 +19,7 @@
 *****************************************************************************/
 GtkWidget *label_device, *label_hw_rev, *label_fw_rev, *button_exit_streaming;
 GtkWidget *label_datatype, *vbox2, *radio01, *radio02, *radio03;
-GtkWidget *label_bayer, *vbox3, *radio_bg, *radio_gb, *radio_rg, *radio_gr;
+GtkWidget *label_bayer, *vbox3, *radio_bg, *radio_gb, *radio_rg, *radio_gr, *radio_mono;
 GtkWidget *check_button_auto_exposure,*check_button_awb,*check_button_auto_gain;
 GtkWidget *label_exposure, *label_gain;
 GtkWidget *hscale_exposure, *hscale_gain;
@@ -396,6 +396,9 @@ int init_control_gui(int argc, char *argv[])
     radio_gr = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)), "GRBG");
     gtk_box_pack_start(GTK_BOX(vbox3), radio_gr, 0, 0, 0);
+    radio_mono = gtk_radio_button_new_with_label(
+        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)), "MONO");
+    gtk_box_pack_start(GTK_BOX(vbox3), radio_mono, 0, 0, 0);
 
     g_signal_connect(radio_bg, "toggled", G_CALLBACK(radio_bayerpattern),
                      (gpointer) "1");
@@ -405,7 +408,8 @@ int init_control_gui(int argc, char *argv[])
                      (gpointer) "3");
     g_signal_connect(radio_gr, "toggled", G_CALLBACK(radio_bayerpattern),
                      (gpointer) "4");
-
+    g_signal_connect(radio_mono, "toggled", G_CALLBACK(radio_bayerpattern),
+                     (gpointer) "5");
     /* --- row 3 --- */
     check_button_auto_exposure = gtk_check_button_new_with_label("Enable auto exposure");
     g_signal_connect(GTK_TOGGLE_BUTTON(check_button_auto_exposure), "toggled",
@@ -522,7 +526,7 @@ int init_control_gui(int argc, char *argv[])
             NULL);
 
     /* ---------------- Layout, don't change ---------------------------- */
-    // zero row: device info, fw revision
+    // zero row: device info, fw revision, exit
     int row = 0;
     int col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_device, col++, row, 1, 1);

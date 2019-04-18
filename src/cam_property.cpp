@@ -209,7 +209,7 @@ void usage( const char *argv0)
 {
 	printf("Usage: %s [options]\n", argv0);
 	printf("Supported options:\n");
-	printf("-n, --nbufs n			Set the number of video buffers\n");
-	printf("-s, --size WxH			Set the frame size\n");
+	printf("-n, --nbufs n		Set the number of video buffers\n");
+	printf("-s, --size WxH		Set the frame size\n");
 	printf("-t, --time-per-frame	Set the time per frame (eg. 25 = 25 fps)\n");
 }

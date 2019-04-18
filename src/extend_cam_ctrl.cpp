@@ -231,6 +231,8 @@ int add_bayer_forcv(int *bayer_flag)
 		return 2;
 	if (*bayer_flag == 4)
 		return 3;
+	if (*bayer_flag == 5)
+		return 4;
 	return 2;
 }
 
@@ -250,6 +252,8 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = 3;
 	if (strcmp((char *)bayer, "4") == 0)
 		*bayer_flag = 4;
+	if (strcmp((char *)bayer, "5") == 0)
+		*bayer_flag = 5;
 }
 
 /*
@@ -414,7 +418,7 @@ static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
 	// 	const float *histRange = {range};
 	// 	bool uniform = true;
 	// 	bool accumulate = false;
-	// 	// void calcHist(img_orig, n_images, channels(gray=0), mask,
+	// 	// void calcHist(img_orig, n_images, channels(gray=0), mask(for ROi),
 	//     //               mat hist, dimemsion, histSize=bins=256,
 	//     //               ranges_for_pixel, bool uniform, bool accumulate);
 	// 	calcHist(&gray, 1, 0, cv::Mat(), hist, 1, &hist_size, &histRange, uniform, accumulate);
@@ -697,7 +701,7 @@ void video_get_format(struct device *dev)
 	dev->imagesize = fmt.fmt.pix.bytesperline ? fmt.fmt.pix.sizeimage : 0;
 
 	printf("\nGet Current Video Format:%c%c%c%c (%08x)%ux%u\n"
-	"byte per line:%d\nsize image:%ud\n",
+	"byte per line:%d\nsize image:%u\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 8) & 0xff,
 		   (fmt.fmt.pix.pixelformat >> 16) & 0xff,
@@ -754,6 +758,7 @@ void get_a_frame(struct device *dev)
 	{
 
 		queuebuffer.index = i;
+
 		/* The buffer's waiting in the outgoing queue. */
 		if (ioctl(dev->fd, VIDIOC_DQBUF, &queuebuffer) < 0)
 		{
@@ -769,12 +774,12 @@ void get_a_frame(struct device *dev)
 			snprintf(buf_name, sizeof(buf_name), "captures_%s_%d.raw",
 				get_product(), image_count);
 			v4l2_core_save_data_to_file(buf_name,
-				dev->buffers->start, dev->imagesize);
+				dev->buffers[i].start, dev->imagesize);
 			image_count++;
 			set_save_raw_flag(0);
 		}
 
-		decode_a_frame(dev, dev->buffers->start, set_shift(shift_flag));
+		decode_a_frame(dev, dev->buffers[i].start, set_shift(shift_flag));
 
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
 		{
@@ -835,8 +840,15 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	{
 		perform_shift(dev, p, shift);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
-		cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
 
+		if (add_bayer_forcv(bayer_flag) != 4)
+			cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		
+		if (add_bayer_forcv(bayer_flag) == 4)
+		{
+			cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR); 
+			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
+		}
 		//flip(img, img, 0); //mirror vertically
 		//flip(img, img, 1); //mirror horizontally
 
@@ -859,6 +871,8 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	{
 		cv::Mat img(height, width, CV_8UC2, (void *)p);
 		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
+		if (add_bayer_forcv(bayer_flag) == 4)
+			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
 		share_img = img;
 	}
 
@@ -960,6 +974,8 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 
 	/* allocate buffer */
 	buffers = (buffer *)malloc(bufrequest.count * sizeof buffers[0]);
+	dev->buffers = buffers;
+
 	if (buffers == NULL)
 		return -ENOMEM;
 
@@ -1009,7 +1025,7 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 			return ret;
 		}
 	}
-	dev->buffers = buffers;
+	//dev->buffers = buffers;
 	return 0;
 }
 
