@@ -1,0 +1,13 @@
+{
+    "deviceName": "LI-IMX334",
+    "subAddress": "0x6c",
+    "regAddressWidth": 16,
+    "regPair": {
+        "0x100a": "0x1a", 
+        "0x3001": "0xff", 
+        "0x2000": "0x11"
+    },
+  
+    "captureNumber": 10,
+    "capturedName": "test"
+}

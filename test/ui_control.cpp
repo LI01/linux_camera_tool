@@ -11,9 +11,9 @@
   Author: Danyu L
   Last edit: 2019/04
 *****************************************************************************/
-#include <gdk/gdkkeysyms.h>
+
 #include "../includes/shortcuts.h"
-#include "ui_control.h"
+#include "../includes/ui_control.h"
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -436,7 +436,7 @@ void init_control_gui()
     gtk_label_set_text(GTK_LABEL(label_gain), "Gain:");
 
     hscale_exposure = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
-                                               0.0, 4000.0, 1.0);
+                                               0.0, 40000.0, 1.0);
     hscale_gain = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
                                            0.0, 63.0, 1.0);
 

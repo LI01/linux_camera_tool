@@ -13,6 +13,7 @@ LDFLAGS	+= \
 		-fopenmp \
 		-lv4l2 \
 		-ludev \
+		-ljson-c \
 		-lm \
 		$(LDLIBS) \
 		$(LDLIBCV)

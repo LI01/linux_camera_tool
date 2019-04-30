@@ -41,7 +41,7 @@
 #include <math.h>       /*for pow gamma correction*/
 
 #include "../includes/shortcuts.h"
-#include "extend_cam_ctrl.h"
+#include "../includes/extend_cam_ctrl.h"
 
 
 /****************************************************************************

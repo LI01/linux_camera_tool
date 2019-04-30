@@ -12,7 +12,7 @@
 *****************************************************************************/
 
 #include "../includes/shortcuts.h"
-#include "uvc_extension_unit_ctrl.h"
+#include "../includes/uvc_extension_unit_ctrl.h"
 
 /****************************************************************************
 **                      	Global data 

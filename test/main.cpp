@@ -1,11 +1,12 @@
 
 #include "../includes/shortcuts.h"
 #include <getopt.h>
-#include "../src/uvc_extension_unit_ctrl.h"
-#include "../src/extend_cam_ctrl.h"
-#include "./ui_control.h"
-#include "../src/cam_property.h"
-#include "../src/v4l2_devices.h"
+#include "../includes/uvc_extension_unit_ctrl.h"
+#include "../includes/extend_cam_ctrl.h"
+#include "../includes/ui_control.h"
+#include "../includes/cam_property.h"
+#include "../includes/v4l2_devices.h"
+#include "../includes/json_parser.h"
 
 int v4l2_dev; /* global variable, file descriptor for camera device */
 int fw_rev;   /* global variable, firmware revision for the camera */
@@ -29,7 +30,7 @@ int main(int argc, char **argv)
 	char *endptr;
 	dev.nbufs = V4L_BUFFERS_DEFAULT;
 	int c;
-
+	
 	char *ret_dev_name = enum_v4l2_device(dev_name);
 	v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
 
@@ -38,7 +39,8 @@ int main(int argc, char **argv)
 		printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
 		return 0;
 	}
-
+	printf("*******************Commands Load From JSON*******************\n");
+	json_parser(v4l2_dev);
 	printf("********************List Available Resolutions***************\n");
 	/* list all the resolutions */
 	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\

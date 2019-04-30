@@ -12,7 +12,7 @@
 *****************************************************************************/
 
 #include "../includes/shortcuts.h"
-#include "v4l2_devices.h"
+#include "../includes/v4l2_devices.h"
 
 char manufacturer[20];
 char product[20];

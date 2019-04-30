@@ -65,7 +65,36 @@ target_link_libraries(<Your Target>
 	leopard_tools
 )
 ```
-
+### Code Structure
+```
+$ linux_camera_tool .
+├── Makefile
+├── configure.sh    
+├── CMakeLists.txt
+│
+├── README.md
+├── CHANGELOG.md
+├── LICENSE.md
+├── AUTHOR.md
+│
+├── includes
+│   ├── shortcuts.h         # common header
+│   ├── cam_property.h
+│   ├── extend_cam_ctrl.h
+│   ├── ui_control.h
+│   ├── uvc_extension_unit_ctrl.h
+│   └── v4l2_devices.h
+│
+├── src
+│   ├── cam_property.cpp
+│   ├── extend_cam_ctrl.cpp
+│   ├── uvc_extension_unit_ctrl.cpp
+│   └── v4l2_device.cpp
+│   
+└── test
+    ├── ui_control.cpp
+    └── main.c
+```
 
 ### Run Camera Tool
 ```

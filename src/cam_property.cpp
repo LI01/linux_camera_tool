@@ -13,7 +13,7 @@
   Last edit: 2019/04
 *****************************************************************************/
 #include "../includes/shortcuts.h"
-#include "cam_property.h"
+#include "../includes/cam_property.h"
 /*
  * handle the error for camera control
  * args:
