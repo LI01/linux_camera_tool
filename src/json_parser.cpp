@@ -7,7 +7,7 @@
   config.json at camera startup to perform group register writes and captures.
 
   Author: Danyu L
-  Last edit: 2019/04
+  Last edit: 2019/05
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/json_parser.h"
@@ -79,10 +79,11 @@ void json_parser(int fd)
     json_object_object_get_ex(parsed_json, "capturedName", &capture_name);
 	json_object_object_get_ex(parsed_json, "regPair", &reg_pairs);
 
+    //TODO: add a flag in the for loop,
+    //      put this function into for loop instead of initialize
     dev_name = (char *)json_object_get_string(device_name);
 	printf("Name: %s\n", dev_name);
     sub_addr = strtol((char *)json_object_get_string(sub_address), NULL, 16);
-    printf("8-bit I2C Address: 0x%x\n", sub_addr);
     addr_width = json_object_get_int(reg_address_width);
 	printf("Register Address Width: %d\n", addr_width);
     printf("Capture Image Number: %d\n", json_object_get_int(capture_num));
@@ -102,20 +103,22 @@ void json_parser(int fd)
         {   
             top_n_tail(reg_pair); // remove double quote
             reg_addr = (uint32_t)strtol(reg_pair, NULL, 16);
-            printf("reg addr = 0x%x\n", reg_addr);
         }
         /* register value */
         else 
         {
             top_n_tail(reg_pair); // remove double quote
             reg_val = (uint32_t)strtol(reg_pair, NULL, 16);
-            printf("reg val = 0x%x\n", reg_val);
+           
+            unsigned char buf[2];
+            buf[0] = reg_val & 0xff;
+            buf[1] = (reg_val >> 8) & 0xff;
+            generic_I2C_write(fd, 0x80 & (addr_width/8), (addr_width / 8), sub_addr, reg_addr, buf);
         }
+ 
 
         reg_pair = strtok (NULL, ",: ");
         i++;
     }
-    //TODO: finish this later
-    //generic_I2C_write(fd, 0x82, 2, slaveAddr, regAddr, buf);
 
 }

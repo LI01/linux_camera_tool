@@ -113,7 +113,7 @@ void write_to_UVC_extension(int fd,int property_id,
 }
 
 /*
- * helper function to commnunicate with FX3 UVC defined extension unit
+ * helper function to communicate with FX3 UVC defined extension unit
  * args:
  * 		fd 			- file descriptor
  *  	property_id - defined Leopard Imaging USB3.0 Camera uvc extension id

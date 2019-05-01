@@ -4,7 +4,7 @@
   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
   
   This is the sample code for Leopard USB3.0 camera, mainly for the camera tool
-  control GUI using Gtk3. Gtk3 asnd Gtk2 don't live together paceful. If you 
+  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you 
   have problem running Gtk3 with your current compiled openCV, please refer to
   README.md guide to rebuild your opencv for supporting Gtk3.
 
@@ -143,12 +143,12 @@ void enable_abc(GtkToggleButton *toggle_button)
 {
     if (gtk_toggle_button_get_active(toggle_button)) 
     {
-        g_print("auto brighness and contrast optimization enable\n");
+        g_print("auto brightness and contrast optimization enable\n");
         abc_enable(1);
     }
     else
     {
-        g_print("auto brighness and contrast optimization disable\n");
+        g_print("auto brightness and contrast optimization disable\n");
         abc_enable(0);
     }
 }
@@ -248,7 +248,7 @@ void capture_bmp(GtkWidget *widget)
     video_capture_save_bmp();
 }
 
-/* callback for captuing raw */
+/* callback for capturing raw */
 void capture_raw(GtkWidget *widget)
 {
     (void)widget;
@@ -280,7 +280,7 @@ void send_trigger(GtkWidget *widget)
     }
 }
 
-/* callback for enabling/disablign sensor trigger */
+/* callback for enabling/disalign sensor trigger */
 void enable_trig(GtkWidget *widget)
 {
     (void)widget;
@@ -436,7 +436,7 @@ void init_control_gui()
     gtk_label_set_text(GTK_LABEL(label_gain), "Gain:");
 
     hscale_exposure = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
-                                               0.0, 40000.0, 1.0);
+                                               0.0, 2505.0, 1.0);
     hscale_gain = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
                                            0.0, 63.0, 1.0);
 
@@ -603,14 +603,14 @@ void init_control_gui()
     gtk_grid_attach(GTK_GRID(grid), button_capture_bmp, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), button_capture_raw, col++, row, 1, 1);
 
-    // evelenth row: gamma correction
+    // eleventh row: gamma correction
     row++;
     col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_gamma, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), entry_gamma, col++, row, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), button_apply_gamma, col++, row, 1, 1);
 
-    // twelvth row: trigger
+    // twelfth row: trigger
     row++;
     col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_trig, col++, row, 1, 1);
@@ -638,5 +638,5 @@ void init_control_gui()
 
     gtk_widget_show_all(window);
     gtk_main();
-    //return 0;
+
 }

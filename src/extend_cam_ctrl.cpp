@@ -79,6 +79,7 @@ void set_loop(int exit)
 {
 	*loop = exit;
 }
+
 /*
  * callback for save raw image from gui
  */
@@ -177,7 +178,7 @@ static int save_frame_image_bmp(cv::Mat opencvImage)
 }
 
 /*
- * return the shift value for choiced sensor datatype
+ * return the shift value for choosing sensor datatype
  * RAW10 - shift 2 bits
  * RAW12 - shift 4 bits
  * YUV422 - shift 0 bit
@@ -470,7 +471,7 @@ static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
 
 	// /*
 	// * Apply brightness and contrast normalization
-	// * convertTo operates with saurate_cast
+	// * convertTo operates with saturate_cast
 	// */
 	// opencvImage.convertTo(opencvImage, -1, alpha, beta);
 
@@ -649,7 +650,7 @@ void stop_Camera(struct device *dev)
  * need to do a v4l2-ctl --list-formats-ext to see the resolution
  * args: 
  * 		struct device *dev - device infomation
- * 	  	width - resoultion width
+ * 	  	width - resolution width
  * 		height - resolution height
  * 		pixelformat - V4L2_PIX_FMT_YUYV
  * 
@@ -814,7 +815,7 @@ void perform_shift(struct device *dev, const void *p, int shift)
 	unsigned char *dst = (unsigned char *)p;
 	unsigned short ts;
 
-/* use openmp loop parallelism to accelate shifting */
+/* use openmp loop parallelism to accelerate shifting */
 /* If there is no speed up, that is because this operation is heavily memory bound. 
  * All the cores share one memory bus, so using more threads does not give you more 
  * bandwidth and speedup.

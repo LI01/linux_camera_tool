@@ -39,8 +39,7 @@ int main(int argc, char **argv)
 		printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
 		return 0;
 	}
-	printf("*******************Commands Load From JSON*******************\n");
-	json_parser(v4l2_dev);
+
 	printf("********************List Available Resolutions***************\n");
 	/* list all the resolutions */
 	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\
@@ -111,7 +110,8 @@ int main(int argc, char **argv)
 	check_dev_cap(&dev);
 	video_get_format(&dev); /* list the current resolution etc */
 	get_frame_rate(v4l2_dev); /* list the current frame rate */
-
+	// printf("*******************Commands Load From JSON*******************\n");
+	// json_parser(v4l2_dev);
 	printf("********************Allocate Buffer for Capturing************\n");
 	video_alloc_buffers(&dev, dev.nbufs);
 
