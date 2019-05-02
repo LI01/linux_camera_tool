@@ -182,6 +182,7 @@ static int save_frame_image_bmp(cv::Mat opencvImage)
  * RAW10 - shift 2 bits
  * RAW12 - shift 4 bits
  * YUV422 - shift 0 bit
+ * RAW8 - shift 0 bit - tightly packed 8-bit in fpga
  * Crosslink doesn't support decode RAW14, RAW16 so far,
  * these two datatypes weren't used in USB3 camera
  */
@@ -192,6 +193,7 @@ inline int set_shift(int *shift_flag)
 		case 1: return 2;
 		case 2: return 4;
 		case 3: return 0;
+		case 4: return -1;
 		default: return 2;
 	}
 }
@@ -211,7 +213,8 @@ void change_datatype(void *datatype)
 		*shift_flag = 2;
 	if (strcmp((char *)datatype, "3") == 0)
 		*shift_flag = 3;
-
+	if (strcmp((char *)datatype, "4") == 0)
+		*shift_flag = 4;
 }
 
 /*
@@ -855,8 +858,9 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	int width = dev->width;
 
 	cv::Mat share_img;
-	/* --- for bayer camera ---*/
-	if (shift != 0)
+
+	/* --- for raw10, raw12 bayer camera ---*/
+	if (shift > 0)
 	{
 		perform_shift(dev, p, shift);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
@@ -886,13 +890,29 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		
 		share_img = img;
 	}
+
 	/* --- for yuv camera ---*/
-	else
+	else if (shift == 0)
 	{
 		cv::Mat img(height, width, CV_8UC2, (void *)p);
 		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
 		if (add_bayer_forcv(bayer_flag) == 4)
 			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
+		share_img = img;
+	}
+
+	/* --- for raw8 camera (tightly packed) ---*/
+	else //if (shift < 0)
+	{
+		width = width * 2; 
+		cv::Mat img(height, width, CV_8UC1, (void *)p);
+		if (add_bayer_forcv(bayer_flag) != 4)
+			cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		if (add_bayer_forcv(bayer_flag) == 4) 
+		{
+			cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR); 
+			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
+		}
 		share_img = img;
 	}
 

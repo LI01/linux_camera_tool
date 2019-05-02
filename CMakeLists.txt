@@ -7,6 +7,7 @@ find_package( OpenCV REQUIRED)
 
 find_library(V4l2Libs v4l2 REQUIRED)
 find_library(udevLibs udev REQUIRED)
+find_library(jsoncLibs json-c REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}") 
 #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}") 
@@ -26,6 +27,7 @@ add_library(${PROJECT_NAME}  STATIC
 target_link_libraries(${PROJECT_NAME} 
 	${V4l2Libs}
 	${udevLibs}
+	${jsoncLibs}
 	${OpenMP_LIBS}
 	${OpenCV_LIBS}
 	${GTK3_LIBRARY_DIRS}
@@ -42,13 +44,13 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
 
 	add_executable(leopard_cam
 		test/main.cpp
-		test/ui_control.cpp
 	)
 
 	target_link_libraries(leopard_cam
 		${CMAKE_PROJECT_NAME}
 		${V4l2Libs}
 		${udevLibs}
+		${jsoncLibs}
 		${OpenMP_LIBS}
 		${OpenCV_LIBS}
 		${GTK3_LIBRARIES}

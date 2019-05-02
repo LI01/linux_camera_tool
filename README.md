@@ -106,15 +106,15 @@ $ linux_camera_tool .
 │   └── v4l2_devices.h
 │
 ├── src
-│   ├── cam_property.cpp
-│   ├── extend_cam_ctrl.cpp
-|   ├── json_parser.cpp
-│   ├── uvc_extension_unit_ctrl.cpp
-│   └── v4l2_device.cpp
+│   ├── cam_property.cpp                  # gain, exposure, ptz ctrl
+│   ├── extend_cam_ctrl.cpp               # camera stream. capture ctrl
+|   ├── json_parser.cpp                   
+|   ├── ui_control.cpp                    # control GUI
+│   ├── uvc_extension_unit_ctrl.cpp       # all uvc extension unit ctrl
+│   └── v4l2_device.cpp                   # udev ctrl
 │   
 └── test
-    ├── ui_control.cpp
-    └── main.c
+    └── main.c                              
 ```
 ---
 ## Run Camera Tool

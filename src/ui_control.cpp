@@ -19,16 +19,17 @@
 *****************************************************************************/
 GtkWidget *label_device, *label_hw_rev, *label_fw_rev, *button_exit_streaming;
 
-GtkWidget *label_datatype, *vbox2, *radio01, *radio02, *radio03;
+GtkWidget *label_datatype, *vbox_datatype;
+GtkWidget *radio_raw10, *radio_raw12, *radio_yuyv, *radio_raw8;
 
-GtkWidget *label_bayer, *vbox3;
+GtkWidget *label_bayer, *vbox_bayer;
 GtkWidget *radio_bg, *radio_gb, *radio_rg, *radio_gr, *radio_mono;
 
 GtkWidget *check_button_auto_exposure,*check_button_awb,*check_button_auto_gain;
 GtkWidget *label_exposure, *label_gain;
 GtkWidget *hscale_exposure, *hscale_gain;
 GtkWidget *label_i2c_addr, *entry_i2c_addr;
-GtkWidget *label_addr_width, *vbox, *radio1, *radio2;
+GtkWidget *label_addr_width, *vbox_addr_width, *radio_8bit, *radio_16bit;
 GtkWidget *label_reg_addr, *entry_reg_addr;
 GtkWidget *label_reg_val, *entry_reg_val;
 GtkWidget *button_read, *button_write;
@@ -368,42 +369,46 @@ void init_control_gui()
     /* --- row 1 --- */
     label_datatype = gtk_label_new("Sensor Datatype:");
     gtk_label_set_text(GTK_LABEL(label_datatype), "Sensor Datatype:");
-    vbox2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    radio01 = gtk_radio_button_new_with_label(NULL, "RAW10");
-    gtk_box_pack_start(GTK_BOX(vbox2), radio01, 0, 0, 0);
-    radio02 = gtk_radio_button_new_with_label(
-        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio01)), "RAW12");
-    gtk_box_pack_start(GTK_BOX(vbox2), radio02, 0, 0, 0);
-    radio03 = gtk_radio_button_new_with_label(
-        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio01)), "YUYV");
-    gtk_box_pack_start(GTK_BOX(vbox2), radio03, 0, 0, 0);
+    vbox_datatype = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    radio_raw10 = gtk_radio_button_new_with_label(NULL, "RAW10");
+    gtk_box_pack_start(GTK_BOX(vbox_datatype), radio_raw10, 0, 0, 0);
+    radio_raw12 = gtk_radio_button_new_with_label(
+        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_raw10)), "RAW12");
+    gtk_box_pack_start(GTK_BOX(vbox_datatype), radio_raw12, 0, 0, 0);
+    radio_yuyv = gtk_radio_button_new_with_label(
+        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_raw10)), "YUYV");
+    gtk_box_pack_start(GTK_BOX(vbox_datatype), radio_yuyv, 0, 0, 0);
+    radio_raw8 = gtk_radio_button_new_with_label(
+        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_raw10)), "RAW8");
+    gtk_box_pack_start(GTK_BOX(vbox_datatype), radio_raw8, 0, 0, 0);
 
-    g_signal_connect(radio01, "toggled", G_CALLBACK(radio_datatype),
+    g_signal_connect(radio_raw10, "toggled", G_CALLBACK(radio_datatype),
                      (gpointer) "1");
-    g_signal_connect(radio02, "toggled", G_CALLBACK(radio_datatype),
+    g_signal_connect(radio_raw12, "toggled", G_CALLBACK(radio_datatype),
                      (gpointer) "2");
-    g_signal_connect(radio03, "toggled", G_CALLBACK(radio_datatype),
+    g_signal_connect(radio_yuyv, "toggled", G_CALLBACK(radio_datatype),
                      (gpointer) "3");
-
+    g_signal_connect(radio_raw8, "toggled", G_CALLBACK(radio_datatype),
+                     (gpointer) "4");
     /* --- row 2 --- */
     label_bayer = gtk_label_new("Raw Camera Pixel Format:");
     gtk_label_set_text(GTK_LABEL(label_bayer), "Raw Camera Pixel Format:");
 
-    vbox3 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    vbox_bayer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     radio_bg = gtk_radio_button_new_with_label(NULL, "BGGR");
-    gtk_box_pack_start(GTK_BOX(vbox3), radio_bg, 0, 0, 0);
+    gtk_box_pack_start(GTK_BOX(vbox_bayer), radio_bg, 0, 0, 0);
     radio_gb = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)), "GBBR");
-    gtk_box_pack_start(GTK_BOX(vbox3), radio_gb, 0, 0, 0);
+    gtk_box_pack_start(GTK_BOX(vbox_bayer), radio_gb, 0, 0, 0);
     radio_rg = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)), "RGGB");
-    gtk_box_pack_start(GTK_BOX(vbox3), radio_rg, 0, 0, 0);
+    gtk_box_pack_start(GTK_BOX(vbox_bayer), radio_rg, 0, 0, 0);
     radio_gr = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)), "GRBG");
-    gtk_box_pack_start(GTK_BOX(vbox3), radio_gr, 0, 0, 0);
+    gtk_box_pack_start(GTK_BOX(vbox_bayer), radio_gr, 0, 0, 0);
     radio_mono = gtk_radio_button_new_with_label(
         gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)), "MONO");
-    gtk_box_pack_start(GTK_BOX(vbox3), radio_mono, 0, 0, 0);
+    gtk_box_pack_start(GTK_BOX(vbox_bayer), radio_mono, 0, 0, 0);
 
     g_signal_connect(radio_bg, "toggled", G_CALLBACK(radio_bayerpattern),
                      (gpointer) "1");
@@ -459,16 +464,16 @@ void init_control_gui()
     /* --- row 7 --- */
     label_addr_width = gtk_label_new("I2C Addr Width");
     gtk_label_set_text(GTK_LABEL(label_addr_width), "I2C Addr Width:");
-    vbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    radio1 = gtk_radio_button_new_with_label(NULL, "8 bit");
-    gtk_box_pack_start(GTK_BOX(vbox), radio1, 0, 0, 0);
-    radio2 = gtk_radio_button_new_with_label(
-        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio1)), "16 bit");
-    gtk_box_pack_start(GTK_BOX(vbox), radio2, 0, 0, 0);
+    vbox_addr_width = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    radio_8bit = gtk_radio_button_new_with_label(NULL, "8 bit");
+    gtk_box_pack_start(GTK_BOX(vbox_addr_width), radio_8bit, 0, 0, 0);
+    radio_16bit = gtk_radio_button_new_with_label(
+        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_8bit)), "16 bit");
+    gtk_box_pack_start(GTK_BOX(vbox_addr_width), radio_16bit, 0, 0, 0);
 
-    g_signal_connect(radio1, "toggled", G_CALLBACK(toggled_addr_length),
+    g_signal_connect(radio_8bit, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "1");
-    g_signal_connect(radio2, "toggled", G_CALLBACK(toggled_addr_length),
+    g_signal_connect(radio_16bit, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "2");
 
 
@@ -541,13 +546,13 @@ void init_control_gui()
     row++;
     col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_datatype, col++, row, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), vbox2, col++, row, 2, 1);
+    gtk_grid_attach(GTK_GRID(grid), vbox_datatype, col++, row, 2, 1);
 
     // second row: bayer pattern
     row++;
     col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_bayer, col++, row, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), vbox3, col++, row, 2, 1);
+    gtk_grid_attach(GTK_GRID(grid), vbox_bayer, col++, row, 2, 1);
 
 
     // third row: ae, awb, ag(not af...)
@@ -580,7 +585,7 @@ void init_control_gui()
     row++;
     col = 0;
     gtk_grid_attach(GTK_GRID(grid), label_addr_width, col++, row, 1, 1);
-    gtk_grid_attach(GTK_GRID(grid), vbox, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), vbox_addr_width, col++, row, 1, 1);
 
     // eighth row: reg addr
     row++;
