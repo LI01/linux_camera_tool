@@ -49,8 +49,8 @@ void json_parser(int fd)
     char* dev_name;
     uint8_t sub_addr;
     int addr_width;
-    uint32_t reg_addr;
-    uint32_t reg_val;
+    uint32_t reg_addr = 0;
+    uint32_t reg_val = 0;
 
     int i;
     int errnum;

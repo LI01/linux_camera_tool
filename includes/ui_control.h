@@ -24,7 +24,7 @@ void enable_ae(GtkToggleButton *toggle_button);
 void enable_awb(GtkToggleButton *toggle_button);
 void enable_abc(GtkToggleButton *toggle_button);
 
-void toggled_addr_length(GtkWidget* widget, gpointer data);
+void toggled_addr_length(GtkWidget *widget, gpointer data);
 int addr_width_for_rw(int address_width_flag);
 
 void register_write(GtkWidget *widget);
@@ -38,6 +38,20 @@ void black_level_correction(GtkWidget *widget);
 
 void send_trigger(GtkWidget *widget);
 void enable_trig(GtkWidget *widget);
+
+void basic_device_info_row();
+void datatype_choice_row();
+void bayer_pattern_choice_row();
+void three_a_ctrl_row();
+void gain_exposure_ctrl_row();
+void i2c_addr_row();
+void i2c_addr_width_row();
+void i2c_reg_addr_row();
+void i2c_reg_val_row();
+void captures_row();
+void gamma_correction_row();
+void triggering_row();
+void black_level_correction_row();
 
 void exit_loop(GtkWidget *widget);
 

@@ -30,6 +30,7 @@ int main(int argc, char **argv)
 	char *endptr;
 	dev.nbufs = V4L_BUFFERS_DEFAULT;
 	int c;
+	int sys_ret;
 	
 	char *ret_dev_name = enum_v4l2_device(dev_name);
 	v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
@@ -37,13 +38,18 @@ int main(int argc, char **argv)
 	if (v4l2_dev < 0)
 	{
 		printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
-		return 0;
+		return -1;
 	}
 
 	printf("********************List Available Resolutions***************\n");
 	/* list all the resolutions */
-	system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\
+	sys_ret = system("v4l2-ctl --list-formats-ext | grep Size | awk '{print $1 $3}'|  	\
 		sed 's/Size/Resolution/g'");
+	if (sys_ret < 0)
+	{
+		printf("failed to list camera %s resolution\n\r", dev_name);
+		return -1;
+	}	
 	/* 
 	 * run a v4l2-ctl --list-formats-ext 
 	 * to see the resolution and available frame rate 
@@ -83,7 +89,7 @@ int main(int argc, char **argv)
 		default:
 			printf("Invalid option -%c\n", c);
 			printf("Run %s -h for help.\n", argv[0]);
-			return 1;
+			return -1;
 		}
 	}
 
@@ -197,6 +203,11 @@ int main(int argc, char **argv)
 	close(v4l2_dev);
 
 	//FIXME:why when close the window, it won't kill the process
-	system("killall -9 leopard_cam"); 
+	sys_ret = system("killall -9 leopard_cam"); 
+	if (sys_ret < 0)
+	{
+		printf("fail to exit the leopard camera tool\r\n");
+		return -1;
+	} 
 	return 0;
 }

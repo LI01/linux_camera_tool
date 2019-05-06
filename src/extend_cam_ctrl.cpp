@@ -908,11 +908,18 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 		if (add_bayer_forcv(bayer_flag) != 4)
 			cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		
 		if (add_bayer_forcv(bayer_flag) == 4) 
 		{
 			cv::cvtColor(img, img, cv::COLOR_BayerBG2BGR); 
 			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
 		}
+
+		/* gamma correction functionality, only available for bayer camera */
+		if (*(gamma_val) != (float)1) 
+			img = apply_gamma_correction(img);
+	
+
 		share_img = img;
 	}
 
