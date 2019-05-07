@@ -1,4 +1,4 @@
-/****************************************************************************
+/*****************************************************************************
   This sample is released as public domain.  It is distributed in the hope it
   will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
@@ -11,25 +11,54 @@
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/json_parser.h"
-/****************************************************************************
+/*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
 extern void generic_I2C_write(int fd, int rw_flag, int bufCnt,
             int slaveAddr, int regAddr, unsigned char *i2c_data);
 extern void sensor_reg_write(int fd, int regAddr, int regVal);
-/*****************************************************************************
+/******************************************************************************
 **                           Function definition
 *****************************************************************************/
-/* 
+/** 
  * Remove the first and last character from c string 
  * for removing the paranthesis, double quote etc
  */
 void top_n_tail(char *str)
 {
+    if(str == NULL || strlen(str) < 1)
+		return;
      size_t len = strlen(str);
      memmove(str, str+1, len-2);
      str[len-2] = 0;
 }
+
+/**
+ * trim trailing white spaces and control chars (\n) from source string
+ * args:
+ *    src - source string
+ *
+ * asserts:
+ *    none
+ *
+ * returns: error code
+ */
+void trim_trailing_whitespaces(char *src)
+{
+	if(src == NULL || strlen(src) < 1)
+		return;
+
+	/**move to end of string*/
+	char *srcp = src + strlen(src);
+
+	while((isspace(*(srcp-1)) || iscntrl(*(srcp-1))) && (srcp - 1) > src)
+		srcp--;
+
+	/**end string*/
+	*srcp = '\0';
+
+}
+
 
 void json_parser(int fd)
 {
@@ -68,10 +97,10 @@ void json_parser(int fd)
 	    fclose(fp);
     }
 
-    /* parse the json file */
+    /** parse the json file */
 	parsed_json = json_tokener_parse(json_buffer);
 
-    /* Get the json_object associated with a given object field */
+    /** Get the json_object associated with a given object field */
 	json_object_object_get_ex(parsed_json, "deviceName", &device_name);
 	json_object_object_get_ex(parsed_json, "subAddress", &sub_address);
     json_object_object_get_ex(parsed_json, "regAddressWidth", &reg_address_width);
@@ -98,13 +127,13 @@ void json_parser(int fd)
 
     while (reg_pair!= NULL)
     {   
-        /* register address */
+        /** register address */
         if(i % 2 == 0) 
         {   
             top_n_tail(reg_pair); // remove double quote
             reg_addr = (uint32_t)strtol(reg_pair, NULL, 16);
         }
-        /* register value */
+        /** register value */
         else 
         {
             top_n_tail(reg_pair); // remove double quote

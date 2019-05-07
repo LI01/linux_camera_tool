@@ -1,4 +1,4 @@
-/****************************************************************************
+/*****************************************************************************
   This sample is released as public domain.  It is distributed in the hope it
   will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
@@ -40,7 +40,7 @@ char *enum_v4l2_device(char *dev_name)
     struct udev_device *dev;
 
     printf("********************Udev Device Start************************\n");
-    /* Create the udev object */
+    /** Create the udev object */
     udev = udev_new();
     if (!udev)
     {
@@ -48,13 +48,13 @@ char *enum_v4l2_device(char *dev_name)
         exit(1);
     }
 
-    /* Create a list of the devices in the 'v4l2' subsystem. */
+    /** Create a list of the devices in the 'v4l2' subsystem. */
     enumerate = udev_enumerate_new(udev);
     udev_enumerate_add_match_subsystem(enumerate, "video4linux");
     udev_enumerate_scan_devices(enumerate);
     devices = udev_enumerate_get_list_entry(enumerate);
 
-    /* For each item enumerated, print out its information.
+    /** For each item enumerated, print out its information.
 	 * udev_list_entry_foreach is a macro which expands to
 	 * a loop. The loop will be executed for each member in
 	 * devices, setting dev_list_entry to a list entry
@@ -63,19 +63,19 @@ char *enum_v4l2_device(char *dev_name)
     {
         const char *path;
 
-        /* Get the filename of the /sys entry for the device
+        /** Get the filename of the /sys entry for the device
 		 * and create a udev_device object (dev) representing it */
         path = udev_list_entry_get_name(dev_list_entry);
         dev = udev_device_new_from_syspath(udev, path);
         char dev_name_tmp[64];
 
-        /* usb_device_get_devnode() returns the path to the device node
+        /** usb_device_get_devnode() returns the path to the device node
 		 * itself in /dev. */
         printf("Device Node Path: %s\n", udev_device_get_devnode(dev));
         strcpy(dev_name_tmp, udev_device_get_devnode(dev));
         printf("%s\n", dev_name_tmp);
 
-        /* The device pointed to by dev contains information about
+        /** The device pointed to by dev contains information about
 		 * the hidraw device. In order to get information about the
 		 * USB device, get the parent device with the
 		 * subsystem/devtype pair of "usb"/"usb_device". This will
@@ -91,13 +91,13 @@ char *enum_v4l2_device(char *dev_name)
             exit(1);
         }
 
-        /*
+        /**
          * 2a0b is leopard manufacurer id, use udev to update video device id
          */
         if ((strcmp("2a0b", udev_device_get_sysattr_value(dev, "idVendor"))) == 0)
         {
             strcpy(dev_name, dev_name_tmp);
-            /* From here, we can call get_sysattr_value() for each file
+            /** From here, we can call get_sysattr_value() for each file
 		     * in the device's /sys entry. The strings passed into these
 		     * functions (idProduct, idVendor, serial, etc.) correspond
 		     * directly to the files in the directory which represents
@@ -114,7 +114,7 @@ char *enum_v4l2_device(char *dev_name)
             printf("  %s\n  %s\n",
                    manufacturer,
                    product);
-            /* Add serial number in usb descriptor will need to request
+            /** Add serial number in usb descriptor will need to request
                a firmware updates, values will get from FX3 and sensor fuse id */
             // printf("  serial: %s\n",
             //        serial);
@@ -125,7 +125,7 @@ char *enum_v4l2_device(char *dev_name)
 
         udev_device_unref(dev);
     }
-    /* Free the enumerator object */
+    /** Free the enumerator object */
     udev_enumerate_unref(enumerate);
 
     udev_unref(udev);

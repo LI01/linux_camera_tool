@@ -1,4 +1,4 @@
-/****************************************************************************
+/*****************************************************************************
   This sample is released as public domain.  It is distributed in the hope it
   will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
@@ -14,7 +14,7 @@
 #include "../includes/shortcuts.h"
 #include "../includes/uvc_extension_unit_ctrl.h"
 
-/****************************************************************************
+/*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
 struct uvc_xu_control_query xu_query;
@@ -45,10 +45,10 @@ unsigned int m_bGain = 0x1;
 int hw_rev;
  char uuid[64];
 
-/*****************************************************************************
+/******************************************************************************
 **                           Function definition
 *****************************************************************************/
-/*
+/**
  * handle the error for extension unit control
  * args:
  * 		none
@@ -84,7 +84,7 @@ void error_handle_extension_unit()
 	return;
 }
 
-/*
+/**
  * helper function to commnunicate with FX3 UVC defined extension unit
  * args:
  * 		fd 			- file descriptor
@@ -112,7 +112,7 @@ void write_to_UVC_extension(int fd,int property_id,
 	
 }
 
-/*
+/**
  * helper function to communicate with FX3 UVC defined extension unit
  * args:
  * 		fd 			- file descriptor
@@ -135,9 +135,9 @@ void read_from_UVC_extension(int fd,int property_id,
 		error_handle_extension_unit();
 }
 
-/*--------------------------------------------------------------------------- */
+/**--------------------------------------------------------------------------- */
 
-/*
+/**
  * set sensor mode
  * most cameras don't support it in the driver
  * 
@@ -154,7 +154,7 @@ void set_sensor_mode(int fd, int mode)
     printf("V4L2_CORE: set sensor mode to %d\n", mode);
 }
 
-/*
+/**
  * set pos
  * most cameras don't support it in the driver
  * 
@@ -176,7 +176,7 @@ void set_pos(int fd, int start_x, int start_y)
 }
 
 
-/*
+/**
  * get led status
  * most cameras don't support it in the driver
  * 
@@ -191,7 +191,7 @@ void get_led_status(int fd)
     printf("V4L2_CORE: led status is %d", buf3[0]);
 }
 
-/*
+/**
  * set led status
  * most cameras don't support it in the driver
  * 
@@ -218,7 +218,7 @@ void set_led(int fd, int left_0, int left_1, int right_0, int right_1)
         left_0, left_1, right_0, right_1);
 }
 
-/* 
+/** 
  * set sensor gain value, 
  * need to enable this feature in USB camera driver 
  * 
@@ -258,7 +258,7 @@ void set_sensor_gain_rgb(int fd,unsigned int rGain,
         LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE, buf4);
 }
 
-/* 
+/** 
  * read camera uuid hardware firmware revision
  * for uuid and fuseid, request for new driver to fit needs
  */
@@ -269,7 +269,7 @@ int read_cam_uuid_hwfw_rev(int fd)
     char uuidBuf[80];
     read_from_UVC_extension(fd, LI_XU_SENSOR_UUID_HWFW_REV,
         LI_XU_SENSOR_UUID_HWFW_REV_SIZE, buf7);
-	/* upper 4 bits are for camera datatype, clear that flags */
+	/** upper 4 bits are for camera datatype, clear that flags */
     hw_rev = buf7[0] | (buf7[1] << 8);
 	hw_rev &= ~(0xf000); 
     int local_fw_rev = buf7[2] | (buf7[3] << 8);
@@ -284,7 +284,7 @@ int read_cam_uuid_hwfw_rev(int fd)
 	return local_fw_rev;
 }
 
-/*
+/**
  * currently PTS information are placed in 2 places
  * 1. UVC video data header 
  * 	- a 33-bit PTS timestamp as defined in ITU-REC-H.222.0/ISO/IEC 13818-1
@@ -320,7 +320,7 @@ void get_pts(int fd)
 	printf("V4L2_CORE: get PTS = %lu\r\n", pts);
 }
 
-/* set PTS counter initial value
+/** set PTS counter initial value
  * args:
  * 		fd 		- file descriptor
  * 		initVal	- initial counter start value for PTS(4-byte long)
@@ -339,7 +339,7 @@ void set_pts(int fd,unsigned long initVal)
 }
 
 
-/*
+/**
  * send out the trigger pulse once when call once
  * need to check with driver it the sensor support trigger mode
  * args:
@@ -372,7 +372,7 @@ void trigger_delay_time(int fd, unsigned int delay_time)
     
 }
 
-/*
+/**
  * Change camera sensor from free running master mode to trigger mode.
  * Different sensors will have different triggering mode configurations.
  * Need to check with the sensor and driver support for triggering functionality.
@@ -400,7 +400,7 @@ void trigger_enable(int fd, int ena, int enb)
     //printf("trigger mode enable\n");
 }
 
-/*
+/**
  *	save register to spi flash on FX3, load it automatically when boot time
  *  flash for storage is set to be 256 bytes
  *  args:
@@ -462,7 +462,7 @@ void load_register_setting_from_configuration(int fd,int regCount,
 	}
 }
 
-/*
+/**
  *	load register to spi flash on FX3 manually     
  *  #########FOR TEST ONLY###########
  *  flash for storage is set to be 256 bytes
@@ -496,7 +496,7 @@ void load_register_setting_from_flash_manually(int fd)
 	}
 }
 
-/* 
+/** 
  * I2C register read/write for the sensor 
  * args: 
  * 		fd 		- file descriptor
@@ -520,7 +520,7 @@ void sensor_reg_write(int fd,int regAddr, int regVal)
 	printf("V4L2_CORE: Write Sensor REG[0x%x]: 0x%x\r\n", regAddr, regVal);
 }
 
-/* 
+/** 
  * I2C register read/write for the sensor 
  * args: 
  * 		fd 		- file descriptor
@@ -550,7 +550,7 @@ int sensor_reg_read(int fd,int regAddr)
 	return regVal;
 }
 
-/*
+/**
  *  register read/write for different slaves on I2C line
  * 
  *	Byte0: bit7 0:read;1:write. bit[6:0] regAddr width, 1:8-bit register addr;
@@ -603,7 +603,7 @@ void generic_I2C_write(int fd,int rw_flag, int bufCnt,
 		   slaveAddr, regAddr, regVal);
 }
 
-/*
+/**
  *  register read/write for different slaves on I2C line
  *
  *  Register data starts from Byte4(8bit address) or Byte5(16bit address)

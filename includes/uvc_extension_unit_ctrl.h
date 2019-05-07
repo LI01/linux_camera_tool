@@ -1,4 +1,4 @@
-/****************************************************************************
+/*****************************************************************************
   This sample is released as public domain.  It is distributed in the hope it
   will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
@@ -12,11 +12,11 @@
 *****************************************************************************/
 
 #pragma once
-/****************************************************************************
+/*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
 
-/* 
+/** 
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id
  */
@@ -37,7 +37,7 @@
 #define LI_XU_GENERIC_I2C_RW (0x10)
 #define LI_XU_SENSOR_DEFECT_PIXEL_TABLE (0x11)
 
-/* 
+/** 
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id buffer size
  */
@@ -54,31 +54,31 @@
 #define LI_XU_TRIGGER_MODE_SIZE (2)
 #define LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE (256) 
 #define LI_XU_SENSOR_REG_RW_SIZE (5)
-#define LI_XU_ERASE_EEPROM_SIZE (0)/////////
+#define LI_XU_ERASE_EEPROM_SIZE (0)
 #define LI_XU_GENERIC_I2C_RW_SIZE (262)
 #define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE (33)
 
 
-/* --- 8-bit I2C slave address list --- */
-/*  On-semi Sensor */
+/** --- 8-bit I2C slave address list --- */
+/**  On-semi Sensor */
 #define AP020X_I2C_ADDR (0xBA)
 #define AR0231_I2C_ADDR (0x20)
 #define AR0144_I2C_ADDR (0x20)
-/*   Sony Sensor   */
+/**   Sony Sensor   */
 #define IMX334_I2C_ADDR (0x34)
 #define IMX390_I2C_ADDR (0x34)
 #define IMX324_I2C_ADDR (0x34)
-/* Omnivision Sensor */
+/** Omnivision Sensor */
 #define OV2311_I2C_ADDR (0xC0)
 #define OS05A20_I2C_ADDR (0x6C)
-/* Toshiba Bridge */
+/** Toshiba Bridge */
 #define TC_MIPI_BRIDGE_I2C_ADDR (0x1C)
-/*  Maxim Serdes */
+/**  Maxim Serdes */
 #define MAX96705_SER_I2C_ADDR (0x80)
 #define MAX9295_SER_I2C_ADDR (0x80) //0x88, 0xC4
 #define MAX9272_SER_I2C_ADDR (0x90)
 #define MAX9296_DESER_I2C_ADDR (0x90) //0xD4
-/* TI Serdes */
+/** TI Serdes */
 #define TI913_SER_I2C_ADDR (0xB4)//0xB2
 #define TI953_SER_I2C_ADDR (0x60) 
 #define TI914_DESER_I2C_ADDR (0xC0)
@@ -107,7 +107,7 @@ typedef struct reg_seq
 
 #define MAX_PAIR_FOR_SPI_FLASH (64)
 
-/* --- test registers on the fly --- */
+/** --- test registers on the fly --- */
 #ifdef AP0202_WRITE_REG_ON_THE_FLY
 // TODO: used in helper function, modify it for different camera
 const reg_seq ChangConfig[] =
@@ -161,11 +161,11 @@ const reg_seq IMX334_MIPI_REG_TESTING[] =
 };
 #endif
 
-/****************************************************************************
+/*****************************************************************************
 **							 Function declaration
 *****************************************************************************/
 
-/* --- helper function ---*/
+/** --- helper function ---*/
 void error_handle_extension_unit();
 
 void write_to_UVC_extension(int fd, int property_id,
@@ -174,9 +174,9 @@ void write_to_UVC_extension(int fd, int property_id,
 void read_from_UVC_extension(int fd, int property_id,
                              int length, unsigned char *buffer);
 
-/*--------------------------------------------------------------------------- */
+/**--------------------------------------------------------------------------- */
 
-/* --- functions using extension unit call in camera driver --- */
+/** --- functions using extension unit call in camera driver --- */
 void set_sensor_mode(int fd, int mode);
 void set_pos(int fd, int start_x, int start_y);
 void get_led_status(int fd);

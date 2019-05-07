@@ -11,14 +11,14 @@
 #include <linux/usb/video.h>
 #include <errno.h>
 #include <linux/uvcvideo.h>
-#include <sys/fcntl.h> /* for open() syscall */ 
-#include <sys/mman.h> /* for using mmap */
-#include <math.h>       /* pow */
+#include <sys/fcntl.h> /** for open() syscall */ 
+#include <sys/mman.h> /** for using mmap */
+#include <math.h>       /** pow */
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
-#define SIZE(a) (sizeof(a) / sizeof(*a))
+#define SIZE(a) (sizeof(a) / sizeof(*a)) 
 
-/*clip value between 0 and 255*/
+/**clip value between 0 and 255*/
 #define CLIP(value) (uint8_t)(((value)>0xFF)?0xff:(((value)<0)?0:(value)))
 
 #define __THREAD_TYPE pthread_t

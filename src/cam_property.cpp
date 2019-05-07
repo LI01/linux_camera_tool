@@ -1,4 +1,4 @@
-/****************************************************************************
+/*****************************************************************************
   This sample is released as public domain.  It is distributed in the hope it
   will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
@@ -14,7 +14,7 @@
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/cam_property.h"
-/*
+/**
  * handle the error for camera control
  * args:
  * 		none
@@ -50,7 +50,7 @@ void error_handle_cam_ctrl()
     return;
 }
 
-/*
+/**
  * helper function for camera control getter
  * args: 
  * 		int fd - put buffers in
@@ -67,7 +67,7 @@ void uvc_get_control(int fd, unsigned int id)
     printf("Control 0x%08x value %u\n", id, ctrl.value);
 }
 
-/*
+/**
  * helper function for camera control setter
  * args: 
  * 		int fd - put buffers in
@@ -87,7 +87,7 @@ void uvc_set_control(int fd, unsigned int id, int value)
     printf("Control 0x%08x set to %u, is %u\n", id, value,
            ctrl.value);
 }
-/*--------------------------------------------------------------------------- */
+/**--------------------------------------------------------------------------- */
 void set_frame_rate(int fd, int fps)
 {
     struct v4l2_streamparm param;
@@ -112,7 +112,7 @@ int get_frame_rate(int fd)
     return param.parm.capture.timeperframe.denominator;
 }
 
-/*--------------------------------------------------------------------------- */
+/**--------------------------------------------------------------------------- */
 void set_gain_auto (int fd, int auto_gain)
 {
     uvc_set_control(fd, V4L2_CID_AUTOGAIN, auto_gain);
@@ -147,7 +147,7 @@ void get_exposure_absolute(int fd)
 
 // from below, it might not support by every camera
 
-/*  
+/**  
  *  Enables automatic adjustments of the exposure time and/or iris aperture. 
  *  The effect of manual changes of the exposure time or iris aperture while 
  *  these features are enabled is undefined, drivers should ignore such requests. 

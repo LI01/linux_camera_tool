@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['buf1',['buf1',['../uvc__extension__unit__ctrl_8cpp.html#ac6663a35b03b840e5c833922f01e99b5',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf10',['buf10',['../uvc__extension__unit__ctrl_8cpp.html#a54eb9210e48090dcd8341a029eb9ec4c',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf11',['buf11',['../uvc__extension__unit__ctrl_8cpp.html#a920484d0aa1001922017ff60fb507c33',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf12',['buf12',['../uvc__extension__unit__ctrl_8cpp.html#a6b5c2a034452a0d7b9012aee4986d91e',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf14',['buf14',['../uvc__extension__unit__ctrl_8cpp.html#a5315623ebdae46f2c3293164df1ed825',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf16',['buf16',['../uvc__extension__unit__ctrl_8cpp.html#a63e8e5215bacf4ba3910f9d4573fdc19',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf17',['buf17',['../uvc__extension__unit__ctrl_8cpp.html#a5780fe912c57a6f921e00ef2940c351f',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf2',['buf2',['../uvc__extension__unit__ctrl_8cpp.html#a69699f112443b6d43f4d6885d2ea48fa',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf3',['buf3',['../uvc__extension__unit__ctrl_8cpp.html#a385d4bc70bb390787d3cb4f68f58b50f',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf4',['buf4',['../uvc__extension__unit__ctrl_8cpp.html#ae8f896bb4d3bb6f2e0e6d63be269f8da',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf7',['buf7',['../uvc__extension__unit__ctrl_8cpp.html#a9b9ce15b58b735df73b56d9239da32e4',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf8',['buf8',['../uvc__extension__unit__ctrl_8cpp.html#a6bbc28030471a8340504b7461732132f',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buf9',['buf9',['../uvc__extension__unit__ctrl_8cpp.html#a8045a2563233d390f99741ff85db5639',1,'uvc_extension_unit_ctrl.cpp']]],
+  ['buffers',['buffers',['../structdevice.html#ac4e51a99063e828f7186e560a8f6901b',1,'device']]],
+  ['button_5fapply_5fblc',['button_apply_blc',['../ui__control_8cpp.html#a7dea3763874859a1b46db5dcaebbba62',1,'ui_control.cpp']]],
+  ['button_5fapply_5fgamma',['button_apply_gamma',['../ui__control_8cpp.html#aae4b875c6ae270080753e5cd6b2c4973',1,'ui_control.cpp']]],
+  ['button_5fcapture_5fbmp',['button_capture_bmp',['../ui__control_8cpp.html#a218133aa2cf12fed2f11751c20e3a9a7',1,'ui_control.cpp']]],
+  ['button_5fcapture_5fraw',['button_capture_raw',['../ui__control_8cpp.html#a9314f907518c655613e1962c335b5e24',1,'ui_control.cpp']]],
+  ['button_5fexit_5fstreaming',['button_exit_streaming',['../ui__control_8cpp.html#a5cb85d2d1130f4e98e618488861d96e0',1,'ui_control.cpp']]],
+  ['button_5fread',['button_read',['../ui__control_8cpp.html#a018e558e36450d868ca3102a9fd55bfc',1,'ui_control.cpp']]],
+  ['button_5ftrig',['button_trig',['../ui__control_8cpp.html#ad98e1fdaf82adb471ebfc758a0a8ef14',1,'ui_control.cpp']]],
+  ['button_5fwrite',['button_write',['../ui__control_8cpp.html#a6cd171f02076e811361a1fc7eeb1cd6c',1,'ui_control.cpp']]],
+  ['bytesperline',['bytesperline',['../structdevice.html#aa23c79c4ecd2cc4750215ccbf7b64d97',1,'device']]]
+];
