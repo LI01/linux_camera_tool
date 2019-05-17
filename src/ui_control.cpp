@@ -29,7 +29,8 @@ GtkWidget *check_button_auto_exposure, *check_button_awb, *check_button_auto_gai
 GtkWidget *label_exposure, *label_gain;
 GtkWidget *hscale_exposure, *hscale_gain;
 GtkWidget *label_i2c_addr, *entry_i2c_addr;
-GtkWidget *label_addr_width, *vbox_addr_width, *radio_8bit, *radio_16bit;
+GtkWidget *label_addr_width, *vbox_addr_width, *radio_8bit_addr, *radio_16bit_addr;
+GtkWidget *label_val_width, *vbox_val_width, *radio_8bit_val, *radio_16bit_val;
 GtkWidget *label_reg_addr, *entry_reg_addr;
 GtkWidget *label_reg_val, *entry_reg_val;
 GtkWidget *button_read, *button_write;
@@ -41,6 +42,7 @@ GtkWidget *label_blc, *entry_blc, *button_apply_blc;
 GtkWidget *grid;
 static GtkWidget *window = NULL; /** the main window */
 int address_width_flag;
+int value_width_flag;
 int row;
 int col;
 extern int v4l2_dev;
@@ -167,12 +169,34 @@ void toggled_addr_length(GtkWidget *widget, gpointer data)
     if (strcmp((char *)data, "2") == 0)
         address_width_flag = 2;
 }
-/** generate address width flag for callback in register read/write */
+
+/** callback for updating register value length 8/16 bits */
+void toggled_val_length(GtkWidget *widget, gpointer data)
+{
+    (void)widget;
+    if (strcmp((char *)data, "1") == 0)
+        value_width_flag = 1;
+
+    if (strcmp((char *)data, "2") == 0)
+        value_width_flag = 2;
+}
+
+/** generate register address width flag for callback in register read/write */
 int addr_width_for_rw(int address_width_flag)
 {
     if (address_width_flag == 1)
         return 1;
     if (address_width_flag == 2)
+        return 2;
+    return 1;
+}
+
+/** generate register value width flag for callback in register read/write */
+int val_width_for_rw(int value_width_flag)
+{
+    if (value_width_flag == 1)
+        return 1;
+    if (value_width_flag == 2)
         return 2;
     return 1;
 }
@@ -205,11 +229,19 @@ void register_write(GtkWidget *widget)
         buf[0] = regVal & 0xff;
         buf[1] = (regVal >> 8) & 0xff;
 
-        /** write 8/16 bit data */
-        if (addr_width_for_rw(address_width_flag) != 1)
-            generic_I2C_write(v4l2_dev, 0x82, 2, slaveAddr, regAddr, buf);
-        else
+        /** write 8/16 bit register addr and register data */
+        if (addr_width_for_rw(address_width_flag) == 1 && 
+            (val_width_for_rw(value_width_flag) == 1))
             generic_I2C_write(v4l2_dev, 0x81, 1, slaveAddr, regAddr, buf);
+        else if (addr_width_for_rw(address_width_flag) == 2 && 
+            (val_width_for_rw(value_width_flag) == 1))
+            generic_I2C_write(v4l2_dev, 0x82, 1, slaveAddr, regAddr, buf);
+        else if (addr_width_for_rw(address_width_flag) == 1 && 
+            (val_width_for_rw(value_width_flag) == 2))
+            generic_I2C_write(v4l2_dev, 0x81, 2, slaveAddr, regAddr, buf);
+        else 
+            generic_I2C_write(v4l2_dev, 0x82, 2, slaveAddr, regAddr, buf);
+
     }
 }
 
@@ -506,20 +538,20 @@ void i2c_addr_row()
 }
 
 /** seventh row: reg addr width */
-void i2c_addr_width_row()
+void reg_addr_width_row()
 {
-    label_addr_width = gtk_label_new("I2C Addr Width");
-    gtk_label_set_text(GTK_LABEL(label_addr_width), "I2C Addr Width:");
+    label_addr_width = gtk_label_new("Register Addr Width");
+    gtk_label_set_text(GTK_LABEL(label_addr_width), "Register Addr Width:");
     vbox_addr_width = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    radio_8bit = gtk_radio_button_new_with_label(NULL, "8 bit");
-    gtk_box_pack_start(GTK_BOX(vbox_addr_width), radio_8bit, 0, 0, 0);
-    radio_16bit = gtk_radio_button_new_with_label(
-        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_8bit)), "16 bit");
-    gtk_box_pack_start(GTK_BOX(vbox_addr_width), radio_16bit, 0, 0, 0);
+    radio_8bit_addr = gtk_radio_button_new_with_label(NULL, "8 bit");
+    gtk_box_pack_start(GTK_BOX(vbox_addr_width), radio_8bit_addr, 0, 0, 0);
+    radio_16bit_addr = gtk_radio_button_new_with_label(
+        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_8bit_addr)), "16 bit");
+    gtk_box_pack_start(GTK_BOX(vbox_addr_width), radio_16bit_addr, 0, 0, 0);
 
-    g_signal_connect(radio_8bit, "toggled", G_CALLBACK(toggled_addr_length),
+    g_signal_connect(radio_8bit_addr, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "1");
-    g_signal_connect(radio_16bit, "toggled", G_CALLBACK(toggled_addr_length),
+    g_signal_connect(radio_16bit_addr, "toggled", G_CALLBACK(toggled_addr_length),
                      (gpointer) "2");
 
     row++;
@@ -528,7 +560,30 @@ void i2c_addr_width_row()
     gtk_grid_attach(GTK_GRID(grid), vbox_addr_width, col++, row, 1, 1);
 }
 
-/** eighth row: reg addr */
+/** eighth row: reg value width */
+void reg_val_width_row()
+{
+    label_val_width = gtk_label_new("Register Value Width");
+    gtk_label_set_text(GTK_LABEL(label_val_width), "Register Value Width:");
+    vbox_val_width = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    radio_8bit_val = gtk_radio_button_new_with_label(NULL, "8 bit");
+    gtk_box_pack_start(GTK_BOX(vbox_val_width), radio_8bit_val, 0, 0, 0);
+    radio_16bit_val = gtk_radio_button_new_with_label(
+        gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_8bit_val)), "16 bit");
+    gtk_box_pack_start(GTK_BOX(vbox_val_width), radio_16bit_val, 0, 0, 0);
+
+    g_signal_connect(radio_8bit_val, "toggled", G_CALLBACK(toggled_val_length),
+                     (gpointer) "1");
+    g_signal_connect(radio_16bit_val, "toggled", G_CALLBACK(toggled_val_length),
+                     (gpointer) "2");
+
+    row++;
+    col = 0;
+    gtk_grid_attach(GTK_GRID(grid), label_val_width, col++, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), vbox_val_width, col++, row, 1, 1);
+}
+
+/** ninth row: reg addr */
 void i2c_reg_addr_row()
 {
     label_reg_addr = gtk_label_new("Reg Addr:");
@@ -547,7 +602,7 @@ void i2c_reg_addr_row()
     gtk_grid_attach(GTK_GRID(grid), button_read, col++, row, 1, 1);
 }
 
-/** ninth row: reg val */
+/** tenth row: reg val */
 void i2c_reg_val_row()
 {
     label_reg_val = gtk_label_new("Reg Value:");
@@ -566,7 +621,7 @@ void i2c_reg_val_row()
     gtk_grid_attach(GTK_GRID(grid), button_write, col++, row, 1, 1);
 }
 
-/** tenth row: capture bmp, raw */
+/** eleventh row: capture bmp, raw */
 void captures_row()
 {
 
@@ -585,7 +640,7 @@ void captures_row()
     gtk_grid_attach(GTK_GRID(grid), button_capture_raw, col++, row, 1, 1);
 }
 
-/** eleventh row: gamma correction */
+/** twelfth row: gamma correction */
 void gamma_correction_row()
 {
     label_gamma = gtk_label_new("Gamma Correction:");
@@ -604,7 +659,7 @@ void gamma_correction_row()
     gtk_grid_attach(GTK_GRID(grid), button_apply_gamma, col++, row, 1, 1);
 }
 
-/** twelfth row: trigger */
+/** thirteenth row: trigger */
 void triggering_row()
 {
     label_trig = gtk_label_new("Trigger Sensor:");
@@ -621,7 +676,7 @@ void triggering_row()
     gtk_grid_attach(GTK_GRID(grid), button_trig, col++, row, 1, 1);
 }
 
-/** thirteenth row: black level correction */
+/**  fourteenth row: black level correction */
 void black_level_correction_row()
 {
     label_blc = gtk_label_new("Black Level Correction:");
@@ -670,7 +725,8 @@ void init_control_gui()
     three_a_ctrl_row();
     gain_exposure_ctrl_row();
     i2c_addr_row();
-    i2c_addr_width_row();
+    reg_addr_width_row();
+    reg_val_width_row();
     i2c_reg_addr_row();
     i2c_reg_val_row();
     captures_row();

@@ -418,8 +418,9 @@ void abc_enable(int enable)
 	}
 }
 
-static cv::Mat apply_auto_brightness_and_contrast(cv::Mat opencvImage,
-												  float clipHistPercent = 0)
+static cv::Mat apply_auto_brightness_and_contrast(
+	cv::Mat opencvImage,
+	float clipHistPercent = 0)
 
 {
 	// if it is grey image, do nothing
@@ -610,7 +611,7 @@ void mmap_variables()
 	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	black_level_correction = (int *)mmap(NULL, sizeof *black_level_correction,
-										 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	loop = (int *)mmap(NULL, sizeof *loop, PROT_READ | PROT_WRITE,
 					   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 }
@@ -898,7 +899,8 @@ static cv::Mat group_3a_ctrl_flags_for_raw_camera(cv::Mat opencvImage)
  * unify putting text in opencv image
  * a wrapper for put_text()
  */
-static void streaming_put_text(cv::Mat opencvImage, const char *str, int cordinate_y)
+static void streaming_put_text(cv::Mat opencvImage, 
+	const char *str, int cordinate_y)
 {
 	cv::putText(opencvImage,
 				str,
