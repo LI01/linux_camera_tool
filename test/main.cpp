@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 	pid = fork();
 	if (pid == 0)
 	{ /** child process */
-		init_control_gui();
+		ctrl_gui_main();
 	}
 	else if (pid > 0)
 	{ /** parent process */

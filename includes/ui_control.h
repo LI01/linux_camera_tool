@@ -14,6 +14,57 @@
 #pragma once
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+
+
+// Hold init data for GTK signals
+typedef struct
+{
+  const gchar *signal_name;
+  const gchar *signal;
+  GCallback handler;
+  gpointer data;
+} window_signal;
+
+typedef enum
+{
+  GTK_WIDGET_TYPE_LABEL = 0,
+  GTK_WIDGET_TYPE_BUTTON,
+  GTK_WIDGET_TYPE_VBOX,
+  GTK_WIDGET_TYPE_RADIO_BUTTON,
+  GTK_WIDGET_TYPE_CHECK_BUTTON,
+  GTK_WIDGET_TYPE_HSCALE,
+  GTK_WIDGET_TYPE_ENTRY,
+} widget_type;
+
+typedef struct
+{
+  GtkWidget *widget;
+  widget_type wid_type;
+  GtkWidget *parent;
+  const gchar *label_str;
+} def_element;
+
+
+typedef struct
+{
+  GtkWidget *widget;
+  int col;
+  int row;
+  int width;
+} grid_elements;
+
+typedef struct
+{
+  GtkWidget *widget;
+  const gchar *signal;
+  GCallback handler;
+  gpointer data;
+} element_callback;
+
+int gui_attach_gtk3_menu(GtkWidget *parent);
+/*****************************************************************************
+**                      	Internal Callbacks
+*****************************************************************************/
 void radio_datatype(GtkWidget *widget, gpointer data);
 void radio_bayerpattern(GtkWidget *widget, gpointer data);
 
@@ -22,7 +73,7 @@ void hscale_gain_up(GtkRange *widget);
 
 void enable_ae(GtkToggleButton *toggle_button);
 void enable_awb(GtkToggleButton *toggle_button);
-void enable_abc(GtkToggleButton *toggle_button);
+void enable_abc(GtkWidget *widget, GtkToggleButton *toggle_button);
 
 void toggled_addr_length(GtkWidget *widget, gpointer data);
 void toggled_val_length(GtkWidget *widget, gpointer data);
@@ -41,21 +92,36 @@ void black_level_correction(GtkWidget *widget);
 void send_trigger(GtkWidget *widget);
 void enable_trig(GtkWidget *widget);
 
-void basic_device_info_row();
-void datatype_choice_row();
-void bayer_pattern_choice_row();
-void three_a_ctrl_row();
-void gain_exposure_ctrl_row();
-void i2c_addr_row();
-void reg_addr_width_row();
-void reg_val_width_row();
-void i2c_reg_addr_row();
-void i2c_reg_val_row();
-void captures_row();
-void gamma_correction_row();
-void triggering_row();
-void black_level_correction_row();
-
 void exit_loop(GtkWidget *widget);
+gboolean check_escape(GtkWidget *widget, GdkEventKey *event);
 
-void init_control_gui();
+/*****************************************************************************
+**                      	GUI Layout Setup, DON'T CHANGE
+*****************************************************************************/
+
+void iterate_def_elements(
+    def_element *definitions, size_t members);
+
+void list_all_def_elements();
+
+void iterate_grid_elements(
+    grid_elements *elements, size_t members);
+void list_all_grid_elements();
+
+void iterate_element_cb(element_callback *callbacks,
+                        size_t members);
+void list_all_element_callbacks();
+
+void iterate_window_signals(GtkWidget *widget,
+                            window_signal *signals, size_t members);
+void list_all_window_signals(GtkWidget *window);
+
+void init_all_widgets();
+/*****************************************************************************
+**                      	Main GUI
+*****************************************************************************/
+int gui_init();
+void grid_setup();
+void menu_bar_setup();
+void gui_run();
+void ctrl_gui_main();

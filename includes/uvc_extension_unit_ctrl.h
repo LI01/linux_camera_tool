@@ -20,69 +20,69 @@
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id
  */
-#define LI_XU_SENSOR_MODES_SWITCH (0x01)
-#define LI_XU_SENSOR_WINDOW_REPOSITION (0x02)
-#define LI_XU_LED_MODES (0x03)
-#define LI_XU_SENSOR_GAIN_CONTROL_RGB (0x04)
-#define LI_XU_SENSOR_GAIN_CONTROL_A (0x05)
+#define LI_XU_SENSOR_MODES_SWITCH           (0x01)
+#define LI_XU_SENSOR_WINDOW_REPOSITION      (0x02)
+#define LI_XU_LED_MODES                     (0x03)
+#define LI_XU_SENSOR_GAIN_CONTROL_RGB       (0x04)
+#define LI_XU_SENSOR_GAIN_CONTROL_A         (0x05)
 
-#define LI_XU_SENSOR_UUID_HWFW_REV (0x07)
-#define LI_XU_PTS_QUERY (0x08) 
-#define LI_XU_SOFT_TRIGGER (0x09)
-#define LI_XU_TRIGGER_DELAY (0x0a)
-#define LI_XU_TRIGGER_MODE (0x0b)
+#define LI_XU_SENSOR_UUID_HWFW_REV          (0x07)
+#define LI_XU_PTS_QUERY                     (0x08) 
+#define LI_XU_SOFT_TRIGGER                  (0x09)
+#define LI_XU_TRIGGER_DELAY                 (0x0a)
+#define LI_XU_TRIGGER_MODE                  (0x0b)
 #define LI_XU_SENSOR_REGISTER_CONFIGURATION (0x0c) 
-#define LI_XU_SENSOR_REG_RW (0x0e)
-#define LI_XU_ERASE_EEPROM (0x0f)
-#define LI_XU_GENERIC_I2C_RW (0x10)
-#define LI_XU_SENSOR_DEFECT_PIXEL_TABLE (0x11)
+#define LI_XU_SENSOR_REG_RW                 (0x0e)
+#define LI_XU_ERASE_EEPROM                  (0x0f)
+#define LI_XU_GENERIC_I2C_RW                (0x10)
+#define LI_XU_SENSOR_DEFECT_PIXEL_TABLE     (0x11)
 
 /** 
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id buffer size
  */
-#define LI_XU_SENSOR_MODES_SWITCH_SIZE (2)
-#define LI_XU_SENSOR_WINDOW_REPOSITION_SIZE (8)
-#define LI_XU_LED_MODES_SIZE (1)
-#define LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE (8)
-#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE (2)
+#define LI_XU_SENSOR_MODES_SWITCH_SIZE          (2)
+#define LI_XU_SENSOR_WINDOW_REPOSITION_SIZE     (8)
+#define LI_XU_LED_MODES_SIZE                    (1)
+#define LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE      (8)
+#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE        (2)
 
-#define LI_XU_SENSOR_UUID_HWFW_REV_SIZE (49)
-#define LI_XU_PTS_QUERY_SIZE (4)
-#define LI_XU_SOFT_TRIGGER_SIZE (2)
-#define LI_XU_TRIGGER_DELAY_SIZE (4)
-#define LI_XU_TRIGGER_MODE_SIZE (2)
+#define LI_XU_SENSOR_UUID_HWFW_REV_SIZE         (49)
+#define LI_XU_PTS_QUERY_SIZE                    (4)
+#define LI_XU_SOFT_TRIGGER_SIZE                 (2)
+#define LI_XU_TRIGGER_DELAY_SIZE                (4)
+#define LI_XU_TRIGGER_MODE_SIZE                 (2)
 #define LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE (256) 
-#define LI_XU_SENSOR_REG_RW_SIZE (5)
-#define LI_XU_ERASE_EEPROM_SIZE (0)
-#define LI_XU_GENERIC_I2C_RW_SIZE (262)
-#define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE (33)
+#define LI_XU_SENSOR_REG_RW_SIZE                (5)
+#define LI_XU_ERASE_EEPROM_SIZE                 (0)
+#define LI_XU_GENERIC_I2C_RW_SIZE               (262)
+#define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE    (33)
 
 
 /** --- 8-bit I2C slave address list --- */
 /**  On-semi Sensor */
-#define AP020X_I2C_ADDR (0xBA)
-#define AR0231_I2C_ADDR (0x20)
-#define AR0144_I2C_ADDR (0x20)
+#define AP020X_I2C_ADDR         (0xBA)
+#define AR0231_I2C_ADDR         (0x20)
+#define AR0144_I2C_ADDR         (0x20)
 /**   Sony Sensor   */
-#define IMX334_I2C_ADDR (0x34)
-#define IMX390_I2C_ADDR (0x34)
-#define IMX324_I2C_ADDR (0x34)
+#define IMX334_I2C_ADDR         (0x34)
+#define IMX390_I2C_ADDR         (0x34)
+#define IMX324_I2C_ADDR         (0x34)
 /** Omnivision Sensor */
-#define OV2311_I2C_ADDR (0xC0)
-#define OS05A20_I2C_ADDR (0x6C)
+#define OV2311_I2C_ADDR         (0xC0)
+#define OS05A20_I2C_ADDR        (0x6C)
 /** Toshiba Bridge */
 #define TC_MIPI_BRIDGE_I2C_ADDR (0x1C)
 /**  Maxim Serdes */
-#define MAX96705_SER_I2C_ADDR (0x80)
-#define MAX9295_SER_I2C_ADDR (0x80) //0x88, 0xC4
-#define MAX9272_SER_I2C_ADDR (0x90)
-#define MAX9296_DESER_I2C_ADDR (0x90) //0xD4
+#define MAX96705_SER_I2C_ADDR   (0x80)
+#define MAX9295_SER_I2C_ADDR    (0x80) //0x88, 0xC4
+#define MAX9272_SER_I2C_ADDR    (0x90)
+#define MAX9296_DESER_I2C_ADDR  (0x90) //0xD4
 /** TI Serdes */
-#define TI913_SER_I2C_ADDR (0xB4)//0xB2
-#define TI953_SER_I2C_ADDR (0x60) 
-#define TI914_DESER_I2C_ADDR (0xC0)
-#define TI954_DESER_I2C_ADDR (0x30)
+#define TI913_SER_I2C_ADDR      (0xB4)//0xB2
+#define TI953_SER_I2C_ADDR      (0x60) 
+#define TI914_DESER_I2C_ADDR    (0xC0)
+#define TI954_DESER_I2C_ADDR    (0x30)
 
 
 #define RAW_8_MODE					(0x1000)

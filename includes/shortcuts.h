@@ -16,7 +16,20 @@
 #include <math.h>       /** pow */
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
+
+/** Get number of elements in an array */
 #define SIZE(a) (sizeof(a) / sizeof(*a)) 
+
+
+/** Loop over an array of given size */
+#define FOREACH_NELEM(array, nelem, iter) \
+	for (__typeof__(*(array)) *iter = (array); \
+		iter < (array) + (nelem); \
+		iter++)
+
+/** Loop over an array of known size */
+#define FOREACH(array, iter) \
+	FOREACH_NELEM(array, SIZE(array), iter)
 
 /**clip value between 0 and 255*/
 #define CLIP(value) (uint8_t)(((value)>0xFF)?0xff:(((value)<0)?0:(value)))
