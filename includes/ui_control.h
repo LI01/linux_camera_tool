@@ -65,6 +65,9 @@ int gui_attach_gtk3_menu(GtkWidget *parent);
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
+void config_profile_clicked (GtkWidget *item, gpointer data);
+
+
 void radio_datatype(GtkWidget *widget, gpointer data);
 void radio_bayerpattern(GtkWidget *widget, gpointer data);
 

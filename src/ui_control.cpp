@@ -45,12 +45,13 @@ GtkWidget *label_trig, *check_button_trig_en, *button_trig;
 GtkWidget *label_blc, *entry_blc, *button_apply_blc;
 GtkWidget *grid;
 GtkWidget *maintable;
-GtkWidget *menu_bar, *menu_item, *file_menu, *help_menu, *help_item;
-
+GtkWidget *menu_bar, *config_file_item, *file_menu, *help_menu, *help_item;
+GtkWidget *device_menu, *device_item;
+GtkWidget *file_dialog;
 
 int address_width_flag;
 int value_width_flag;
-
+static GtkWidget *window = NULL; /** the main window */
 extern int v4l2_dev;
 extern int fw_rev;
 
@@ -58,19 +59,29 @@ extern int fw_rev;
 **                      	Internal Callbacks
 *****************************************************************************/
 //TODO:
-static void menu_response (GtkWidget *menu_item, gpointer data)
+void config_profile_clicked (GtkWidget *item, gpointer data)
 {
-    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(menu_item)), "New") == 0 )
+    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Load json") == 0 )
     {
-        g_print("You pressed new");
+        g_print("You pressed load json\r\n");
+        // file_dialog = gtk_file_chooser_dialog_new (
+        //     ("Load json"),
+        //     GTK_WINDOW(window),
+        //     GTK_FILE_CHOOSER_ACTION_OPEN,
+        //     ("Cancel"), 
+        //     GTK_RESPONSE_CANCEL,
+        //     ("Save"), 
+        //     GTK_RESPONSE_ACCEPT,
+        //     NULL
+        // );
     }
-    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(menu_item)), "Exit") == 0 )
+    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Program Flash") == 0 )
     {
-        gtk_main_quit();
+        g_print("You pressed program flash\r\n");
     }
-    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(menu_item)), "About") == 0 )
+    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Program EEPROM") == 0 )
     {
-        g_print("You pressed about");
+        g_print("You pressed program eeprom\r\n");
     }
 }
 /** callback for sensor datatype updates*/
@@ -331,6 +342,7 @@ void exit_loop(GtkWidget *widget)
 {
     (void)widget;
     set_loop(0);
+    gtk_main_quit();
     g_print("exit\n");
 }
 
@@ -358,9 +370,13 @@ void iterate_def_elements (
         switch (def->wid_type) 
         {
             case GTK_WIDGET_TYPE_LABEL:
+               // def->widget = gtk_label_new(NULL);
+                //printf("widget is %d\r\n", def->widget);
                 gtk_label_set_text(GTK_LABEL(def->widget), def->label_str);
                break;
             case GTK_WIDGET_TYPE_BUTTON:
+                //def->widget = gtk_button_new();
+                //printf("widget is %d\r\n", def->widget);
                 gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
                 break;
             case GTK_WIDGET_TYPE_VBOX:
@@ -466,6 +482,7 @@ void iterate_grid_elements(
 {
     FOREACH_NELEM(elements, members, ele)
     {
+        //printf("element is %d, col=%d, row=%d\r\n", ele->widget, ele->col, ele->row);
         g_assert(ele->widget != NULL);
         gtk_grid_attach(GTK_GRID(grid), ele->widget, ele->col,
                         ele->row, ele->width, 1);
@@ -473,13 +490,13 @@ void iterate_grid_elements(
 }
 
 
-
 /** grid_elements to hold all grid elements layout info */
 void list_all_grid_elements()
 {
+
     int row;
     int col;
-    static grid_elements elements[] = {
+    grid_elements elements[] = {
         {label_device,          col = 0,    row = 0,1},
         {label_fw_rev,          ++col,      row,    1},
         {button_exit_streaming, ++col,      row++,  1},
@@ -727,35 +744,55 @@ void grid_setup()
 void menu_bar_setup()
 {
     menu_bar = gtk_menu_bar_new();
+    gtk_menu_bar_set_pack_direction(GTK_MENU_BAR(menu_bar), 
+        GTK_PACK_DIRECTION_LTR); 
+    
+    device_menu = gtk_menu_new();
     file_menu = gtk_menu_new();
     help_menu = gtk_menu_new();
 
-    menu_item = gtk_menu_item_new_with_label("File");
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(menu_item), file_menu);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), menu_item);
+    /** device items */
+    device_item = gtk_menu_item_new_with_label("Devices");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(device_item), device_menu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), device_item);
 
 
+    /** config file items */
+    config_file_item = gtk_menu_item_new_with_label("Config File");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(config_file_item), file_menu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), config_file_item);
+
+
+    config_file_item = gtk_menu_item_new_with_label("Load json");
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(config_profile_clicked), NULL);
+
+    config_file_item = gtk_menu_item_new_with_label("Program Flash");
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(config_profile_clicked), NULL);
+    config_file_item = gtk_menu_item_new_with_label("Program EEPROM");
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(config_profile_clicked), NULL);
+
+    /** help items */
     help_item = gtk_menu_item_new_with_label("Help");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(help_item), help_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), help_item);
-    g_signal_connect(help_item, "activate", G_CALLBACK(menu_response), NULL);
+    //g_signal_connect(help_item, "activate", G_CALLBACK(menu_response), NULL);
 
-    menu_item = gtk_menu_item_new_with_label("New");
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), menu_item);
-    g_signal_connect(menu_item, "activate", G_CALLBACK(menu_response), NULL);
 
-    menu_item = gtk_menu_item_new_with_label("Exit");
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), menu_item);
+    help_item = gtk_menu_item_new_with_label("About");
+    gtk_menu_shell_append(GTK_MENU_SHELL(help_menu), help_item);
 
-    menu_item = gtk_menu_item_new_with_label("About");
-    gtk_menu_shell_append(GTK_MENU_SHELL(help_menu), menu_item);
-
+    help_item = gtk_menu_item_new_with_label("Exit");
+    gtk_menu_shell_append(GTK_MENU_SHELL(help_menu), help_item);
 
     gtk_container_add(GTK_CONTAINER(maintable), menu_bar);
 }
+
 void gui_run()
 {
-    static GtkWidget *window = NULL; /** the main window */
+    // static GtkWidget *window = NULL; /** the main window */
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Camera Control");
     gtk_widget_set_size_request(window, 500, 100);

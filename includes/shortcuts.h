@@ -64,3 +64,6 @@ struct device
     unsigned int bytesperline;
     unsigned int imagesize;
 };
+
+// default VID
+#define USB_VENDOR_ID (0x2A0B) // Leopard Imaging

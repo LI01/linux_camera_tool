@@ -32,7 +32,7 @@ unsigned char buf10[LI_XU_TRIGGER_DELAY_SIZE] = {0};
 unsigned char buf11[LI_XU_TRIGGER_MODE_SIZE] = {0};
 unsigned char buf12[LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE] = {0};		
 unsigned char buf14[LI_XU_SENSOR_REG_RW_SIZE] = {0};		 
-
+unsigned char buf15[LI_XU_ERASE_EEPROM] = {0};
 unsigned char buf16[LI_XU_GENERIC_I2C_RW_SIZE] = {0}; 
 unsigned char buf17[LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE] = {0};		
 
@@ -283,7 +283,28 @@ int read_cam_uuid_hwfw_rev(int fd)
     printf("uuid=%s\n", uuid);
 	return local_fw_rev;
 }
-
+/**
+ * set sensor serial number/ uuid number
+ */
+void sensor_set_serial_number (int fd, char *sn)
+{
+	CLEAR(buf7);
+	
+	buf7[0] = 0xa5; // flag indicating write
+	buf7[1] = *sn;
+	buf7[2] = *(sn+1);
+	buf7[3] = *(sn+2);
+	buf7[4] = *(sn+3);
+	buf7[5] = *(sn+4);
+	buf7[6] = *(sn+5);
+	buf7[7] = *(sn+6);
+	buf7[8] = *(sn+7);
+	buf7[9] = *(sn+8);
+	buf7[10] = *(sn+9);
+	write_to_UVC_extension(fd, LI_XU_SENSOR_UUID_HWFW_REV, 
+        LI_XU_SENSOR_UUID_HWFW_REV_SIZE, buf7);
+	printf("Sensor Set Serial Number = %s\n\r",sn);
+}
 /**
  * currently PTS information are placed in 2 places
  * 1. UVC video data header 
@@ -549,6 +570,24 @@ int sensor_reg_read(int fd,int regAddr)
 	printf("V4L2_CORE: Read Sensor REG[0x%x] = 0x%x\r\n", regAddr, regVal);
 	return regVal;
 }
+/** 
+ * This call will erase firmware saved in EEPROM, and issue a reset for FX3 
+ * !!!!!!!!!!!CALL IT WITH CAUTION!!!!!!!!!!!! 
+ * For firmware update and further, refer to FX3 API:
+ * https://github.com/nickdademo/cypress-fx3-sdk-linux/tree/master/util/cyusb_linux_1.0.4/src
+ */
+void firmware_erase_reboot(int fd)
+{
+	CLEAR(buf15);
+
+	/** flag indicating write */
+	buf15[0] = 0x9a; 
+	buf15[1] = 0;
+
+	write_to_UVC_extension(fd, LI_XU_ERASE_EEPROM,
+	LI_XU_ERASE_EEPROM_SIZE, buf15);
+	printf("V4L2_CORE: Firmware Erased\r\n");
+}
 
 /**
  *  register read/write for different slaves on I2C line
@@ -645,4 +684,36 @@ int generic_I2C_read(int fd,int rw_flag, int bufCnt,
 	printf("V4L2_CORE: I2C slave ADDR[0x%x], Read REG[0x%x]: 0x%x\r\n",
 		   slaveAddr, regAddr, regVal);
 	return regVal;
+}
+/** only available for certain sensor that provide a defect pixel table */
+void write_cam_defect_pixel_table(int fd, char *buf)
+{
+	CLEAR(buf17);
+	memcpy(buf17, buf, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE);
+	write_to_UVC_extension(fd, LI_XU_SENSOR_DEFECT_PIXEL_TABLE,
+	LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE, buf17);
+	printf("V4L2_CORE: Write Camera Defect Pixel Table: %s\r\n", buf);
+
+}
+
+void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
+{
+	CLEAR(buf17);
+	int addr = 0;
+	int remain_length = len;
+	int position = 0;
+
+	while (remain_length > 0)
+	{
+		printf("..");
+		fflush(stdout);
+		for(int i=0; i < LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE; 	i++)
+			buf17[i] = 0;
+		buf17[0] = 0xaa;
+
+		memcpy(&buf17[1], buf+position, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE -1);
+		usleep(2000);
+		remain_length -= 32;
+		position += 32;
+	}
 }

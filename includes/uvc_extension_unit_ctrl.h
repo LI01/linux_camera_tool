@@ -36,7 +36,7 @@
 #define LI_XU_ERASE_EEPROM                  (0x0f)
 #define LI_XU_GENERIC_I2C_RW                (0x10)
 #define LI_XU_SENSOR_DEFECT_PIXEL_TABLE     (0x11)
-
+#define LI_XU_SENSOR_REGISTER_CONFIG        (0x1f) 
 /** 
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id buffer size
@@ -54,7 +54,7 @@
 #define LI_XU_TRIGGER_MODE_SIZE                 (2)
 #define LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE (256) 
 #define LI_XU_SENSOR_REG_RW_SIZE                (5)
-#define LI_XU_ERASE_EEPROM_SIZE                 (0)
+#define LI_XU_ERASE_EEPROM_SIZE                 (2)
 #define LI_XU_GENERIC_I2C_RW_SIZE               (262)
 #define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE    (33)
 
@@ -89,8 +89,8 @@
 #define RAW_10_MODE					(0x2000)
 #define RAW_12_MODE					(0x3000)
 #define YUY2_MODE					(0x4000)
-
-
+#define RAW_8_DUAL_MODE             (0x5000)
+#define JPEG_MODE                   (0x6000)
 
 typedef struct reg_pair
 {
@@ -185,18 +185,28 @@ void set_sensor_gain_rgb(int fd,unsigned int rGain,
 						 unsigned int grGain,
 						 unsigned int gbGain,
 						 unsigned int bGain);
+
 int read_cam_uuid_hwfw_rev(int fd);
+void sensor_set_serial_number(int fd, char *sn);
 
 void get_pts(int fd);
 void soft_trigger(int fd);
 void trigger_delay_time(int fd, unsigned int delay_time);
 void trigger_enable(int fd, int ena, int enb);
+
 void load_register_setting_from_configuration(int fd,int regCount,
 											  const struct reg_pair *buffer);
-void load_register_setting_from_flash_manually(int fd);                                              
+void load_register_setting_from_flash_manually(int fd);  
+
 void sensor_reg_write(int fd,int regAddr, int regVal);
 int sensor_reg_read(int fd,int regAddr);
+
+void firmware_erase_reboot(int fd);
+
 void generic_I2C_write(int fd,int rw_flag, int bufCnt,
 					   int slaveAddr, int regAddr, unsigned char *i2c_data);
 int generic_I2C_read(int fd,int rw_flag, int bufCnt,
 					  int slaveAddr, int regAddr);                      
+
+void write_cam_defect_pixel_table(int fd, char *buf);
+void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len);
