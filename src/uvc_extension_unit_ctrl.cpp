@@ -290,7 +290,7 @@ void sensor_set_serial_number (int fd, char *sn)
 {
 	CLEAR(buf7);
 	
-	buf7[0] = 0xa5; // flag indicating write
+	buf7[0] = SERIAL_NUMBER_WR_FLG; 
 	buf7[1] = *sn;
 	buf7[2] = *(sn+1);
 	buf7[3] = *(sn+2);
@@ -305,6 +305,7 @@ void sensor_set_serial_number (int fd, char *sn)
         LI_XU_SENSOR_UUID_HWFW_REV_SIZE, buf7);
 	printf("Sensor Set Serial Number = %s\n\r",sn);
 }
+
 /**
  * currently PTS information are placed in 2 places
  * 1. UVC video data header 
@@ -529,7 +530,7 @@ void sensor_reg_write(int fd,int regAddr, int regVal)
 
 	CLEAR(buf14);
 
-	buf14[0] = 1; //1 indicates for write
+	buf14[0] = SENSOR_REG_WRITE_FLG; 
 	buf14[1] = (regAddr >> 8) & 0xff;
 	buf14[2] = regAddr & 0xff;
 	buf14[3] = (regVal >> 8) & 0xff;
@@ -554,13 +555,13 @@ int sensor_reg_read(int fd,int regAddr)
 
 	CLEAR(buf14);
 
-	buf14[0] = 0; //0 indicates for read
+	buf14[0] = SENSOR_REG_READ_FLG; 
 	buf14[1] = (regAddr >> 8) & 0xff;
 	buf14[2] = regAddr & 0xff;
 
 	write_to_UVC_extension(fd, LI_XU_SENSOR_REG_RW, 
         LI_XU_SENSOR_REG_RW_SIZE, buf14);
-	buf14[0] = 0; //0 indicates for read
+	buf14[0] = SENSOR_REG_READ_FLG; 
 	buf14[3] = 0;
 	buf14[4] = 0;
 	read_from_UVC_extension(fd, LI_XU_SENSOR_REG_RW, 
@@ -570,25 +571,56 @@ int sensor_reg_read(int fd,int regAddr)
 	printf("V4L2_CORE: Read Sensor REG[0x%x] = 0x%x\r\n", regAddr, regVal);
 	return regVal;
 }
+
 /** 
- * This call will erase firmware saved in EEPROM, and issue a reset for FX3 
+ * This call will erase firmware saved in FX3 EEPROM, and then issue a reset for FX3 
  * !!!!!!!!!!!CALL IT WITH CAUTION!!!!!!!!!!!! 
  * For firmware update and further, refer to FX3 API:
  * https://github.com/nickdademo/cypress-fx3-sdk-linux/tree/master/util/cyusb_linux_1.0.4/src
  */
-void firmware_erase_reboot(int fd)
+void firmware_erase(int fd)
 {
 	CLEAR(buf15);
 
-	/** flag indicating write */
-	buf15[0] = 0x9a; 
+	buf15[0] = ERASE_EEPROM_FLG; 
 	buf15[1] = 0;
 
 	write_to_UVC_extension(fd, LI_XU_ERASE_EEPROM,
 	LI_XU_ERASE_EEPROM_SIZE, buf15);
 	printf("V4L2_CORE: Firmware Erased\r\n");
 }
+/** 
+ * This call will issue a reset for FX3 
+ * !!!!!!!!!!!CALL IT WITH CAUTION!!!!!!!!!!!!  
+ */
+void reboot_camera(int fd)
+{
+	CLEAR(buf15);
 
+	buf15[0] = REBOOT_CAM_FLG; 
+	buf15[1] = 0;
+
+	write_to_UVC_extension(fd, LI_XU_ERASE_EEPROM,
+	LI_XU_ERASE_EEPROM_SIZE, buf15);
+	printf("V4L2_CORE: Reboot Camera\r\n");
+}
+
+/** 
+ * ONLY some of YUV camera driver will support this
+ * TODO: find the corresponding firmware code
+ */
+void set_spi_port_select(int fd, int mode)
+{	
+	CLEAR(buf15);
+
+	buf15[0] = SET_SPI_PORT_SELECT(mode); 
+	buf15[1] = 0;
+
+	write_to_UVC_extension(fd, LI_XU_ERASE_EEPROM,
+	LI_XU_ERASE_EEPROM_SIZE, buf15);
+	printf("V4L2_CORE: Set SPI Port Select\r\n");
+
+}
 /**
  *  register read/write for different slaves on I2C line
  * 
@@ -685,21 +717,286 @@ int generic_I2C_read(int fd,int rw_flag, int bufCnt,
 		   slaveAddr, regAddr, regVal);
 	return regVal;
 }
-/** only available for certain sensor that provide a defect pixel table */
-void write_cam_defect_pixel_table(int fd, char *buf)
+
+
+
+/** write to camera defect pixel table
+ *  args:	
+ * 		fd 		 - file descriptor
+ * 		w_buf	 - write data buffer
+ */
+void write_cam_defect_pixel_table(int fd, unsigned char *w_buf)
 {
 	CLEAR(buf17);
-	memcpy(buf17, buf, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE);
+	memcpy(buf17, w_buf, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE);
 	write_to_UVC_extension(fd, LI_XU_SENSOR_DEFECT_PIXEL_TABLE,
 	LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE, buf17);
-	printf("V4L2_CORE: Write Camera Defect Pixel Table: %s\r\n", buf);
+	printf("V4L2_CORE: Write Camera Defect Pixel Table: %s\r\n", w_buf);
 
 }
 
+/** read from camera defect pixel table
+ *  args:	
+ * 		fd 		 - file descriptor
+ * 		r_buf	 - read data buffer
+ */
+void read_cam_defect_pixel_table(int fd, unsigned char *r_buf)
+{
+	CLEAR(buf17);
+	read_from_UVC_extension(fd, LI_XU_SENSOR_DEFECT_PIXEL_TABLE,
+	LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE, buf17);
+	memcpy(r_buf, buf17, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE);
+	printf("V4L2_CORE: Read Camera Defect Pixel Table: %s\r\n", buf17);
+}
+
+// s_buf[0] : type : 0: soft reset, 1: read data, 2,3: write command
+// s_buf[1] : count ( including address & data)
+// s_buf[2:3] : address{addrH, addrL}
+// s_buf[4-] : data
+
+/* AP020X software reset */
+void ap020x_soft_reset(int fd)
+{
+	unsigned char s_buf[4];
+	CLEAR(s_buf);// s_buf[0] = 0 for reset
+	write_cam_defect_pixel_table(fd, s_buf);
+	printf("Software Reset\r\n");
+}
+
+/* AP020X read data from register address */
+void ap020x_read_data(int fd, int reg_addr, int count)
+{
+	unsigned char s_buf[4];
+	s_buf[0] = IMG_SENSOR_UPDATE_DPT_RD_FLG;
+	s_buf[1] = (unsigned char) count;
+	s_buf[2] = (unsigned char)((reg_addr >> 8)&0xff);
+	s_buf[3] = (unsigned char)(reg_addr&0xff);
+	write_cam_defect_pixel_table(fd, s_buf);
+	read_cam_defect_pixel_table(fd, s_buf);
+	for (int i=0; i< LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE;i++) 
+	{
+		printf("buf17[%d] = 0x%x\r\n", i, s_buf[i]);
+	}
+}
+
+void ap020x_write_data(int fd, int buf_size, int pos, unsigned char *buf)
+{
+	if (buf_size > 16)
+		return;
+	unsigned char s_buf[33];
+	CLEAR(s_buf);
+	s_buf[0] = IMG_SENSOR_UPDATE_DPT_DATA_WR_FLG; 
+	s_buf[1] = (unsigned char)(buf_size + 7 + 2);
+	s_buf[CMD_START_POS] = (AP020X_HOST_CMD_PARAM_POOL>>8)&0xff;	
+	s_buf[CMD_START_POS+1] = AP020X_HOST_CMD_PARAM_POOL&0xff;		
+	s_buf[CMD_START_POS+2] = (unsigned char) ((pos >> 24) &0xff);
+	s_buf[CMD_START_POS+3] = (unsigned char) ((pos >> 16) &0xff);
+	s_buf[CMD_START_POS+4] = (unsigned char) ((pos >> 8) &0xff);
+	s_buf[CMD_START_POS+5] = (unsigned char) (pos &0xff);
+	s_buf[CMD_START_POS+6] = buf_size;
+
+	memcpy(&s_buf[CMD_START_POS+7], buf+pos, buf_size);
+	write_cam_defect_pixel_table(fd, s_buf);
+}
+
+void ap020x_send_command(int fd, AP0200_CMD cmd, int time_out)
+{
+
+	int retry;
+	unsigned char r_buf[33] = {0};
+	unsigned char s_buf[6];
+
+	s_buf[0] = IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG; 
+	s_buf[1] = 4; // command length = 4 bytes
+	s_buf[CMD_START_POS] = (AP020X_SYSCTL_REG >> 8) & 0xff;
+	s_buf[CMD_START_POS+1] = AP020X_SYSCTL_REG & 0xff;
+	s_buf[CMD_START_POS+2] = (unsigned char)((cmd >>8)&0xff);
+	s_buf[CMD_START_POS+3] = (unsigned char) (cmd & 0xff);
+
+	retry = 0;
+
+	while (retry < time_out) 
+	{
+		write_cam_defect_pixel_table(fd, s_buf);
+		read_cam_defect_pixel_table(fd, r_buf);
+		if (s_buf[0] == 0x00 && s_buf[1] == 0x00) // doorbell cleared
+			break;
+		retry++;
+		usleep(10);
+	}
+
+	if (retry == time_out)
+	{
+		printf("Error: %d didn't go through\r\n", cmd);
+	}
+}
+
+
+/*r945 r940 support AP0200/AP0202 isp file update on the fly.
+	NOTES: ap0200/ap0202 flash update.
+    do not reset the ap0200/ap0202 before update flash, 
+	for some case if user flash incorrect flash file and
+	want short circle to bypass the incorrect isp file. reboot is no need.
+
+*/
+void ap020x_program_flash_eeprom(int fd, unsigned char *bin_buf, int bin_size)
+{
+	int pos = 0;
+	int page_remaining = 0;
+	int step = 0;
+	
+	unsigned char s_buf[20];
+	AP0200_CMD AP0200_CMD_EXP;
+	//int flash_update_in_progress = 0;
+	int flash_update_percentage = 0;
+
+	usleep(800);
+	ap020x_read_data(fd, 0x00, 2);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_GET_LOCK, 5);
+	usleep(50);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_LOCK_STATUS, 5);
+	usleep(50);
+
+	CLEAR(s_buf);
+	s_buf[0] = IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG;
+	s_buf[1] = (unsigned char)(8+2);//count
+	s_buf[CMD_START_POS] = (AP020X_HOST_CMD_PARAM_POOL >> 8)&0xff;
+	s_buf[CMD_START_POS+1] = (AP020X_HOST_CMD_PARAM_POOL &0xff);
+	s_buf[CMD_START_POS+2] = 2;
+	s_buf[CMD_START_POS+3] = 0;
+	s_buf[CMD_START_POS+4] = 3;
+	s_buf[CMD_START_POS+5] = 0x18;
+	s_buf[CMD_START_POS+6] = 0;
+	s_buf[CMD_START_POS+7] = 0x2;
+	s_buf[CMD_START_POS+8] = 0;
+	s_buf[CMD_START_POS+9] = 0;
+	write_cam_defect_pixel_table(fd, s_buf);
+	usleep(50);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_CONFIG_DEV,5);
+	usleep(50);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_RELEASE_LOCK,5);
+	usleep(50);
+
+	CLEAR(s_buf);
+	s_buf[0] = IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG;
+	s_buf[1] = (unsigned char)(CMD_START_POS + 16);//count
+	s_buf[CMD_START_POS] = (AP020X_HOST_CMD_PARAM_POOL >> 8)&0xff;
+	s_buf[CMD_START_POS+1] = (AP020X_HOST_CMD_PARAM_POOL &0xff);
+	write_cam_defect_pixel_table(fd, s_buf);
+	usleep(50);
+
+	for(int i=0; i < 15; i++)
+	{
+		s_buf[1] = (unsigned char)(CMD_START_POS + 16);
+		s_buf[CMD_START_POS] = (AP020X_HOST_CMD_PARAM_POOL >> 8)&0xff;
+		s_buf[CMD_START_POS+1] = (unsigned char)(i*16);
+		write_cam_defect_pixel_table(fd, s_buf);
+		usleep(50);
+	}
+
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_GET_LOCK, 5);
+	usleep(50);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_LOCK_STATUS, 5);
+	usleep(50);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_QUERY_DEV, 5);
+	usleep(50);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_FLASH_STATUS, 5);
+	usleep(50);
+	usleep(50);
+
+	pos = 0;
+
+	while (pos < bin_size) 
+	{
+		if (bin_size - pos > PACKET_SIZE)
+		{
+			page_remaining = 0x0100 - (pos & 0x00ff);
+
+			if (page_remaining > PACKET_SIZE)
+			{
+				ap020x_write_data (fd, PACKET_SIZE, pos, bin_buf);
+				pos += PACKET_SIZE;
+			}
+			else 
+			{
+				ap020x_write_data(fd, page_remaining, pos, bin_buf);
+				pos += page_remaining;
+			}
+			
+		}
+		else 
+		{
+			ap020x_write_data(fd, bin_size - pos, pos, bin_buf);
+			pos = bin_size; 
+		}
+		ap020x_send_command(fd, AP0200_CMD_EXP=CMD_WRITE, 50);
+		ap020x_send_command(fd, AP0200_CMD_EXP=CMD_FLASH_STATUS, 50);
+		
+		if (pos > bin_size * step /100)
+			step ++;
+		flash_update_percentage = pos * 100 / bin_size;
+		printf("flash update percentage = %d%%\r\n", flash_update_percentage);
+	}
+	usleep(50);
+	ap020x_send_command(fd, AP0200_CMD_EXP=CMD_RELEASE_LOCK, 5);
+	usleep(50);
+
+}
+
+
+#ifdef FOR_FPGA_UPDATE
+//TODO: hasn't tested yet...
+int eeprom_page_write(int fd)
+{
+	sensor_reg_write(fd, HEADER_EEPROM_PAGE_PROG, 0);
+	return eeprom_process_done(fd, 10); // max 10ms
+}
+int eeprom_bulk_erase(int fd)
+{
+	sensor_reg_write(fd, HEADER_EEPROM_BULK_ERASE, 0);
+	return eeprom_process_done(fd, 100*1000); // max 100s
+}
+int eeprom_process_done(int fd, int total_time)
+{
+	int reg_val = 1;
+
+	// try 100 times
+	for (int i=0; i < total_time; i++)
+	{
+		sensor_reg_write(fd, HEADER_EEPROM_RDSR, 0);
+
+		reg_val = sensor_reg_read(fd, HEADER_EEPROM_RDSR);
+		if ((reg_val & 0x01) == 0x0)
+			return 0; // true
+	}
+	return 1; //false
+}
+int eeprom_verify_page(int fd)
+{
+	int reg_val = 1;
+	sensor_reg_write(fd, HEADER_EEPROM_VERIFY, 0);
+	reg_val = sensor_reg_read(fd, HEADER_EEPROM_VERIFY);
+	if ((reg_val & 0xff) == 0x0)
+		return 0; //true
+	return 1; // false
+	
+}
+// set 3-byte address
+void eeprom_set_page_addr(int fd, int page_addr)
+{
+	sensor_reg_write(fd, HEADER_EEPROM_UPATE_ADDR, (page_addr >> 16) & 0xff);
+	sensor_reg_write(fd, HEADER_EEPROM_UPATE_ADDR, ((page_addr >> 8) & 0xff)| 0x0100);
+	sensor_reg_write(fd, HEADER_EEPROM_UPATE_ADDR, ((page_addr) & 0xff) | 0x0200);
+}
+
+// fill 256-byte buffer in FX3
+// for AR01335_ICP3:
+// buf17[0] = 0xaa; // flag to trigger EEPROM reflash 
 void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
 {
 	CLEAR(buf17);
 	int addr = 0;
+#ifdef AR1335_ICP3
 	int remain_length = len;
 	int position = 0;
 
@@ -712,8 +1009,29 @@ void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
 		buf17[0] = 0xaa;
 
 		memcpy(&buf17[1], buf+position, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE -1);
+		write_cam_defect_pixel_table(fd, buf17);
+	
 		usleep(2000);
 		remain_length -= 32;
 		position += 32;
+
 	}
+#endif
+
+	for (addr = 0; addr < len; addr+=32)
+	{
+		buf17[0] = 0x0;
+		memcpy(&buf17[1], buf,  LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE -1);
+		write_cam_defect_pixel_table(fd, buf17);
+	}
+	if (addr != len) {
+		for (int i=0; i < 256; i++) 
+			buf17[i] = 0xff;
+		buf17[0] = (unsigned char)addr;
+		memcpy(&buf17[1], buf+addr, len-addr);
+	}
+
+
 }
+#endif
+

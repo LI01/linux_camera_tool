@@ -11,6 +11,7 @@
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/json_parser.h"
+#include "../includes/core_io.h"
 /*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
@@ -20,44 +21,6 @@ extern void sensor_reg_write(int fd, int regAddr, int regVal);
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
-/** 
- * Remove the first and last character from c string 
- * for removing the paranthesis, double quote etc
- */
-void top_n_tail(char *str)
-{
-    if(str == NULL || strlen(str) < 1)
-		return;
-     size_t len = strlen(str);
-     memmove(str, str+1, len-2);
-     str[len-2] = 0;
-}
-
-/**
- * trim trailing white spaces and control chars (\n) from source string
- * args:
- *    src - source string
- *
- * asserts:
- *    none
- *
- * returns: error code
- */
-void trim_trailing_whitespaces(char *src)
-{
-	if(src == NULL || strlen(src) < 1)
-		return;
-
-	/**move to end of string*/
-	char *srcp = src + strlen(src);
-
-	while((isspace(*(srcp-1)) || iscntrl(*(srcp-1))) && (srcp - 1) > src)
-		srcp--;
-
-	/**end string*/
-	*srcp = '\0';
-
-}
 
 
 void json_parser(int fd)
@@ -149,5 +112,5 @@ void json_parser(int fd)
         reg_pair = strtok (NULL, ",: ");
         i++;
     }
-
+    fclose(fp);
 }
