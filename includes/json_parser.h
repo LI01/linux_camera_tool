@@ -13,7 +13,6 @@
 #include<json-c/json.h>
 #include<ctype.h>
 
-#define BUFFER_MAX 1 << 16
 
-void json_parser(int fd);
+void json_parser(int fd, char *json_buffer);
 

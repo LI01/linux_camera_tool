@@ -11,8 +11,16 @@
 *****************************************************************************/
 #pragma once
 #include<ctype.h>
+
+
+#define CONFIG_FILE_TXT 0 
+#define CONFIG_FILE_JSON 1
+#define CONFIG_FILE_BIN 2
+
+
 void top_n_tail(char *str);
 void trim_trailing_whitespaces(char *src);
 char *get_file_basename(char *filename);
 char *get_file_extension(char *filename);
-void load_control_profile(char *filename);
+int config_file_identifier (char *filename);
+void load_control_profile(int fd, char *filename);

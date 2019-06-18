@@ -12,6 +12,9 @@
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/core_io.h"
+#include "../includes/uvc_extension_unit_ctrl.h"
+#include "../includes/json_parser.h"
+//extern void ap020x_program_flash_eeprom(int fd, const unsigned char *bin_buf, int bin_size);
 
 /** 
  * Remove the first and last character from c string 
@@ -19,11 +22,11 @@
  */
 void top_n_tail(char *str)
 {
-    if(str == NULL || strlen(str) < 1)
-		return;
-     size_t len = strlen(str);
-     memmove(str, str+1, len-2);
-     str[len-2] = 0;
+    if (str == NULL || strlen(str) < 1)
+        return;
+    size_t len = strlen(str);
+    memmove(str, str + 1, len - 2);
+    str[len - 2] = 0;
 }
 
 /**
@@ -38,18 +41,17 @@ void top_n_tail(char *str)
  */
 void trim_trailing_whitespaces(char *src)
 {
-	if(src == NULL || strlen(src) < 1)
-		return;
+    if (src == NULL || strlen(src) < 1)
+        return;
 
-	/**move to end of string*/
-	char *srcp = src + strlen(src);
+    /**move to end of string*/
+    char *srcp = src + strlen(src);
 
-	while((isspace(*(srcp-1)) || iscntrl(*(srcp-1))) && (srcp - 1) > src)
-		srcp--;
+    while ((isspace(*(srcp - 1)) || iscntrl(*(srcp - 1))) && (srcp - 1) > src)
+        srcp--;
 
-	/**end string*/
-	*srcp = '\0';
-
+    /**end string*/
+    *srcp = '\0';
 }
 
 /*
@@ -70,9 +72,8 @@ char *get_file_basename(char *filename)
         basename = strdup(name + 1); // skip '/'
     else
         basename = strdup(filename);
-    printf("basename for %s is %s\n", filename, basename);
+    //printf("basename for %s is %s\n", filename, basename);
     return basename;
-    
 }
 
 /*
@@ -88,37 +89,55 @@ char *get_file_basename(char *filename)
  */
 char *get_file_extension(char *filename)
 {
-	char *basename = get_file_basename(filename);
+    char *basename = get_file_basename(filename);
 
-	char *name = strrchr(basename, '.');
+    char *name = strrchr(basename, '.');
 
-	char *extname = NULL;
+    char *extname = NULL;
 
-	if(name)
-		extname = strdup(name + 1);
+    if (name)
+        extname = strdup(name + 1);
 
-	
-	printf("extension for %s is %s\n", filename, extname);
+    //printf("extension for %s is %s\n", filename, extname);
 
-	free(basename);
+    free(basename);
 
-	return extname;
+    return extname;
 }
 
-void load_control_profile(char *filename)
+int config_file_identifier(char *filename)
+{
+    char *file_type = get_file_extension(filename);
+    if (strcmp(file_type, "bin") == 0)
+        return CONFIG_FILE_BIN;
+    else if (strcmp(file_type, "json") == 0)
+        return CONFIG_FILE_JSON;
+    else if (strcmp(file_type, "txt") == 0)
+        return CONFIG_FILE_TXT;
+    return CONFIG_FILE_BIN;
+}
+
+void txt_file_parser(char *buf)
+{
+    //int sub_addr = 0, reg_addr = 0, reg_addr_width = 16, read_count = 2, write_count = 2;
+    const char carriage_return[5] = "/\r/\n";
+    char *token;
+    token = strtok(buf, carriage_return);
+    while (token != NULL)
+    {
+        // if (token[0] == '#')
+        //     printf("remove it!!!");
+        token = strtok(NULL, carriage_return);
+    }
+}
+void load_control_profile(int fd, char *filename)
 {
     FILE *fp;
     long l_size;
     char *buffer;
 
-    if (strcmp(get_file_extension(filename), "bin") == 0)
-    {    
-        printf("in bin!!!!!!!!!!!!!!!!!!\r\n");
-        fp = fopen(filename, "rb");
-    }
-    else
-        fp = fopen(filename, "rb");
-    
+    fp = fopen(filename, "rb");
+
     if (!fp)
     {
         printf("File is NULL\r\n");
@@ -129,8 +148,8 @@ void load_control_profile(char *filename)
     rewind(fp);
 
     /// allocate memory for entire content
-    buffer = (char *)calloc(1, l_size+1);
-    if (!buffer) 
+    buffer = (char *)calloc(1, l_size + 1);
+    if (!buffer)
     {
         fclose(fp);
         printf("memory alloc failure\r\n");
@@ -138,16 +157,36 @@ void load_control_profile(char *filename)
     }
     /// copy file into the buffer
     if (1 != fread(buffer, l_size, 1, fp))
-    {    
+    {
         fclose(fp);
         free(buffer);
         printf("read file failure\r\n");
         return;
     }
-    printf("%s\r\n", buffer);
+
+    switch (config_file_identifier(filename))
+    {
+    case CONFIG_FILE_TXT:
+        printf("*******************Commands Load From BatchCmd.txt***********\n");
+        printf("%s\r\n", buffer);
+        //txt_file_parser(buffer);
+        printf("*******************Commands Executed From BatchCmd.txt*******\n");
+
+        break;
+    case CONFIG_FILE_JSON:
+        printf("*******************Commands Load From JSON*******************\n");
+        json_parser(fd, buffer);
+        printf("*******************Commands Executed From JSON***************\n");
+        break;
+    case CONFIG_FILE_BIN:
+        printf("*******************Configs Load From BIN file*****************\n");
+        //printf("%x\r\n", buffer);
+        //ap020x_program_flash_eeprom(fd, (unsigned char *)buffer, (int)l_size);
+        printf("*******************Flash Finish From BIN file*****************\n");
+        break;
+    }
+
     fclose(fp);
     //TODO: remember to do it somewhere
     free(buffer);
-
-
 }

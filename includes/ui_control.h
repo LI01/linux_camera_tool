@@ -9,11 +9,12 @@
   README.md guide to rebuild your opencv for supporting Gtk3.
   
   Author: Danyu L
-  Last edit: 2019/04
+  Last edit: 2019/06
 *****************************************************************************/
 #pragma once
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+
 
 
 // Hold init data for GTK signals
@@ -53,7 +54,7 @@ typedef struct
   int width;
 } grid_elements;
 
-typedef struct
+typedef struct 
 {
   GtkWidget *widget;
   const gchar *signal;
@@ -65,8 +66,11 @@ int gui_attach_gtk3_menu(GtkWidget *parent);
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-void config_profile_clicked (GtkWidget *item, gpointer data);
 
+
+void open_config_dialog(GtkWidget *widget, gpointer window);
+void config_profile_clicked (GtkWidget *item);
+void fw_update_clicked (GtkWidget *item);
 
 void radio_datatype(GtkWidget *widget, gpointer data);
 void radio_bayerpattern(GtkWidget *widget, gpointer data);

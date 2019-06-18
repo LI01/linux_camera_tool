@@ -76,6 +76,7 @@
 #define PACKET_SIZE (16)
 
 
+
 /* Once a command has been written through the HCI, it will be 
  * executed by on-chip firmware. The results are reported back.
  * All commands are encoded with bit 15 set, which automatically
@@ -101,7 +102,7 @@
 /** --- 8-bit I2C slave address list --- */
 /**  On-semi Sensor */
 #define AP020X_I2C_ADDR         (0xBA)
-#define AR0231_I2C_ADDR         (0x20)
+#define AR0231_I2C_ADDR         (0x20)// 0x30
 #define AR0144_I2C_ADDR         (0x20)
 /**   Sony Sensor   */
 #define IMX334_I2C_ADDR         (0x34)

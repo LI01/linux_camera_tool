@@ -9,7 +9,7 @@
   README.md guide to rebuild your opencv for supporting Gtk3.
 
   Author: Danyu L
-  Last edit: 2019/04
+  Last edit: 2019/06
 *****************************************************************************/
 
 #include "../includes/shortcuts.h"
@@ -19,6 +19,7 @@
 #include "../includes/extend_cam_ctrl.h"
 #include "../includes/cam_property.h"
 #include "../includes/json_parser.h"
+#include "../includes/core_io.h"
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -47,7 +48,9 @@ GtkWidget *grid;
 GtkWidget *maintable;
 GtkWidget *menu_bar, *config_file_item, *file_menu, *help_menu, *help_item;
 GtkWidget *device_menu, *device_item;
+GtkWidget *fw_update_item, *fw_update_menu;
 GtkWidget *file_dialog;
+//GtkWiget *progress_fw_update, *progress_flash_eeprom;
 
 int address_width_flag;
 int value_width_flag;
@@ -58,32 +61,69 @@ extern int fw_rev;
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-//TODO:
-void config_profile_clicked (GtkWidget *item, gpointer data)
+
+void open_config_dialog(GtkWidget *widget, gpointer window)
 {
-    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Load json") == 0 )
+    (void)widget;
+    file_dialog = gtk_file_chooser_dialog_new("Load Config File",
+    GTK_WINDOW(window),
+    GTK_FILE_CHOOSER_ACTION_OPEN,
+    ("_Open"),
+    GTK_RESPONSE_OK,
+    ("_Cancel"),
+    GTK_RESPONSE_CANCEL,
+    NULL);
+    gtk_widget_show(file_dialog);
+    gint resp = gtk_dialog_run(GTK_DIALOG(file_dialog));
+    //gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(file_dialog), "/");
+    // gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(file_dialog), 
+    // g_get_home_dir());
+
+    if (resp == GTK_RESPONSE_OK) 
     {
-        g_print("You pressed load json\r\n");
-        // file_dialog = gtk_file_chooser_dialog_new (
-        //     ("Load json"),
-        //     GTK_WINDOW(window),
-        //     GTK_FILE_CHOOSER_ACTION_OPEN,
-        //     ("Cancel"), 
-        //     GTK_RESPONSE_CANCEL,
-        //     ("Save"), 
-        //     GTK_RESPONSE_ACCEPT,
-        //     NULL
-        // );
+        char *file_name = gtk_file_chooser_get_filename(
+            GTK_FILE_CHOOSER(file_dialog));
+
+        if ((strcmp(get_file_extension(file_name), "json") == 0) | \
+            (strcmp(get_file_extension(file_name), "bin") == 0) | \
+            (strcmp(get_file_extension(file_name), "txt") == 0))
+        {
+            //g_print("Load %s\r\n", get_file_basename(file_name));
+            load_control_profile(v4l2_dev, file_name);
+        }
+        else
+            g_print("Choose another type of file\r\n");
+
     }
-    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Program Flash") == 0 )
+    else
+        g_print("You pressed the cancel\r\n");
+    gtk_widget_destroy(file_dialog);
+    
+}
+
+
+void fw_update_clicked (GtkWidget *item)
+{
+    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Erase") == 0 )
     {
-        g_print("You pressed program flash\r\n");
+        /// close the camera first before erase 
+        //FIXME: camera tool exit??
+        set_loop(0);
+        firmware_erase(v4l2_dev);
+        //gtk_main_quit();
+        
     }
-    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Program EEPROM") == 0 )
+    else if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Reset Camera") == 0 )
     {
-        g_print("You pressed program eeprom\r\n");
+        reboot_camera(v4l2_dev);
+    }
+    else if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "FW Update") == 0 )
+    {
+        g_print("You pressed fw update. I haven't finished the code yet\r\n");
+        //TODO:
     }
 }
+
 /** callback for sensor datatype updates*/
 void radio_datatype(GtkWidget *widget, gpointer data)
 {
@@ -227,17 +267,10 @@ void register_write(GtkWidget *widget)
         buf[1] = (regVal >> 8) & 0xff;
 
         /** write 8/16 bit register addr and register data */
-        if (addr_width_for_rw(address_width_flag) == 1 &&
-            (val_width_for_rw(value_width_flag) == 1))
-            generic_I2C_write(v4l2_dev, 0x81, 1, slaveAddr, regAddr, buf);
-        else if (addr_width_for_rw(address_width_flag) == 2 &&
-                 (val_width_for_rw(value_width_flag) == 1))
-            generic_I2C_write(v4l2_dev, 0x82, 1, slaveAddr, regAddr, buf);
-        else if (addr_width_for_rw(address_width_flag) == 1 &&
-                 (val_width_for_rw(value_width_flag) == 2))
-            generic_I2C_write(v4l2_dev, 0x81, 2, slaveAddr, regAddr, buf);
-        else
-            generic_I2C_write(v4l2_dev, 0x82, 2, slaveAddr, regAddr, buf);
+        generic_I2C_write(v4l2_dev, (GENERIC_REG_WRITE_FLG | 
+            addr_width_for_rw(address_width_flag)),
+            val_width_for_rw(value_width_flag), 
+            slaveAddr, regAddr, buf);
     }
 }
 
@@ -264,7 +297,13 @@ void register_read(GtkWidget *widget)
                                NULL, 16);
         int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
                              NULL, 16);
-        int regVal = generic_I2C_read(v4l2_dev, 0x02, 1, slaveAddr, regAddr);
+        int regVal;
+
+        regVal = generic_I2C_read(v4l2_dev, GENERIC_REG_READ_FLG | 
+                addr_width_for_rw(address_width_flag), 
+                val_width_for_rw(value_width_flag), 
+                slaveAddr, regAddr);
+
         char buf[6];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_reg_val), buf);
@@ -357,42 +396,52 @@ gboolean check_escape(GtkWidget *widget, GdkEventKey *event)
     }
     return FALSE;
 }
-
+int count;
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE
 *****************************************************************************/
 void iterate_def_elements (
     def_element *definitions, size_t members)
-{
+{   
+    count = 0;
     FOREACH_NELEM(definitions, members, def)
     {
 
         switch (def->wid_type) 
         {
             case GTK_WIDGET_TYPE_LABEL:
-               // def->widget = gtk_label_new(NULL);
-                //printf("widget is %d\r\n", def->widget);
+                //def->widget = gtk_label_new(NULL);
+                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_label_set_text(GTK_LABEL(def->widget), def->label_str);
                break;
             case GTK_WIDGET_TYPE_BUTTON:
                 //def->widget = gtk_button_new();
-                //printf("widget is %d\r\n", def->widget);
+               // printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
                 break;
             case GTK_WIDGET_TYPE_VBOX:
+                //def->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
+            
+                //printf("widget %d is %x\r\n", count++, def->widget);
                 break;
             case GTK_WIDGET_TYPE_RADIO_BUTTON:
+                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_box_pack_start(GTK_BOX(def->parent), def->widget, 0, 0, 0);
                 gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
                 break;
             case GTK_WIDGET_TYPE_CHECK_BUTTON:
+                //def->widget =  gtk_check_button_new();
+                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
                 break;
             case GTK_WIDGET_TYPE_ENTRY:
+                //def->widget =  gtk_entry_new();
+                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_entry_set_text(GTK_ENTRY(def->widget), def->label_str);
                 gtk_entry_set_width_chars(GTK_ENTRY(def->widget), -1);
                 break;
             case GTK_WIDGET_TYPE_HSCALE:
+                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_widget_set_hexpand(def->widget, TRUE);
                 break;
             default:
@@ -413,63 +462,62 @@ void list_all_def_elements ()
              fw_rev);
 
     static def_element definitions[] = {
-        {label_device,      GTK_WIDGET_TYPE_LABEL, NULL, device_buf},
-        {label_fw_rev,      GTK_WIDGET_TYPE_LABEL, NULL, fw_rev_buf},
-        {label_exposure,    GTK_WIDGET_TYPE_LABEL, NULL, "Exposure:"},
-        {label_gain,        GTK_WIDGET_TYPE_LABEL, NULL, "Gain:"},   
-        {label_i2c_addr,    GTK_WIDGET_TYPE_LABEL, NULL, "I2C Addr:"},
-        {label_datatype,    GTK_WIDGET_TYPE_LABEL, NULL, "Sensor Datatype:"},
-        {label_bayer,       GTK_WIDGET_TYPE_LABEL, NULL, "Raw Camera Pixel Format:"},
-        {label_addr_width,  GTK_WIDGET_TYPE_LABEL, NULL, "Register Addr Width:"},
-        {label_val_width,   GTK_WIDGET_TYPE_LABEL, NULL, "Register Value Width:"},
-        {label_reg_addr,    GTK_WIDGET_TYPE_LABEL, NULL, "Reg Addr:"},     
-        {label_reg_val,     GTK_WIDGET_TYPE_LABEL, NULL, "Reg Value:"},
-        {label_trig,        GTK_WIDGET_TYPE_LABEL, NULL, "Trigger Sensor:"},
-        {label_capture,     GTK_WIDGET_TYPE_LABEL, NULL, "Capture:"},     
-        {label_gamma,       GTK_WIDGET_TYPE_LABEL, NULL, "Gamma Correction:"},
-        {label_blc,         GTK_WIDGET_TYPE_LABEL, NULL, "Black Level Correction:"},
+        {.widget = label_device,      .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = device_buf},
+        {.widget = label_fw_rev,      .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = fw_rev_buf},
+        {.widget = label_exposure,    .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Exposure:"},
+        {.widget = label_gain,        .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Gain:"},   
+        {.widget = label_i2c_addr,    .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "I2C Addr:"},
+        {.widget = label_datatype,    .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Sensor Datatype:"},
+        {.widget = label_bayer,       .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Raw Camera Pixel Format:"},
+        {.widget = label_addr_width,  .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Register Addr Width:"},
+        {.widget = label_val_width,   .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Register Value Width:"},
+        {.widget = label_reg_addr,    .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Reg Addr:"},     
+        {.widget = label_reg_val,     .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Reg Value:"},
+        {.widget = label_trig,        .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Trigger Sensor:"},
+        {.widget = label_capture,     .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Capture:"},     
+        {.widget = label_gamma,       .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Gamma Correction:"},
+        {.widget = label_blc,         .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = "Black Level Correction:"},
 
+        {.widget = button_exit_streaming, .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "EXIT"},
+        {.widget = button_write,          .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "Write"}, 
+        {.widget = button_read,           .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "Read"}, 
+        {.widget = button_capture_bmp,    .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "Capture bmp"},  
+        {.widget = button_capture_raw,    .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "Capture raw"},  
+        {.widget = button_trig,           .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "Shot 1 Trigger"},
+        {.widget = button_apply_gamma ,   .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "Apply"},   
+        {.widget = button_apply_blc,      .wid_type = GTK_WIDGET_TYPE_BUTTON, .parent = NULL, .label_str = "Apply"},
 
-        {button_exit_streaming, GTK_WIDGET_TYPE_BUTTON, NULL, "EXIT"},
-        {button_write,          GTK_WIDGET_TYPE_BUTTON, NULL, "Write"}, 
-        {button_read,           GTK_WIDGET_TYPE_BUTTON, NULL, "Read"}, 
-        {button_capture_bmp,    GTK_WIDGET_TYPE_BUTTON, NULL, "Capture bmp"},  
-        {button_capture_raw,    GTK_WIDGET_TYPE_BUTTON, NULL, "Capture raw"},  
-        {button_trig,           GTK_WIDGET_TYPE_BUTTON, NULL, "Shot 1 Trigger"},
-        {button_apply_gamma ,   GTK_WIDGET_TYPE_BUTTON, NULL, "Apply"},   
-        {button_apply_blc,      GTK_WIDGET_TYPE_BUTTON, NULL, "Apply"},
+        {.widget = check_button_auto_exposure, .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, .parent = NULL, .label_str = "Enable auto exposure"},
+        {.widget = check_button_awb ,          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, .parent = NULL, .label_str = "Enable auto white balance"},
+        {.widget = check_button_auto_gain ,    .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, .parent = NULL, .label_str = "Enable auto brightness&contrast"},        
+        {.widget = check_button_just_sensor,   .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, .parent = NULL, .label_str = "Just sensor read/write"},
+        {.widget = check_button_trig_en,       .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, .parent = NULL, .label_str = "Enable"},
 
-        {check_button_auto_exposure, GTK_WIDGET_TYPE_CHECK_BUTTON, NULL, "Enable auto exposure"},
-        {check_button_awb ,          GTK_WIDGET_TYPE_CHECK_BUTTON, NULL, "Enable auto white balance"},
-        {check_button_auto_gain ,    GTK_WIDGET_TYPE_CHECK_BUTTON, NULL, "Enable auto brightness&contrast"},        
-        {check_button_just_sensor,   GTK_WIDGET_TYPE_CHECK_BUTTON, NULL, "Just sensor read/write"},
-        {check_button_trig_en,       GTK_WIDGET_TYPE_CHECK_BUTTON, NULL, "Enable"},
+        {.widget = hscale_exposure,   .wid_type = GTK_WIDGET_TYPE_HSCALE, .parent =  NULL, .label_str = "2505"},
+        {.widget = hscale_gain,       .wid_type = GTK_WIDGET_TYPE_HSCALE, .parent =  NULL, .label_str = "64"},
+ 
+        {.widget = entry_i2c_addr,    .wid_type = GTK_WIDGET_TYPE_ENTRY, .parent = NULL, .label_str = "0x"},
+        {.widget = entry_reg_addr,    .wid_type = GTK_WIDGET_TYPE_ENTRY, .parent = NULL, .label_str = "0x"},
+        {.widget = entry_reg_val,     .wid_type = GTK_WIDGET_TYPE_ENTRY, .parent = NULL, .label_str = "0x"},    
+        {.widget = entry_gamma,       .wid_type = GTK_WIDGET_TYPE_ENTRY, .parent = NULL, .label_str = "1"},
+        {.widget = entry_blc,         .wid_type = GTK_WIDGET_TYPE_ENTRY, .parent = NULL, .label_str = "0"},
 
-        {hscale_exposure,   GTK_WIDGET_TYPE_HSCALE, NULL, "2505"},
-        {hscale_gain,       GTK_WIDGET_TYPE_HSCALE, NULL, "64"},
+        {.widget = radio_raw10, .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_datatype, .label_str = "RAW10"},
+        {.widget = radio_raw12, .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_datatype, .label_str = "RAW12"},
+        {.widget = radio_yuyv,  .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_datatype, .label_str = "YUYV"},
+        {.widget = radio_raw8,  .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_datatype, .label_str = "RAW8"},
         
-        {entry_i2c_addr,    GTK_WIDGET_TYPE_ENTRY, NULL, "0x"},
-        {entry_reg_addr,    GTK_WIDGET_TYPE_ENTRY, NULL, "0x"},
-        {entry_reg_val,     GTK_WIDGET_TYPE_ENTRY, NULL, "0x"},    
-        {entry_gamma,       GTK_WIDGET_TYPE_ENTRY, NULL, "1"},
-        {entry_blc,         GTK_WIDGET_TYPE_ENTRY, NULL, "0"},
+        {.widget = radio_bg,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "BGGR"},
+        {.widget = radio_gb,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "GBBR"},
+        {.widget = radio_rg,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "RGGB"},
+        {.widget = radio_gr,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "GRBG"},
+        {.widget = radio_mono, .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "MONO"},
 
-        {radio_raw10, GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_datatype, "RAW10"},
-        {radio_raw12, GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_datatype, "RAW12"},
-        {radio_yuyv,  GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_datatype, "YUYV"},
-        {radio_raw8,  GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_datatype, "RAW8"},
-        
-        {radio_bg,   GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_bayer, "BGGR"},
-        {radio_gb,   GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_bayer, "GBBR"},
-        {radio_rg,   GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_bayer, "RGGB"},
-        {radio_gr,   GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_bayer, "GRBG"},
-        {radio_mono, GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_bayer, "MONO"},
+        {.widget = radio_8bit_addr,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_addr_width, .label_str = "8-bit"},
+        {.widget = radio_16bit_addr,  .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_addr_width, .label_str = "16-bit"},
 
-        {radio_8bit_addr,   GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_addr_width, "8-bit"},
-        {radio_16bit_addr,  GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_addr_width, "16-bit"},
-
-        {radio_8bit_val,   GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_val_width, "8-bit"},
-        {radio_16bit_val,  GTK_WIDGET_TYPE_RADIO_BUTTON, hbox_val_width,"16-bit"},
+        {.widget = radio_8bit_val,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_val_width, .label_str = "8-bit"},
+        {.widget = radio_16bit_val,  .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_val_width, .label_str = "16-bit"},
 
     };
     iterate_def_elements(definitions, SIZE(definitions));
@@ -482,7 +530,7 @@ void iterate_grid_elements(
 {
     FOREACH_NELEM(elements, members, ele)
     {
-        //printf("element is %d, col=%d, row=%d\r\n", ele->widget, ele->col, ele->row);
+       // printf("element is %x, col=%d, row=%d\r\n", ele->widget, ele->col, ele->row);
         g_assert(ele->widget != NULL);
         gtk_grid_attach(GTK_GRID(grid), ele->widget, ele->col,
                         ele->row, ele->width, 1);
@@ -497,59 +545,59 @@ void list_all_grid_elements()
     int row;
     int col;
     grid_elements elements[] = {
-        {label_device,          col = 0,    row = 0,1},
-        {label_fw_rev,          ++col,      row,    1},
-        {button_exit_streaming, ++col,      row++,  1},
-
-        {label_datatype,        col = 0,    row,    1},
-        {hbox_datatype,         ++col,      row++,  2},
-
-        {label_bayer,           col = 0,    row,    1},
-        {hbox_bayer,            ++col,      row++,  2},
-
-        {check_button_auto_exposure,col = 0,    row,    1},
-        {check_button_awb,          ++col,      row,    1},
-        {check_button_auto_gain,    ++col,      row++,  1},
-
-        {label_exposure,       col = 0,    row,    1},
-        {hscale_exposure,      ++col,      row++,  3},
-
-        {label_gain,           col = 0,    row,    1},
-        {hscale_gain,          ++col,      row++,  3},
-
-        {label_i2c_addr,            col = 0,    row,    1},
-        {entry_i2c_addr,            ++col,      row,    1},
-        {check_button_just_sensor,  ++col,      row++,  1},
-
-        {label_addr_width,     col = 0,    row,    1},
-        {hbox_addr_width,      ++col,      row++,  1},
-
-        {label_val_width,      col = 0,    row,    1},
-        {hbox_val_width,       ++col,      row++,  1},
-
-        {label_reg_addr,       col = 0,    row,    1},
-        {entry_reg_addr,       ++col,      row,    1},
-        {button_read,          ++col,      row++,  1},
-
-        {label_reg_val,        col = 0,    row,    1},
-        {entry_reg_val,        ++col,      row,    1},
-        {button_write,         ++col,      row++,  1},
-
-        {label_capture,        col = 0,    row,    1},
-        {button_capture_bmp,   ++col,      row,    1},
-        {button_capture_raw,   ++col,      row++,  1},
-
-        {label_gamma,          col = 0,    row,    1},
-        {entry_gamma,          ++col,      row,    1},
-        {button_apply_gamma,   ++col,      row++,  1},
-
-        {label_trig,           col = 0,    row,    1},
-        {check_button_trig_en, ++col,      row,    1},
-        {button_trig,          ++col,      row++,  1},
-
-        {label_blc,            col = 0,    row,    1},
-        {entry_blc,            ++col,      row,    1},
-        {button_apply_blc,     ++col,      row++,  1},
+        {.widget = label_device,          .col = col = 0,    .row = row= 0, .width = 1},
+        {.widget = label_fw_rev,          .col = ++col,      .row = row,    .width = 1},
+        {.widget = button_exit_streaming, .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_datatype,        .col = col = 0,    .row = row,    .width = 1},
+        {.widget = hbox_datatype,         .col = ++col,      row++,  .width = 2},
+ 
+        {.widget = label_bayer,           .col = col = 0,    .row = row,    .width = 1},
+        {.widget = hbox_bayer,            .col = ++col,      row++,  .width = 2},
+ 
+        {.widget = check_button_auto_exposure,.col = col = 0,    .row = row,    .width = 1},
+        {.widget = check_button_awb,          .col = ++col,      .row = row,    .width = 1},
+        {.widget = check_button_auto_gain,    .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_exposure,       .col = col = 0,    .row = row,    .width = 1},
+        {.widget = hscale_exposure,      .col = ++col,      row++,  .width = 3},
+ 
+        {.widget = label_gain,           .col = col = 0,    .row = row,    .width = 1},
+        {.widget = hscale_gain,          .col = ++col,      row++,  .width = 3},
+ 
+        {.widget = label_i2c_addr,            .col = col = 0,    .row = row,    .width = 1},
+        {.widget = entry_i2c_addr,            .col = ++col,      .row = row,    .width = 1},
+        {.widget = check_button_just_sensor,  .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_addr_width,     .col = col = 0,    .row = row,    .width = 1},
+        {.widget = hbox_addr_width,      .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_val_width,      .col = col = 0,    .row = row,    .width = 1},
+        {.widget = hbox_val_width,       .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_reg_addr,       .col = col = 0,    .row = row,    .width = 1},
+        {.widget = entry_reg_addr,       .col = ++col,      .row = row,    .width = 1},
+        {.widget = button_read,          .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_reg_val,        .col = col = 0,    .row = row,    .width = 1},
+        {.widget = entry_reg_val,        .col = ++col,      .row = row,    .width = 1},
+        {.widget = button_write,         .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_capture,        .col = col = 0,    .row = row,    .width = 1},
+        {.widget = button_capture_bmp,   .col = ++col,      .row = row,    .width = 1},
+        {.widget = button_capture_raw,   .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_gamma,          .col = col = 0,    .row = row,    .width = 1},
+        {.widget = entry_gamma,          .col = ++col,      .row = row,    .width = 1},
+        {.widget = button_apply_gamma,   .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_trig,           .col = col = 0,    .row = row,    .width = 1},
+        {.widget = check_button_trig_en, .col = ++col,      .row = row,    .width = 1},
+        {.widget = button_trig,          .col = ++col,      row++,  .width = 1},
+ 
+        {.widget = label_blc,            .col = col = 0,    .row = row,    .width = 1},
+        {.widget = entry_blc,            .col = ++col,      .row = row,    .width = 1},
+        {.widget = button_apply_blc,     .col = ++col,      row++,  .width = 1},
 
     };
     iterate_grid_elements(elements, SIZE(elements));
@@ -559,54 +607,58 @@ void list_all_grid_elements()
 void iterate_element_cb(element_callback *callbacks, size_t members)
 {
     FOREACH_NELEM(callbacks, members, cb) {
+        g_assert(cb->widget != NULL);
+        g_assert(cb->handler != NULL);
         g_signal_connect (cb->widget, cb->signal, cb->handler, cb->data);
     }
 }
+
 
 /** element_callback to hold all elements callback info */
 void list_all_element_callbacks()
 {
     static element_callback callbacks[] = {
-        {button_exit_streaming, "clicked", G_CALLBACK(exit_loop), NULL},
-
-        {radio_raw10,       "toggled", G_CALLBACK(radio_datatype), (gpointer)"1"},
-        {radio_raw12,       "toggled", G_CALLBACK(radio_datatype), (gpointer)"2"},
-        {radio_yuyv,        "toggled", G_CALLBACK(radio_datatype), (gpointer)"3"},
-        {radio_raw8,        "toggled", G_CALLBACK(radio_datatype), (gpointer)"4"},
-
-        {radio_bg,          "toggled", G_CALLBACK(radio_bayerpattern), (gpointer)"1"},
-        {radio_gb,          "toggled", G_CALLBACK(radio_bayerpattern), (gpointer)"2"},
-        {radio_rg,          "toggled", G_CALLBACK(radio_bayerpattern), (gpointer)"3"},
-        {radio_gr,          "toggled", G_CALLBACK(radio_bayerpattern), (gpointer)"4"},
-        {radio_mono,        "toggled", G_CALLBACK(radio_bayerpattern), (gpointer)"5"},
-
-        {check_button_auto_exposure, "toggled", G_CALLBACK(enable_ae), NULL},
-        {check_button_awb,           "toggled", G_CALLBACK(enable_awb), NULL},
-        {check_button_auto_gain,     "toggled", G_CALLBACK(enable_abc), NULL},
-
-        {hscale_exposure,   "value_changed", G_CALLBACK(hscale_exposure_up), NULL},
-        {hscale_gain,       "value_changed", G_CALLBACK(hscale_gain_up), NULL},
-
-        {radio_8bit_addr,   "toggled", G_CALLBACK(toggled_addr_length), (gpointer)"1"},
-        {radio_16bit_addr,  "toggled", G_CALLBACK(toggled_addr_length), (gpointer)"2"},
-
-        {radio_8bit_val,    "toggled", G_CALLBACK(toggled_val_length), (gpointer)"1"},
-        {radio_16bit_val,   "toggled", G_CALLBACK(toggled_val_length), (gpointer)"2"},
-
-        {button_read,   "clicked", G_CALLBACK(register_read), NULL},
-        {button_write,  "clicked", G_CALLBACK(register_write), NULL},
-
-        {button_capture_bmp, "clicked", G_CALLBACK(capture_bmp), NULL},
-        {button_capture_raw, "clicked", G_CALLBACK(capture_raw), NULL},
-
-        {button_apply_gamma, "clicked", G_CALLBACK(gamma_correction), NULL},
-
-        {check_button_trig_en,  "toggled", G_CALLBACK(enable_trig), NULL},
-        {button_trig,           "clicked", G_CALLBACK(send_trigger), NULL},
-        
-        {button_apply_blc,      "clicked", G_CALLBACK(black_level_correction), NULL},
-
+        {.widget = button_exit_streaming, .signal = "clicked", .handler = G_CALLBACK(exit_loop), .data = NULL},
+ 
+        {.widget = radio_raw10,       .signal = "toggled", .handler = G_CALLBACK(radio_datatype), .data = (gpointer)"1"},
+        {.widget = radio_raw12,       .signal = "toggled", .handler = G_CALLBACK(radio_datatype), .data = (gpointer)"2"},
+        {.widget = radio_yuyv,        .signal = "toggled", .handler = G_CALLBACK(radio_datatype), .data = (gpointer)"3"},
+        {.widget = radio_raw8,        .signal = "toggled", .handler = G_CALLBACK(radio_datatype), .data = (gpointer)"4"},
+ 
+        {.widget = radio_bg,          .signal = "toggled", .handler = G_CALLBACK(radio_bayerpattern), .data = (gpointer)"1"},
+        {.widget = radio_gb,          .signal = "toggled", .handler = G_CALLBACK(radio_bayerpattern), .data = (gpointer)"2"},
+        {.widget = radio_rg,          .signal = "toggled", .handler = G_CALLBACK(radio_bayerpattern), .data = (gpointer)"3"},
+        {.widget = radio_gr,          .signal = "toggled", .handler = G_CALLBACK(radio_bayerpattern), .data = (gpointer)"4"},
+        {.widget = radio_mono,        .signal = "toggled", .handler = G_CALLBACK(radio_bayerpattern), .data = (gpointer)"5"},
+ 
+        {.widget = check_button_auto_exposure, .signal = "toggled", .handler = G_CALLBACK(enable_ae),  .data = NULL},
+        {.widget = check_button_awb,           .signal = "toggled", .handler = G_CALLBACK(enable_awb), .data = NULL},
+        {.widget = check_button_auto_gain,     .signal = "toggled", .handler = G_CALLBACK(enable_abc), .data = NULL},
+ 
+        {.widget = hscale_exposure,   .signal = "value_changed", .handler = G_CALLBACK(hscale_exposure_up), .data = NULL},
+        {.widget = hscale_gain,       .signal = "value_changed", .handler = G_CALLBACK(hscale_gain_up), .data = NULL},
+ 
+        {.widget = radio_8bit_addr,   .signal = "toggled", .handler = G_CALLBACK(toggled_addr_length), .data = (gpointer)"1"},
+        {.widget = radio_16bit_addr,  .signal = "toggled", .handler = G_CALLBACK(toggled_addr_length), .data = (gpointer)"2"},
+ 
+        {.widget = radio_8bit_val,    .signal = "toggled", .handler = G_CALLBACK(toggled_val_length), .data = (gpointer)"1"},
+        {.widget = radio_16bit_val,   .signal = "toggled", .handler = G_CALLBACK(toggled_val_length), .data = (gpointer)"2"},
+ 
+        {.widget = button_read,   .signal = "clicked", .handler = G_CALLBACK(register_read), .data = NULL},
+        {.widget = button_write,  .signal = "clicked", .handler = G_CALLBACK(register_write), .data = NULL},
+ 
+        {.widget = button_capture_bmp, .signal = "clicked", .handler = G_CALLBACK(capture_bmp), .data = NULL},
+        {.widget = button_capture_raw, .signal = "clicked", .handler = G_CALLBACK(capture_raw), .data =  NULL},
+ 
+        {.widget = button_apply_gamma, .signal = "clicked", .handler = G_CALLBACK(gamma_correction), .data = NULL},
+ 
+        {.widget = check_button_trig_en,  .signal = "toggled", .handler = G_CALLBACK(enable_trig), .data = NULL},
+        {.widget = button_trig,           .signal = "clicked", .handler = G_CALLBACK(send_trigger), .data = NULL},
+      
+        {.widget = button_apply_blc,      .signal = "clicked", .handler = G_CALLBACK(black_level_correction), NULL},
+ 
     };
+
     iterate_element_cb(callbacks, SIZE(callbacks));
 }
 
@@ -685,15 +737,22 @@ void init_all_widgets()
     hbox_datatype   = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
 
     radio_raw10 = gtk_radio_button_new(NULL);
-    radio_raw12 = gtk_radio_button_new(gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_raw10)));
-    radio_yuyv  = gtk_radio_button_new(gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_raw10)));
-    radio_raw8  = gtk_radio_button_new(gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_raw10)));
+    radio_raw12 = gtk_radio_button_new(gtk_radio_button_get_group
+        (GTK_RADIO_BUTTON(radio_raw10)));
+    radio_yuyv  = gtk_radio_button_new(gtk_radio_button_get_group
+        (GTK_RADIO_BUTTON(radio_raw10)));
+    radio_raw8  = gtk_radio_button_new(gtk_radio_button_get_group
+        (GTK_RADIO_BUTTON(radio_raw10)));
 
     radio_bg    = gtk_radio_button_new(NULL);
-    radio_gb    = gtk_radio_button_new(gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)));
-    radio_rg    = gtk_radio_button_new(gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)));
-    radio_gr    = gtk_radio_button_new(gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)));
-    radio_mono  = gtk_radio_button_new(gtk_radio_button_get_group(GTK_RADIO_BUTTON(radio_bg)));
+    radio_gb    = gtk_radio_button_new(gtk_radio_button_get_group   
+        (GTK_RADIO_BUTTON(radio_bg)));
+    radio_rg    = gtk_radio_button_new(gtk_radio_button_get_group
+        (GTK_RADIO_BUTTON(radio_bg)));
+    radio_gr    = gtk_radio_button_new(gtk_radio_button_get_group
+        (GTK_RADIO_BUTTON(radio_bg)));
+    radio_mono  = gtk_radio_button_new(gtk_radio_button_get_group
+        (GTK_RADIO_BUTTON(radio_bg)));
 
     radio_8bit_addr    = gtk_radio_button_new(NULL);
     radio_16bit_addr   = gtk_radio_button_new(gtk_radio_button_get_group
@@ -741,6 +800,7 @@ void grid_setup()
     gtk_container_add(GTK_CONTAINER(maintable), grid);
 }
 
+
 void menu_bar_setup()
 {
     menu_bar = gtk_menu_bar_new();
@@ -749,7 +809,9 @@ void menu_bar_setup()
     
     device_menu = gtk_menu_new();
     file_menu = gtk_menu_new();
+    fw_update_menu = gtk_menu_new();
     help_menu = gtk_menu_new();
+
 
     /** device items */
     device_item = gtk_menu_item_new_with_label("Devices");
@@ -762,17 +824,39 @@ void menu_bar_setup()
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(config_file_item), file_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), config_file_item);
 
-
     config_file_item = gtk_menu_item_new_with_label("Load json");
     gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(config_profile_clicked), NULL);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
+
+    config_file_item = gtk_menu_item_new_with_label("Load BatchCmd.txt");
+    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
 
     config_file_item = gtk_menu_item_new_with_label("Program Flash");
     gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(config_profile_clicked), NULL);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
+  
     config_file_item = gtk_menu_item_new_with_label("Program EEPROM");
     gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(config_profile_clicked), NULL);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
+    
+
+    /** firmware update items */
+    fw_update_item = gtk_menu_item_new_with_label("FW Update");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(fw_update_item), fw_update_menu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), fw_update_item);
+
+    fw_update_item = gtk_menu_item_new_with_label("Reset Camera");
+    gtk_menu_shell_append(GTK_MENU_SHELL(fw_update_menu), fw_update_item);
+    g_signal_connect(fw_update_item, "activate", G_CALLBACK(fw_update_clicked), NULL);
+
+    fw_update_item = gtk_menu_item_new_with_label("Erase");
+    gtk_menu_shell_append(GTK_MENU_SHELL(fw_update_menu), fw_update_item);
+    g_signal_connect(fw_update_item, "activate", G_CALLBACK(fw_update_clicked), NULL);
+
+    fw_update_item = gtk_menu_item_new_with_label("FW Update");
+    gtk_menu_shell_append(GTK_MENU_SHELL(fw_update_menu), fw_update_item);
+    g_signal_connect(fw_update_item, "activate", G_CALLBACK(fw_update_clicked), NULL);
 
     /** help items */
     help_item = gtk_menu_item_new_with_label("Help");

@@ -67,6 +67,7 @@ char string_frame_rate[10];			/** string to save the frame rate */
 struct v4l2_buffer queuebuffer; /** queuebuffer query for enqueue, dequeue buffers*/
 
 extern char *get_product(); /** put product name into captured image name */
+extern void json_parser(int fd);
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
@@ -189,13 +190,13 @@ inline int set_shift(int *shift_flag)
 	int cmp = *shift_flag;
 	switch (cmp)
 	{
-	case 1:
+	case RAW10_2BIT_SHIFT_FLG:
 		return 2;
-	case 2:
+	case RAW12_4BIT_SHIFT_FLG:
 		return 4;
-	case 3:
+	case YUYV_0BIT_SHIFT_FLG:
 		return 0;
-	case 4:
+	case RAW8_0BIT_SHIFT_FLG:
 		return -1;
 	default:
 		return 2;
@@ -205,20 +206,21 @@ inline int set_shift(int *shift_flag)
 /**
  * callback for change sensor datatype shift flag
  * args:
- * 		datatype - RAW10  -> set *shift_flag = 1
- *  			   RAW12  -> set *shift_flag = 2
- * 				   YUV422 -> set *shift_flag = 3
+ * 		datatype - RAW10  -> set *shift_flag accordingly
+ *  			   RAW12  
+ * 				   YUV422 
+ * 				   RAW8   
  */
 void change_datatype(void *datatype)
 {
 	if (strcmp((char *)datatype, "1") == 0)
-		*shift_flag = 1;
+		*shift_flag = RAW10_2BIT_SHIFT_FLG;
 	if (strcmp((char *)datatype, "2") == 0)
-		*shift_flag = 2;
+		*shift_flag = RAW12_4BIT_SHIFT_FLG;
 	if (strcmp((char *)datatype, "3") == 0)
-		*shift_flag = 3;
+		*shift_flag = YUYV_0BIT_SHIFT_FLG;
 	if (strcmp((char *)datatype, "4") == 0)
-		*shift_flag = 4;
+		*shift_flag = RAW8_0BIT_SHIFT_FLG;
 }
 
 /**
@@ -239,15 +241,15 @@ inline int add_bayer_forcv(int *bayer_flag)
 	int cmp = *bayer_flag;
 	switch (cmp)
 	{
-	case 1:
+	case CV_BayerBG2BGR_FLG:
 		return 0;
-	case 2:
+	case CV_BayerGB2BGR_FLG:
 		return 1;
-	case 3:
+	case CV_BayerRG2BGR_FLG:
 		return 2;
-	case 4:
+	case CV_BayerGR2BGR_FLG:
 		return 3;
-	case 5:
+	case CV_MONO_FLG:
 		return 4;
 	default:
 		return 2;
@@ -263,15 +265,15 @@ inline int add_bayer_forcv(int *bayer_flag)
 void change_bayerpattern(void *bayer)
 {
 	if (strcmp((char *)bayer, "1") == 0)
-		*bayer_flag = 1;
+		*bayer_flag = CV_BayerBG2BGR_FLG;
 	if (strcmp((char *)bayer, "2") == 0)
-		*bayer_flag = 2;
+		*bayer_flag = CV_BayerGB2BGR_FLG;
 	if (strcmp((char *)bayer, "3") == 0)
-		*bayer_flag = 3;
+		*bayer_flag = CV_BayerRG2BGR_FLG;
 	if (strcmp((char *)bayer, "4") == 0)
-		*bayer_flag = 4;
+		*bayer_flag = CV_BayerGR2BGR_FLG;
 	if (strcmp((char *)bayer, "5") == 0)
-		*bayer_flag = 5;
+		*bayer_flag = CV_MONO_FLG;
 }
 
 /**
@@ -771,6 +773,7 @@ void video_get_format(struct device *dev)
 void streaming_loop(struct device *dev)
 {
 	cv::namedWindow("cam", cv::WINDOW_NORMAL);
+
 	image_count = 0;
 	*loop = 1;
 	while (*loop)
@@ -859,6 +862,25 @@ void perform_shift(struct device *dev, const void *p, int shift)
 		}
 	}
 }
+/** easier way to debug if it is FPGA byte swap problem */ 
+void swap_two_bytes(struct device *dev, const void *p)
+{
+	uint16_t *dst = (uint16_t *)p;
+	uint16_t *src = (uint16_t *)p;
+	uint16_t tmp;
+	uint8_t hi_byte;
+	uint8_t lo_byte;
+	for (unsigned int i = 0; i < dev->height; i++)
+	{
+		for (unsigned int j = 0; j < dev->width; j++) {
+			
+			tmp = src[i*dev->width + j];
+			hi_byte = ( tmp & 0xff00) >> 8;
+			lo_byte = ( tmp & 0xff);
+			dst[i*dev->width + j] = lo_byte << 8 | hi_byte;  
+		}
+	}
+}
 /**
  * group 3a ctrl flags for bayer cameras
  * auto exposure, auto white balance, auto brightness and contrast ctrl
@@ -877,8 +899,8 @@ static cv::Mat group_3a_ctrl_flags_for_raw_camera(cv::Mat opencvImage)
 		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
 		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
 	}
-	//flip(img, img, 0); //mirror vertically
-	//flip(img, img, 1); //mirror horizontally
+	cv::flip(opencvImage, opencvImage, 0); //mirror vertically
+	cv::flip(opencvImage, opencvImage, 1); //mirror horizontally
 
 	/** gamma correction functionality, only available for bayer camera */
 	if (*(gamma_val) != (float)1)
@@ -934,9 +956,27 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	if (shift > 0)
 	{
 		perform_shift(dev, p, shift);
+		//swap_two_bytes(dev, p);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 		img = group_3a_ctrl_flags_for_raw_camera(img);
+		//#define DUAL_CAM
+		#ifdef DUAL_CAM
+		/// define region of interest for cropped Mat for AR0231 DUAL
+		cv::Rect roi_left(0, 0, dev->width/2, dev->height);
+		cv::Mat cropped_ref_left(img, roi_left);
+		cv::Mat cropped_left;
+		cropped_ref_left.copyTo(cropped_left);
+		cv::imshow("cam_left", cropped_left);
+
+		cv::Rect roi_right(dev->width/2, 0, dev->width/2, dev->height);
+		cv::Mat cropped_ref_right(img, roi_right);
+		cv::Mat cropped_right;
+		cropped_ref_right.copyTo(cropped_right);
+		cv::imshow("cam_right", cropped_right);
+		#endif
+
 		share_img = img;
+
 	}
 
 	/** --- for yuv camera ---*/
@@ -995,7 +1035,6 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	streaming_put_text(share_img, fpsString, 300);
 
 	cv::imshow("cam", share_img);
-
 	if (cv::waitKey(_1MS) == _ESC_KEY)
 	{
 		cv::destroyWindow("cam");
@@ -1098,6 +1137,7 @@ int video_alloc_buffers(struct device *dev, int nbufs)
  * 
  * args: 
  * 		struct device *dev - put buffers in
+ * 
  * returns: 
  * 		errno 
  * 

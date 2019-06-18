@@ -25,20 +25,27 @@ void uvc_set_control(int fd, unsigned int id, int value);
 void set_frame_rate(int fd, int fps);
 int get_frame_rate(int fd);
 
-void set_gain_auto (int fd, int auto_gain);
-void get_gain_auto (int fd);
+void set_gain_auto(int fd, int auto_gain);
+void get_gain_auto(int fd);
+
 void set_gain(int fd, int analog_gain);
 void get_gain(int fd);
+
 void set_exposure_absolute(int fd, int exposure_absolute);
 void get_exposure_absolute(int fd);
+
 void set_exposure_auto(int fd, int exposure_auto);
 void get_exposure_auto(int fd);
+
 void set_zoom_absolute(int fd, int zoom_absolute);
 void get_zoom_absolute(int fd);
+
 void set_pan_absolute(int fd, int pan_absolute);
 void get_pan_absolute(int fd);
+
 void set_tilt_absolute(int fd, int tilt_absolute);
 void get_tilt_absolute(int fd);
+
 void set_focus_absolute(int fd, int focus_absolute);
 void get_focus_absolute(int fd);
 

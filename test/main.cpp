@@ -116,8 +116,7 @@ int main(int argc, char **argv)
 	check_dev_cap(&dev);
 	video_get_format(&dev); /** list the current resolution etc */
 	get_frame_rate(v4l2_dev); /** list the current frame rate */
-	// printf("*******************Commands Load From JSON*******************\n");
-	// json_parser(v4l2_dev);
+
 	printf("********************Allocate Buffer for Capturing************\n");
 	video_alloc_buffers(&dev, dev.nbufs);
 
@@ -138,6 +137,7 @@ int main(int argc, char **argv)
 	{
 		fprintf(stderr, "ERROR:fork() failed\n");
 	}
+
 
 /** individual camera tests, detail info is in uvc_extension_unit_ctrl.h */
 #ifdef AP0202_WRITE_REG_ON_THE_FLY
