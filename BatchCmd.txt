@@ -1,0 +1,42 @@
+# Batch Command file for CameraTool
+# Copyright Leopard Imaging, Inc. 2017
+# 
+# This file contains some commands, including I2C access, Delay, Capture.
+# A line starting with a # is a comment line
+# The first word of each line is a command, each line supports only one command
+# Support for the following commands
+#    Read, Write, SubAddress, RegAddress, RegAddrWidth, Delay
+# 
+# command syntax:
+# Read byte_count
+# Write byte0 byte1 byte2 ... max 256 bytes
+# SubAddress i2c_sub_address
+# RegAddress register_address
+# RegAddrWidth register_address_width(8 or 16)
+# Delay delay_time_in_ms
+# Capture frame_number file_name 
+# Display yes_or_no 
+# InterFrameDelay delay_time_in_ms_for_each_frame_during_capture
+# 
+# examples: 
+# SubAddress 0x6c # device 8-bit I2C sub address is 0x6C 
+# RegAddrWidth 16 # 16-bit address 
+# RegAddress 0x000A # register address 0x000A 
+# Read 2 # read 2 bytes 
+# Write 0xA3 0x30 # write 0xA330 to register 0x000A 
+# Display no # Disable display to avoid frame drop during image capture 
+# Delay 100 # delay 100ms 
+# InterFrameDelay 10 # delay 10 ms after each frame is captured 
+# Capture 3 CapturedImage # capture 3 frames, the file name is CapturedImage_1.bmp, CapturedImage_2.bmp, and CapturedImage_3.bmp 
+# Display yes # enable Display
+SubAddress 0x30
+RegAddrWidth 16
+RegAddress 0x3060
+Write 0x0040
+Read 2
+RwgAddress 0x3012
+Write 0x00F0
+Read 2
+RegAddress 0x305e
+Write 0x300
+Read 2

@@ -68,5 +68,5 @@ struct device
 // default VID
 #define USB_VENDOR_ID (0x2A0B) // Leopard Imaging
 
-#define GENERIC_REG_WRITE_FLG 0x80
-#define GENERIC_REG_READ_FLG 0x00
+#define GENERIC_REG_WRITE_FLG (0x80)
+#define GENERIC_REG_READ_FLG  (0x00)

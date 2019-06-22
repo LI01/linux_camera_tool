@@ -298,13 +298,13 @@ void register_read(GtkWidget *widget)
         int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
                              NULL, 16);
         int regVal;
-
+        
         regVal = generic_I2C_read(v4l2_dev, GENERIC_REG_READ_FLG | 
                 addr_width_for_rw(address_width_flag), 
                 val_width_for_rw(value_width_flag), 
                 slaveAddr, regAddr);
 
-        char buf[6];
+        char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_reg_val), buf);
     }

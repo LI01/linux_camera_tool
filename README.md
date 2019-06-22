@@ -3,21 +3,24 @@
   This is the sample code for Leopard USB3.0 camera linux camera tool. It is a simple interface for capturing, viewing, controlling video from v4l2 devices, with a special emphasis for the linux uvc driver. 
   
 
-- [Installation](#installation)
-  - [Dependencies](#dependencies)
-  - [OpenCV Prerequisites](#opencv-prerequisites)
-  - [Build Camera Tool](#build-camera-tool)
-- [Code Structure](#code-structure)
-- [Run Camera Tool](#run-camera-tool)
-  - [Examples](#examples)
-    - [Declarations](#declarations)
-    - [Test on RAW sensor 12 Megapixel IMX477](#test-on-raw-sensor-12-megapixel-imx477)
-    - [Test on RAW sensor 5 Megapixel OS05A20](#test-on-raw-sensor-5-megapixel-os05a20)
-    - [Test on AR1335-ICP3 YUV 12 Megapixel Cam](#test-on-ar1335-icp3-yuv-12-megapixel-cam)
-  - [Exit Camera Tool](#exit-camera-tool)
-  - [Kill Camera Tool Windows Left Over](#kill-camera-tool-windows-left-over)
-- [Test Platforms](#test-platforms)
-- [Known Bugs](#known-bugs)
+- [Leopard USB3.0 Camera Linux Camera Tool](#Leopard-USB30-Camera-Linux-Camera-Tool)
+  - [Installation](#Installation)
+    - [Dependencies](#Dependencies)
+    - [OpenCV Prerequisites](#OpenCV-Prerequisites)
+    - [Build Camera Tool](#Build-Camera-Tool)
+  - [Code Structure](#Code-Structure)
+  - [Run Camera Tool](#Run-Camera-Tool)
+    - [Examples](#Examples)
+      - [Declarations](#Declarations)
+      - [Test on RAW sensor 12 Megapixel IMX477](#Test-on-RAW-sensor-12-Megapixel-IMX477)
+      - [Test on RAW sensor 5 Megapixel OS05A20](#Test-on-RAW-sensor-5-Megapixel-OS05A20)
+      - [Test on AR1335-ICP3 YUV 12 Megapixel Cam](#Test-on-AR1335-ICP3-YUV-12-Megapixel-Cam)
+      - [Exit Camera Tool](#Exit-Camera-Tool)
+      - [Kill Camera Tool Windows Left Over](#Kill-Camera-Tool-Windows-Left-Over)
+  - [Test Platforms](#Test-Platforms)
+  - [Known Bugs](#Known-Bugs)
+    - [Exposure & Gain Control Momentarily Split Screen](#Exposure--Gain-Control-Momentarily-Split-Screen)
+    - [SerDes Camera Experiences First Frame Bad When Uses Trigger](#SerDes-Camera-Experiences-First-Frame-Bad-When-Uses-Trigger)
 
 ---
 ## Installation
@@ -96,11 +99,16 @@ $ linux_camera_tool .
 ├── LICENSE.md
 ├── AUTHOR.md
 │
+├── config.json
+├── BatchCmd.txt
+|
 ├── includes
-│   ├── shortcuts.h                     # common header
+│   ├── shortcuts.h                       # common header
 │   ├── cam_property.h
 │   ├── extend_cam_ctrl.h
+│   ├── core_io.h
 |   ├── json_parser.h
+│   ├── batch_cmd_parser.h
 │   ├── ui_control.h
 │   ├── uvc_extension_unit_ctrl.h
 │   └── v4l2_devices.h
@@ -108,7 +116,9 @@ $ linux_camera_tool .
 ├── src
 │   ├── cam_property.cpp                  # gain, exposure, ptz ctrl
 │   ├── extend_cam_ctrl.cpp               # camera stream. capture ctrl
-|   ├── json_parser.cpp                   
+|   ├── core_io.cpp                       # string manipulation for parser
+|   ├── json_parser.cpp                   # json parser
+|   ├── batch_cmd_parser.cpp              # BatchCmd.txt parser
 |   ├── ui_control.cpp                    # control GUI
 │   ├── uvc_extension_unit_ctrl.cpp       # all uvc extension unit ctrl
 │   └── v4l2_device.cpp                   # udev ctrl
@@ -170,6 +180,8 @@ __Disable ae:__
 1. Use __ESC__ on both of GUI.
 2. Use __EXIT__ button on the control panel to exit the whole program
 3. User __Ctrl + C__ to exit the control panel after exit from camera streaming GUI
+4. Unexpected quit results in defunct process, use ps to see if the leopard_cam still alive,
+   if it is, use __killall -9 leopard_cam__ to kill the zombie process
 
 #### Kill Camera Tool Windows Left Over
 If you forget to exit both windows and tried to run the camera tool again, it will give you the error of 

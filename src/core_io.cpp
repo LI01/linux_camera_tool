@@ -14,6 +14,8 @@
 #include "../includes/core_io.h"
 #include "../includes/uvc_extension_unit_ctrl.h"
 #include "../includes/json_parser.h"
+#include "../includes/batch_cmd_parser.h"
+
 //extern void ap020x_program_flash_eeprom(int fd, const unsigned char *bin_buf, int bin_size);
 
 /** 
@@ -54,7 +56,7 @@ void trim_trailing_whitespaces(char *src)
     *srcp = '\0';
 }
 
-/*
+/**
  * get the filename basename
  * args:
  *    filename - string with filename (full path)
@@ -76,7 +78,7 @@ char *get_file_basename(char *filename)
     return basename;
 }
 
-/*
+/**
  * get the filename extension
  * args:
  *    filename - string with filename (full path)
@@ -117,19 +119,7 @@ int config_file_identifier(char *filename)
     return CONFIG_FILE_BIN;
 }
 
-void txt_file_parser(char *buf)
-{
-    //int sub_addr = 0, reg_addr = 0, reg_addr_width = 16, read_count = 2, write_count = 2;
-    const char carriage_return[5] = "/\r/\n";
-    char *token;
-    token = strtok(buf, carriage_return);
-    while (token != NULL)
-    {
-        // if (token[0] == '#')
-        //     printf("remove it!!!");
-        token = strtok(NULL, carriage_return);
-    }
-}
+
 void load_control_profile(int fd, char *filename)
 {
     FILE *fp;
@@ -168,10 +158,8 @@ void load_control_profile(int fd, char *filename)
     {
     case CONFIG_FILE_TXT:
         printf("*******************Commands Load From BatchCmd.txt***********\n");
-        printf("%s\r\n", buffer);
-        //txt_file_parser(buffer);
+        txt_file_parser(fd, buffer, (int) l_size);
         printf("*******************Commands Executed From BatchCmd.txt*******\n");
-
         break;
     case CONFIG_FILE_JSON:
         printf("*******************Commands Load From JSON*******************\n");
@@ -187,6 +175,6 @@ void load_control_profile(int fd, char *filename)
     }
 
     fclose(fp);
-    //TODO: remember to do it somewhere
+
     free(buffer);
 }
