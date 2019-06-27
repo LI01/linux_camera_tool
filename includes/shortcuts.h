@@ -52,6 +52,8 @@
 #define V4L_BUFFERS_DEFAULT	1
 #define V4L_BUFFERS_MAX	32
 
+typedef enum { FALSE, TRUE } BOOL;
+
 struct device
 {
     int fd;

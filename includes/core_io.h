@@ -11,17 +11,22 @@
 *****************************************************************************/
 #pragma once
 #include<ctype.h>
-
-
-#define CONFIG_FILE_TXT  (0)
-#define CONFIG_FILE_JSON (1)
-#define CONFIG_FILE_BIN  (2)
-
-
+/****************************************************************************
+**                      	Global data 
+*****************************************************************************/
+typedef enum 
+{
+  CONFIG_FILE_TXT = 0,
+  CONFIG_FILE_JSON,
+  CONFIG_FILE_BIN, 
+}config_file_type;
+/****************************************************************************
+**							 Function declaration
+*****************************************************************************/
 void top_n_tail(char *str);
 void trim_trailing_whitespaces(char *src);
 char *get_file_basename(char *filename);
 char *get_file_extension(char *filename);
 
-int config_file_identifier (char *filename);
+config_file_type config_file_identifier (char *filename);
 void load_control_profile(int fd, char *filename);

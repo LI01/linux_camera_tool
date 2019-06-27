@@ -8,7 +8,7 @@
   UVC extension unit features, firmware will need to get updated.
   
   Author: Danyu L
-  Last edit: 2019/04
+  Last edit: 2019/06
 *****************************************************************************/
 
 #pragma once
@@ -20,23 +20,26 @@
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id selector
  */
-#define LI_XU_SENSOR_MODES_SWITCH           (0x01)
-#define LI_XU_SENSOR_WINDOW_REPOSITION      (0x02)
-#define LI_XU_LED_MODES                     (0x03)
-#define LI_XU_SENSOR_GAIN_CONTROL_RGB       (0x04)
-#define LI_XU_SENSOR_GAIN_CONTROL_A         (0x05)
+typedef enum
+{
+    LI_XU_SENSOR_MODES_SWITCH           = 0x01,
+    LI_XU_SENSOR_WINDOW_REPOSITION      = 0x02,
+    LI_XU_LED_MODES                     = 0x03,
+    LI_XU_SENSOR_GAIN_CONTROL_RGB       = 0x04,
+    LI_XU_SENSOR_GAIN_CONTROL_A         = 0x05,
+    LI_XU_SENSOR_UUID_HWFW_REV          = 0x07,
+    LI_XU_PTS_QUERY                     = 0x08, 
+    LI_XU_SOFT_TRIGGER                  = 0x09,
+    LI_XU_TRIGGER_DELAY                 = 0x0a,
+    LI_XU_TRIGGER_MODE                  = 0x0b,
+    LI_XU_SENSOR_REGISTER_CONFIGURATION = 0x0c, 
+    LI_XU_SENSOR_REG_RW                 = 0x0e,
+    LI_XU_ERASE_EEPROM                  = 0x0f,
+    LI_XU_GENERIC_I2C_RW                = 0x10,
+    LI_XU_SENSOR_DEFECT_PIXEL_TABLE     = 0x11,
+    LI_XU_SENSOR_REGISTER_CONFIG        = 0x1f, 
+}ext_unit_ctrl;
 
-#define LI_XU_SENSOR_UUID_HWFW_REV          (0x07)
-#define LI_XU_PTS_QUERY                     (0x08) 
-#define LI_XU_SOFT_TRIGGER                  (0x09)
-#define LI_XU_TRIGGER_DELAY                 (0x0a)
-#define LI_XU_TRIGGER_MODE                  (0x0b)
-#define LI_XU_SENSOR_REGISTER_CONFIGURATION (0x0c) 
-#define LI_XU_SENSOR_REG_RW                 (0x0e)
-#define LI_XU_ERASE_EEPROM                  (0x0f)
-#define LI_XU_GENERIC_I2C_RW                (0x10)
-#define LI_XU_SENSOR_DEFECT_PIXEL_TABLE     (0x11)
-#define LI_XU_SENSOR_REGISTER_CONFIG        (0x1f) 
 /** 
  * define the Leopard Imaging USB3.0 Camera
  * uvc extension id buffer size
@@ -61,12 +64,14 @@
 #define SERIAL_NUMBER_WR_FLG        (0xA5)
 
 // for FX3 EEPROM functionality
-#define HEADER_EEPROM_VERIFY	    (0x00F9)    // verify a page
-#define HEADER_EEPROM_PAGE_PROG     (0x00FA)    // program one page
-#define HEADER_EEPROM_BULK_ERASE    (0x00FB)    // send bulk erase command
-#define HEADER_EEPROM_UPDATE_BUF    (0x00FC)    // update EEPROM page buffer, 256 bytes
-#define HEADER_EEPROM_UPATE_ADDR    (0x00FD)    // update EEPROM page address, 3 bytes
-#define HEADER_EEPROM_RDSR          (0x00FE)    // EEPROM read status
+typedef enum{
+    HEADER_EEPROM_VERIFY	  = 0x00F9,    // verify a page
+    HEADER_EEPROM_PAGE_PROG   = 0x00FA,    // program one page
+    HEADER_EEPROM_BULK_ERASE  = 0x00FB,    // send bulk erase command
+    HEADER_EEPROM_UPDATE_BUF  = 0x00FC,    // update EEPROM page buffer, 256 bytes
+    HEADER_EEPROM_UPATE_ADDR  = 0x00FD,    // update EEPROM page address, 3 bytes
+    HEADER_EEPROM_RDSR        = 0x00FE,    // EEPROM read status
+}fx3_eeprom_func;
 
 // uvc extension unit flag for FX3 EEPROM
 #define ERASE_EEPROM_FLG    (0x9a)
@@ -82,12 +87,12 @@
  * All commands are encoded with bit 15 set, which automatically
  * generates the 'host command' (doorbell) interrupt to ISP MCU
  */
-
-// AP020X update defect pixel table flags
-#define IMG_SENSOR_UPDATE_DPT_RST_FLG       (0)
-#define IMG_SENSOR_UPDATE_DPT_RD_FLG        (1)
-#define IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG    (2)
-#define IMG_SENSOR_UPDATE_DPT_DATA_WR_FLG   (3)
+typedef enum{
+    IMG_SENSOR_UPDATE_DPT_RST_FLG     = 0,
+    IMG_SENSOR_UPDATE_DPT_RD_FLG      = 1,
+    IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG  = 2,
+    IMG_SENSOR_UPDATE_DPT_DATA_WR_FLG = 3,
+}ap0202_dpt_flag;
 
 #define CMD_START_POS                       (2)
 
@@ -124,13 +129,15 @@
 #define TI914_DESER_I2C_ADDR    (0xC0)
 #define TI954_DESER_I2C_ADDR    (0x30)
 
-
-#define RAW_8_MODE					(0x1000)
-#define RAW_10_MODE					(0x2000)
-#define RAW_12_MODE					(0x3000)
-#define YUY2_MODE					(0x4000)
-#define RAW_8_DUAL_MODE             (0x5000)
-#define JPEG_MODE                   (0x6000)
+typedef enum
+{
+    RAW_8_MODE				= 0x1000,
+    RAW_10_MODE				= 0x2000,
+    RAW_12_MODE				= 0x3000,
+    YUY2_MODE				= 0x4000,
+    RAW_8_DUAL_MODE         = 0x5000,
+    JPEG_MODE               = 0x6000
+}datatype_fw_flag;
 
 
 typedef struct reg_pair

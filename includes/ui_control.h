@@ -16,7 +16,9 @@
 #include <gdk/gdkkeysyms.h>
 
 
-
+/****************************************************************************
+**                      	Global data 
+*****************************************************************************/
 // Hold init data for GTK signals
 typedef struct
 {
@@ -62,11 +64,11 @@ typedef struct
   gpointer data;
 } element_callback;
 
-int gui_attach_gtk3_menu(GtkWidget *parent);
+
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-
+int gui_attach_gtk3_menu(GtkWidget *parent);
 
 void open_config_dialog(GtkWidget *widget, gpointer window);
 void config_profile_clicked (GtkWidget *item);
@@ -80,7 +82,7 @@ void hscale_gain_up(GtkRange *widget);
 
 void enable_ae(GtkToggleButton *toggle_button);
 void enable_awb(GtkToggleButton *toggle_button);
-void enable_abc(GtkWidget *widget, GtkToggleButton *toggle_button);
+void enable_abc(GtkToggleButton *toggle_button);
 
 void toggled_addr_length(GtkWidget *widget, gpointer data);
 void toggled_val_length(GtkWidget *widget, gpointer data);

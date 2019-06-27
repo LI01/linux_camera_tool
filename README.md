@@ -8,6 +8,8 @@
     - [Dependencies](#Dependencies)
     - [OpenCV Prerequisites](#OpenCV-Prerequisites)
     - [Build Camera Tool](#Build-Camera-Tool)
+    - [Install leopard_cam](#Install-leopardcam)
+    - [Uninstall leopard_cam](#Uninstall-leopardcam)
   - [Code Structure](#Code-Structure)
   - [Run Camera Tool](#Run-Camera-Tool)
     - [Examples](#Examples)
@@ -84,7 +86,14 @@ target_link_libraries(<Your Target>
 	leopard_tools
 )
 ```
-
+### Install leopard_cam
+```sh
+sudo cp ./leopard_cam /usr/bin
+```
+### Uninstall leopard_cam
+```sh
+sudo rm -f /usr/bin/leopard_cam 
+```
 ---
 
 ## Code Structure
@@ -129,7 +138,7 @@ $ linux_camera_tool .
 ---
 ## Run Camera Tool
 ```
-./leopard_cam
+leopard_cam
 ```
 
 ### Examples

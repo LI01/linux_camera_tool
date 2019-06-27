@@ -14,11 +14,31 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
-
+/****************************************************************************
+**                      	Global data 
+*****************************************************************************/
+typedef enum
+{
+  eSubAddress,
+  eRegAddress,
+  eRegAddrWidth,
+  eDelay,
+  eInterFrameDelay,
+  eRead,
+  eWrite,
+  eCapture,
+  eFlashVal
+}option_string_code;
+/****************************************************************************
+**							 Function declaration
+*****************************************************************************/
 template<typename Out>
 void split(const std::string &s, char delim, Out result);
 
 std::vector<std::string> split(const std::string &s, char delim);
+
+option_string_code hashit(std::string const &inString);
+int hex_or_dec_interpreter(std::string const &inString);
 
 void txt_file_parser(int fd, char *buf, int length);
 

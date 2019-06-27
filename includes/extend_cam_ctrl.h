@@ -42,16 +42,28 @@ struct buffer
 	size_t length;
 };
 
-#define RAW10_2BIT_SHIFT_FLG (1)
-#define RAW12_4BIT_SHIFT_FLG (2)
-#define YUYV_0BIT_SHIFT_FLG  (3)
-#define RAW8_0BIT_SHIFT_FLG  (4)
+typedef enum 
+{
+   RAW10_2BIT_SHIFT_FLG = 1,
+   RAW12_4BIT_SHIFT_FLG,
+   YUYV_0BIT_SHIFT_FLG,
+   RAW8_0BIT_SHIFT_FLG
+}datatype_shift_flag;
 
-#define CV_BayerBG2BGR_FLG  (1)
-#define CV_BayerGB2BGR_FLG  (2)
-#define CV_BayerRG2BGR_FLG  (3)
-#define CV_BayerGR2BGR_FLG  (4)
-#define CV_MONO_FLG         (5)
+typedef enum
+{
+   CV_BayerBG2BGR_FLG = 1,
+   CV_BayerGB2BGR_FLG,
+   CV_BayerRG2BGR_FLG,
+   CV_BayerGR2BGR_FLG,
+   CV_MONO_FLG        
+}pixel_order_flag;
+
+typedef enum
+{
+   CROPPED_WIDTH = 1280,
+   CROPPED_HEIGHT = 720
+}cropped_resolution;
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/

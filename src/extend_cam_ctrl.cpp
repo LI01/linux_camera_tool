@@ -28,7 +28,7 @@
  10. Close your descriptor to the device 
   
   Author: Danyu L
-  Last edit: 2019/04
+  Last edit: 2019/06
 *****************************************************************************/
 
 /** Include files to use OpenCV API */
@@ -36,9 +36,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include <string.h>
 #include <omp.h>  /**for openmp */
-#include <math.h> /**for pow gamma correction*/
 
 #include "../includes/shortcuts.h"
 #include "../includes/extend_cam_ctrl.h"
@@ -321,13 +319,13 @@ void awb_enable(int enable)
 	switch (enable)
 	{
 	case 1:
-		*awb_flag = 1;
+		*awb_flag = TRUE;
 		break;
 	case 0:
-		*awb_flag = 0;
+		*awb_flag = FALSE;
 		break;
 	default:
-		*awb_flag = 0;
+		*awb_flag = FALSE;
 		break;
 	}
 }
@@ -409,13 +407,13 @@ void abc_enable(int enable)
 	switch (enable)
 	{
 	case 1:
-		*abc_flag = 1;
+		*abc_flag = TRUE;
 		break;
 	case 0:
-		*abc_flag = 0;
+		*abc_flag = FALSE;
 		break;
 	default:
-		*abc_flag = 0;
+		*abc_flag = FALSE;
 		break;
 	}
 }
@@ -907,11 +905,11 @@ static cv::Mat group_3a_ctrl_flags_for_raw_camera(cv::Mat opencvImage)
 		opencvImage = apply_gamma_correction(opencvImage);
 
 	/** check awb flag, awb functionality, only available for bayer camera */
-	if (*(awb_flag) == 1)
+	if (*(awb_flag) == TRUE)
 		opencvImage = apply_white_balance(opencvImage);
 
 	/** check abc flag, abc functionality, only available for bayer camera */
-	if (*(abc_flag) == 1)
+	if (*(abc_flag) == TRUE)
 		opencvImage = apply_auto_brightness_and_contrast(opencvImage, 1);
 
 	return opencvImage;
@@ -1010,8 +1008,8 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	}
 
 	/** if image larger than 720p by any dimension, resize the window */
-	if (width >= 1280 || height >= 720)
-		cv::resizeWindow("cam", 1280, 720);
+	if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
+		cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
 
 
 	streaming_put_text(share_img, "ESC: close streaming window", 100);

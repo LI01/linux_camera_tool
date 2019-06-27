@@ -107,7 +107,7 @@ char *get_file_extension(char *filename)
     return extname;
 }
 
-int config_file_identifier(char *filename)
+config_file_type config_file_identifier(char *filename)
 {
     char *file_type = get_file_extension(filename);
     if (strcmp(file_type, "bin") == 0)
@@ -125,7 +125,7 @@ void load_control_profile(int fd, char *filename)
     FILE *fp;
     long l_size;
     char *buffer;
-
+    config_file_type cfg_file = CONFIG_FILE_TXT;
     fp = fopen(filename, "rb");
 
     if (!fp)
@@ -153,8 +153,8 @@ void load_control_profile(int fd, char *filename)
         printf("read file failure\r\n");
         return;
     }
-
-    switch (config_file_identifier(filename))
+    cfg_file = config_file_identifier(filename);
+    switch (cfg_file)
     {
     case CONFIG_FILE_TXT:
         printf("*******************Commands Load From BatchCmd.txt***********\n");
