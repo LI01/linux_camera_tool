@@ -158,7 +158,7 @@ void load_control_profile(int fd, char *filename)
     {
     case CONFIG_FILE_TXT:
         printf("*******************Commands Load From BatchCmd.txt***********\n");
-        txt_file_parser(fd, buffer, (int) l_size);
+        txt_file_parser(fd, buffer, l_size);
         printf("*******************Commands Executed From BatchCmd.txt*******\n");
         break;
     case CONFIG_FILE_JSON:

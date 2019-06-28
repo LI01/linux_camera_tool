@@ -20,6 +20,7 @@
 #include "../includes/cam_property.h"
 #include "../includes/json_parser.h"
 #include "../includes/core_io.h"
+
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -155,9 +156,9 @@ void hscale_gain_up(GtkRange *widget)
 void enable_ae(GtkToggleButton *toggle_button)
 {
     if (gtk_toggle_button_get_active(toggle_button))
-        set_exposure_auto(v4l2_dev, 0);
+        set_exposure_auto(v4l2_dev, V4L2_EXPOSURE_AUTO);
     else
-        set_exposure_auto(v4l2_dev, 1);
+        set_exposure_auto(v4l2_dev, V4L2_EXPOSURE_MANUAL);
 }
 
 /** callback for enabling/disabling auto white balance */
@@ -195,10 +196,10 @@ void toggled_addr_length(GtkWidget *widget, gpointer data)
 {
     (void)widget;
     if (strcmp((char *)data, "1") == 0)
-        address_width_flag = 1;
+        address_width_flag = _8BIT_FLG;
 
     if (strcmp((char *)data, "2") == 0)
-        address_width_flag = 2;
+        address_width_flag = _16BIT_FLG;
 }
 
 /** callback for updating register value length 8/16 bits */
@@ -206,18 +207,18 @@ void toggled_val_length(GtkWidget *widget, gpointer data)
 {
     (void)widget;
     if (strcmp((char *)data, "1") == 0)
-        value_width_flag = 1;
+        value_width_flag = _8BIT_FLG;
 
     if (strcmp((char *)data, "2") == 0)
-        value_width_flag = 2;
+        value_width_flag = _16BIT_FLG;
 }
 
 /** generate register address width flag for callback in register read/write */
 int addr_width_for_rw(int address_width_flag)
 {
-    if (address_width_flag == 1)
+    if (address_width_flag == _8BIT_FLG)
         return 1;
-    if (address_width_flag == 2)
+    if (address_width_flag == _16BIT_FLG)
         return 2;
     return 1;
 }
@@ -225,11 +226,25 @@ int addr_width_for_rw(int address_width_flag)
 /** generate register value width flag for callback in register read/write */
 int val_width_for_rw(int value_width_flag)
 {
-    if (value_width_flag == 1)
+    if (value_width_flag == _8BIT_FLG)
         return 1;
-    if (value_width_flag == 2)
+    if (value_width_flag == _16BIT_FLG)
         return 2;
     return 1;
+}
+
+int hex_or_dec_interpreter_c_string(char *in_string)
+{
+    int out_val;
+    char *hex_prefix = (char*)"0x";
+
+    char *pch =strstr(in_string, hex_prefix);
+    if (pch)
+        out_val = strtol(in_string, NULL, 16);
+    else
+        out_val = strtol(in_string, NULL, 10);
+    return out_val;
+    
 }
 
 /** callback for register write */
@@ -240,22 +255,22 @@ void register_write(GtkWidget *widget)
     /** sensor read */
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
-        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
-                             NULL, 16);
-        int regVal = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_val)),
-                            NULL, 16);
+        int regAddr = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        int regVal = hex_or_dec_interpreter_c_string((char *)  \
+            gtk_entry_get_text(GTK_ENTRY(entry_reg_val)));
         sensor_reg_write(v4l2_dev, regAddr, regVal);
     }
 
     /** generic i2c slave read */
     else
     {
-        int slaveAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)),
-                               NULL, 16);
-        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
-                             NULL, 16);
-        int regVal = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_val)),
-                            NULL, 16);
+        int slaveAddr = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)));
+        int regAddr = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        int regVal = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_reg_val)));
         unsigned char buf[2];
         buf[0] = regVal & 0xff;
         buf[1] = (regVal >> 8) & 0xff;
@@ -275,8 +290,8 @@ void register_read(GtkWidget *widget)
     /** sensor read */
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
-        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
-                             NULL, 16);
+        int regAddr = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
 
         int regVal = sensor_reg_read(v4l2_dev, regAddr);
         char buf[6];
@@ -287,10 +302,10 @@ void register_read(GtkWidget *widget)
     /** generic i2c slave read */
     else
     {
-        int slaveAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)),
-                               NULL, 16);
-        int regAddr = strtol((char *)gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)),
-                             NULL, 16);
+        int slaveAddr = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)));
+        int regAddr = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
         int regVal;
         
         regVal = generic_I2C_read(v4l2_dev, GENERIC_REG_READ_FLG | 
@@ -323,8 +338,13 @@ void gamma_correction(GtkWidget *widget)
 {
     (void)widget;
     float gamma = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_gamma)));
-    add_gamma_val(gamma);
-    g_print("gamma = %f\n", gamma);
+    if (isgreater(gamma, 0.0)) 
+    {
+        add_gamma_val(gamma);
+        g_print("gamma = %f\n", gamma);
+    }
+    else
+        g_print("gamma should be greater than 0, you entered gamma = %f\n", gamma);
 }
 
 /** callback for triggering sensor functionality */
@@ -365,9 +385,18 @@ void enable_trig(GtkWidget *widget)
 void black_level_correction(GtkWidget *widget)
 {
     (void)widget;
-    int black_level = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_blc)));
-    add_black_level_correction(black_level);
-    g_print("black level correction = %d\n", black_level);
+    float float_blc;
+    float_blc = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_blc)));
+    if (floor(float_blc) == ceil(float_blc))
+    {
+        add_black_level_correction((int)float_blc);
+        g_print("Apply black level correction = %d\n", (int)float_blc);
+    }
+    else
+    {
+         g_print("Please enter an integer for each pixel black level correction\r\n");
+    }
+    
 }
 
 /** exit streaming loop */

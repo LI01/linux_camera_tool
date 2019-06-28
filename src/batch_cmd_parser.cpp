@@ -77,11 +77,17 @@ option_string_code hashit(std::string const &inString)
         return eCapture;
     if (inString == "FlashVal")
         return eFlashVal;
+    return eNotExist;
 }
 
+/* 
+ * add this helper function for interpreting hex and decimal number 
+ * for all the batchCmd values
+ */
 int hex_or_dec_interpreter(std::string const &inString)
 {
     int out_val;
+
     if (inString.find("0x") != std::string::npos)
         out_val = std::stoi(inString, 0, 16);
     else
@@ -90,7 +96,7 @@ int hex_or_dec_interpreter(std::string const &inString)
     
 }
 /// well, let's use cpp stl library, i don't want to use c anymore for this...
-void txt_file_parser(int fd, char *buf, int length)
+void txt_file_parser(int fd, char *buf, long length)
 {
     int sub_addr = 0, reg_addr = 0, reg_addr_width = 16;
     int read_count = 2, write_count = 2, delay_time = 0;
@@ -170,6 +176,9 @@ void txt_file_parser(int fd, char *buf, int length)
 
             case eFlashVal:
                 //TODO: add that later
+                break;
+            case eNotExist:
+                std::cout <<"ERROR! Script key value =[" << element[0]<< "] doesn\'t exist\r\n";
                 break;
             }
           

@@ -27,7 +27,8 @@ typedef enum
   eRead,
   eWrite,
   eCapture,
-  eFlashVal
+  eFlashVal,
+  eNotExist
 }option_string_code;
 /****************************************************************************
 **							 Function declaration
@@ -40,5 +41,5 @@ std::vector<std::string> split(const std::string &s, char delim);
 option_string_code hashit(std::string const &inString);
 int hex_or_dec_interpreter(std::string const &inString);
 
-void txt_file_parser(int fd, char *buf, int length);
+void txt_file_parser(int fd, char *buf, long length);
 

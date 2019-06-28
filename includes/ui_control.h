@@ -64,6 +64,11 @@ typedef struct
   gpointer data;
 } element_callback;
 
+typedef enum 
+{
+  _8BIT_FLG = 1,
+  _16BIT_FLG = 2
+}reg_addr_val_width_flag;
 
 /*****************************************************************************
 **                      	Internal Callbacks
@@ -88,6 +93,8 @@ void toggled_addr_length(GtkWidget *widget, gpointer data);
 void toggled_val_length(GtkWidget *widget, gpointer data);
 int addr_width_for_rw(int address_width_flag);
 int val_width_for_rw(int value_width_flag);
+
+int hex_or_dec_interpreter_c_string(char *in_string);
 
 void register_write(GtkWidget *widget);
 void register_read(GtkWidget *widget);
