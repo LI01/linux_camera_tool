@@ -7,7 +7,8 @@
 #include "../includes/cam_property.h"
 #include "../includes/v4l2_devices.h"
 #include "../includes/json_parser.h"
-
+#include <chrono> //high resolution clock
+#include <iostream>
 int v4l2_dev; /** global variable, file descriptor for camera device */
 int fw_rev;   /** global variable, firmware revision for the camera */
 struct v4l2_fract time_per_frame = {1, 15};
@@ -31,7 +32,10 @@ int main(int argc, char **argv)
 	dev.nbufs = V4L_BUFFERS_DEFAULT;
 	int c;
 	int sys_ret;
-	
+
+	// record start time
+	auto start = std::chrono::high_resolution_clock::now();
+
 	char *ret_dev_name = enum_v4l2_device(dev_name);
 	v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
 
@@ -202,12 +206,21 @@ int main(int argc, char **argv)
 	video_free_buffers(&dev);
 	close(v4l2_dev);
 
+	auto finish = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = finish - start;
+	std::cout << "pid:" << getpid() << "\tElapsed time： " << elapsed.count() << "s\r\n";
+
 	//FIXME:why when close the window, it won't kill the process
 	sys_ret = system("killall -9 leopard_cam"); 
+
+
+
 	if (sys_ret < 0)
 	{
 		printf("fail to exit the leopard camera tool\r\n");
 		return -1;
 	} 
+
+
 	return 0;
 }

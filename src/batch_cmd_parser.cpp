@@ -61,21 +61,21 @@ option_string_code hashit(std::string const &inString)
 {
     if (inString == "SubAddress")
         return eSubAddress;
-    if (inString == "RegAddress")
+    else if (inString == "RegAddress")
         return eRegAddress;
-    if (inString == "RegAddrWidth")
+    else if (inString == "RegAddrWidth")
         return eRegAddrWidth;
-    if (inString == "Delay")
+    else if (inString == "Delay")
         return eDelay;
-    if (inString == "InterFrameDelay")
+    else if (inString == "InterFrameDelay")
         return eInterFrameDelay;
-    if (inString == "Read")
+    else if (inString == "Read")
         return eRead;
-    if (inString == "Write")
+    else if (inString == "Write")
         return eWrite;
-    if (inString == "Capture")
+    else if (inString == "Capture")
         return eCapture;
-    if (inString == "FlashVal")
+    else if (inString == "FlashVal")
         return eFlashVal;
     return eNotExist;
 }
@@ -109,6 +109,8 @@ void txt_file_parser(int fd, char *buf, long length)
     {
         if (line[0] != '#') /// ignore the comment lines
         {
+            /// split line words by space
+            /// first word: key, second word: value, third word and so on: ignored
             std::vector<std::string> element = split(line, ' ');
             switch (hashit(element[0]))
             {
