@@ -1,18 +1,30 @@
 # LI Firmware Update Tool
+
 A simple and easy to use firmware update tool for Leopard USB3 camera.
+
+- [LI Firmware Update Tool](#LI-Firmware-Update-Tool)
+  - [Installation](#Installation)
+    - [Install Firmware Update Tool](#Install-Firmware-Update-Tool)
+    - [Uninstall Firmware Update Tool](#Uninstall-Firmware-Update-Tool)
+  - [Firmware Updates](#Firmware-Updates)
+  - [Code Structure](#Code-Structure)
+
+
 ## Installation
-### Install
+### Install Firmware Update Tool
+__First time running__
 To install the rules and configs for firmware updates 
-__[First time running LI Firmware Update Tool]__
 ```sh
 sudo chmod 777 firmware.sh
 ./firmware.sh install 
 ```
-### Uninstall
+### Uninstall Firmware Update Tool
 To uninstall the rules and configs for firmware updates
 ```sh
 ./firmware.sh uninstall
 ```
+---
+
 ## Firmware Updates
 1. Erase the current firmware in this USB3 board
   - Run linux camera tool (``` ./leopard_cam```)
@@ -27,6 +39,8 @@ To uninstall the rules and configs for firmware updates
     Log file in terminal will tell you whether it succeed or not
     If it failed, try to __power cycle your board__ to clear things in RAM and restart from __1__
 
+
+---
 ## Code Structure
 ```
 .
@@ -38,7 +52,10 @@ To uninstall the rules and configs for firmware updates
 │   ├── eos.log
 │   ├── libcyusb.so             # shared library
 │   └── libcyusb.so.1           # shared library
+│ 
 ├── firmware.sh                 # shell script to install, uninstall and update firmware
+├── cyfxuvc_rev1425.lif         # test lif file 1
+│
 ├── Flash_factory.img           # test img file 1
 ├── Flash_update.img            # test img file 2
 ├── install
