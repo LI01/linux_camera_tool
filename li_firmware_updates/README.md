@@ -22,7 +22,7 @@ To uninstall the rules and configs for firmware updates
 3. Go inside __li_firmware_updates__, have your new firmware update binary with you(end with img file)
     ```sh
     cd li_firmware_updates
-    ./firmware.sh update_firmware xxx(new img file)
+    ./firmware.sh update_firmware xxx(new img/lif file)
     ```
     Log file in terminal will tell you whether it succeed or not
     If it failed, try to __power cycle your board__ to clear things in RAM and restart from __1__
