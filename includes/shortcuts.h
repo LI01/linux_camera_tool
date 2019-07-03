@@ -72,3 +72,5 @@ struct device
 
 #define GENERIC_REG_WRITE_FLG (0x80)
 #define GENERIC_REG_READ_FLG  (0x00)
+
+#define UNDEFINED_MAX_EXPOSURE_LINE ((1<<16)-1)

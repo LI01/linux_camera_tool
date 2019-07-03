@@ -39,3 +39,5 @@
 *.json
 *.txt
 *.bin
+*.img
+*.lif

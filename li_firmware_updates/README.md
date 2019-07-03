@@ -31,16 +31,17 @@ To uninstall the rules and configs for firmware updates
   - Inside __FW Updates__, click __Erase Firmware__. (_Linux camera tool_ then will exit)
 2. Power cycle your USB3 board, do a ```lsusb```, make sure a device called ```04b4:00f3 Cypress Semiconductor Corp.``` is listed. 
    Go to __4__ if you find your Cypress device, otherwise, go over __1,2__ again
-3. Go inside __li_firmware_updates__, have your new firmware update binary with you(end with img file)
+3. Go inside __li_firmware_updates__, have your new firmware update binary with you(end with __img__/__lif__ file)
     ```sh
     cd li_firmware_updates
     ./firmware.sh update_firmware xxx(new img/lif file)
     ```
-    Log file in terminal will tell you whether it succeed or not
+    Log file in terminal will tell you whether it succeed or not.
     If it failed, try to __power cycle your board__ to clear things in RAM and restart from __1__
 
 
 ---
+
 ## Code Structure
 ```
 .
