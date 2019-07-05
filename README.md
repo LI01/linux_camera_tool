@@ -11,11 +11,14 @@
     - [Install leopard_cam](#Install-leopard_cam)
     - [Uninstall leopard_cam](#Uninstall-leopard_cam)
   - [Code Structure](#Code-Structure)
-  - [Run Camera Tool](#Run-Camera-Tool)
+  - [Declarations](#Declarations)
+  - [Regarding Exposure Time Calculation](#Regarding-Exposure-Time-Calculation)
     - [Examples](#Examples)
-      - [Declarations](#Declarations)
-      - [Regarding Exposure Time Calculation](#Regarding-Exposure-Time-Calculation)
-  - [```](#)
+      - [Test on RAW sensor 12 Megapixel IMX477](#Test-on-RAW-sensor-12-Megapixel-IMX477)
+      - [Test on RAW sensor 5 Megapixel OS05A20](#Test-on-RAW-sensor-5-Megapixel-OS05A20)
+      - [Test on AR1335-ICP3 YUV 12 Megapixel Cam](#Test-on-AR1335-ICP3-YUV-12-Megapixel-Cam)
+      - [Exit Camera Tool](#Exit-Camera-Tool)
+      - [Kill Camera Tool Windows Left Over](#Kill-Camera-Tool-Windows-Left-Over)
   - [Test Platforms](#Test-Platforms)
   - [Known Bugs](#Known-Bugs)
     - [Exposure & Gain Control Momentarily Split Screen](#Exposure--Gain-Control-Momentarily-Split-Screen)
@@ -133,24 +136,25 @@ $ linux_camera_tool .
     └── main.c                              
 ```
 ---
-## Run Camera Tool
-```
-leopard_cam
-```
-
-### Examples
-
-#### Declarations 
+## Declarations 
 _Auto white balance_, _gamma correction_ and _auto brightness and contrast_ are done by mainly using opencv, since histogram matrix calculations are involved, enabling these features will slow down the streaming a lot.
-_Auto exposure_ is usually implemented on sensor/isp, which when enabled, won't further slow down the streaming, need to check with camera driver for auto exposure support.
-#### Regarding Exposure Time Calculation
+_Auto exposure_ is usually implemented on sensor/isp, which when enabled, won't further slow down the streaming, need to check with camera driver for auto exposure support. If some sensor don't have AE support built-in, this button won't work.
+
+## Regarding Exposure Time Calculation
 Since _Linux V4L2 API_ doesn't provide a easier way to tell you what exact exposure time in _ms_ like what _Windows_ does, here is the explanation for helping you figuring out your camera's current exposure time in _ms_:
+
 ```Exposure time = exposure_time_line_number / (frame_rate * total_line_number)```
+
 , where 
 1. __exposure_time_line_number__ is the value that display is linux camera tool exposure control
 2. you can get __frame_rate__ from log _Get Current Frame Rate=_, don't refer to _Current Fps_ that displays in _cam_, that's the frame rate your PC can process, not the physically USB received frame rate from camera.
 3. __total_line_number__ is usually around the height of the camera's current resolution, usually slightly larger than that since VD needs blanking. To get the exact __total_line_number__, you might want to read __VTS__ register value for your sensor, which might be a hassle for you so I will only tell you this roughly calculation method...
 4. Noticing for exposure time change in Linux Camera Tool Control GUI, the exposure time range will usually be over the camera's resolution height. If you have the exposure value set to be over camera's resolution height, it might affect your frame rate, since camera exposure time line number is greater than the total line number, that will slow down your camera's frame rate. But this varies from different sensors. Some sensors don't allow that happen, so the exposure time will stick the same when it is over total line number.
+## Run Camera Tool
+
+```leopard_cam```
+
+### Examples
   
 #### Test on RAW sensor 12 Megapixel IMX477
 __Original streaming for IMX477:__ 

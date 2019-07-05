@@ -297,7 +297,7 @@ void add_gamma_val(float gamma_val_from_gui)
  *  whereas it will be the opposite with *gamma_val > 1
  *  recommend *gamma_val: 0.45(1/2.2)
  */
-static cv::Mat apply_gamma_correction(cv::Mat opencvImage)
+void apply_gamma_correction(const cv::InputOutputArray opencvImage)
 {
 	cv::Mat look_up_table(1, 256, CV_8U);
 	uchar *p = look_up_table.ptr();
@@ -306,7 +306,6 @@ static cv::Mat apply_gamma_correction(cv::Mat opencvImage)
 		p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, *gamma_val) * 255.0);
 	}
 	LUT(opencvImage, look_up_table, opencvImage);
-	return opencvImage;
 }
 
 /**
@@ -337,20 +336,20 @@ void awb_enable(int enable)
  *  color temperature.
  *  ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
  */
-static cv::Mat apply_white_balance(cv::Mat opencvImage)
+void apply_white_balance(cv::InputOutputArray opencvImage)
 {
 	// if it is grey image, do nothing
 	if (opencvImage.type() == CV_8UC1)
-		return opencvImage;
-
+		return;
+	cv::Mat _opencvImage = opencvImage.getMat();
 	double discard_ratio = 0.05;
 	int hists[3][256];
 	CLEAR(hists);
 
-	for (int y = 0; y < opencvImage.rows; ++y)
+	for (int y = 0; y < _opencvImage.rows; ++y)
 	{
-		uchar *ptr = opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < opencvImage.cols; ++x)
+		uchar *ptr = _opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < _opencvImage.cols; ++x)
 		{
 			for (int j = 0; j < 3; ++j)
 			{
@@ -360,7 +359,7 @@ static cv::Mat apply_white_balance(cv::Mat opencvImage)
 	}
 
 	// cumulative hist
-	int total = opencvImage.cols * opencvImage.rows;
+	int total = _opencvImage.cols * _opencvImage.rows;
 	int vmin[3], vmax[3];
 	for (int i = 0; i < 3; ++i)
 	{
@@ -378,10 +377,10 @@ static cv::Mat apply_white_balance(cv::Mat opencvImage)
 			vmax[i] += 1;
 	}
 
-	for (int y = 0; y < opencvImage.rows; ++y)
+	for (int y = 0; y < _opencvImage.rows; ++y)
 	{
-		uchar *ptr = opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < opencvImage.cols; ++x)
+		uchar *ptr = _opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < _opencvImage.cols; ++x)
 		{
 			for (int j = 0; j < 3; ++j)
 			{
@@ -394,7 +393,7 @@ static cv::Mat apply_white_balance(cv::Mat opencvImage)
 			}
 		}
 	}
-	return opencvImage;
+	
 }
 
 /**
@@ -418,14 +417,14 @@ void abc_enable(int enable)
 	}
 }
 
-static cv::Mat apply_auto_brightness_and_contrast(
-	cv::Mat opencvImage,
+void apply_auto_brightness_and_contrast(
+	cv::InputOutputArray opencvImage,
 	float clipHistPercent = 0)
 
 {
 	// if it is grey image, do nothing
 	if (opencvImage.type() == CV_8UC1)
-		return opencvImage;
+		return;
 	// /** Method 1:
 	//  * Automatic brightness and contrast optimization with optional histogram clipping
 	//  * Looking at histogram, alpha operates as color range amplifier, beta operates as range shift.
@@ -520,7 +519,7 @@ static cv::Mat apply_auto_brightness_and_contrast(
 
 	// convert back to RGB
 	cv::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
-	return opencvImage;
+
 }
 
 /** 
@@ -883,7 +882,7 @@ void swap_two_bytes(struct device *dev, const void *p)
  * group 3a ctrl flags for bayer cameras
  * auto exposure, auto white balance, auto brightness and contrast ctrl
  */
-static cv::Mat group_3a_ctrl_flags_for_raw_camera(cv::Mat opencvImage)
+void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 {
 	/** color output */
 	if (add_bayer_forcv(bayer_flag) != 4)
@@ -902,17 +901,16 @@ static cv::Mat group_3a_ctrl_flags_for_raw_camera(cv::Mat opencvImage)
 
 	/** gamma correction functionality, only available for bayer camera */
 	if (*(gamma_val) != (float)1)
-		opencvImage = apply_gamma_correction(opencvImage);
+		apply_gamma_correction(opencvImage);
 
 	/** check awb flag, awb functionality, only available for bayer camera */
 	if (*(awb_flag) == TRUE)
-		opencvImage = apply_white_balance(opencvImage);
+		apply_white_balance(opencvImage);
 
 	/** check abc flag, abc functionality, only available for bayer camera */
 	if (*(abc_flag) == TRUE)
-		opencvImage = apply_auto_brightness_and_contrast(opencvImage, 1);
+		apply_auto_brightness_and_contrast(opencvImage, 1);
 
-	return opencvImage;
 }
 
 /**
@@ -956,7 +954,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		perform_shift(dev, p, shift);
 		//swap_two_bytes(dev, p);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
-		img = group_3a_ctrl_flags_for_raw_camera(img);
+		group_3a_ctrl_flags_for_raw_camera(img);
 		//#define DUAL_CAM
 		#ifdef DUAL_CAM
 		/// define region of interest for cropped Mat for AR0231 DUAL
@@ -994,7 +992,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		// need to adjust read width
 		width = width * 2; 
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
-		img = group_3a_ctrl_flags_for_raw_camera(img);
+		group_3a_ctrl_flags_for_raw_camera(img);
 		share_img = img;
 	}
 

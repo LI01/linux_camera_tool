@@ -295,7 +295,7 @@ void register_read(GtkWidget *widget)
             gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
 
         int regVal = sensor_reg_read(v4l2_dev, regAddr);
-        char buf[6];
+        char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_reg_val), buf);
     }
