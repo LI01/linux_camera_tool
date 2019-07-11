@@ -775,7 +775,7 @@ void streaming_loop(struct device *dev)
 	*loop = 1;
 	while (*loop)
 	{
-		t = (double)cv::getTickCount();
+		
 		get_a_frame(dev);
 	}
 	unmap_variables();
@@ -794,7 +794,7 @@ void get_a_frame(struct device *dev)
 {
 	for (unsigned int i = 0; i < dev->nbufs; i++)
 	{
-
+		t = (double)cv::getTickCount();
 		queuebuffer.index = i;
 
 		/** The buffer's waiting in the outgoing queue. */

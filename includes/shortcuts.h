@@ -49,7 +49,7 @@
 #define _1MS    1
 #define _ESC_KEY 27
 
-#define V4L_BUFFERS_DEFAULT	1
+#define V4L_BUFFERS_DEFAULT	2 //default set to 2 so frame rate is higher
 #define V4L_BUFFERS_MAX	32
 
 typedef enum { FALSE, TRUE } BOOL;

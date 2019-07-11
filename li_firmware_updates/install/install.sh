@@ -1,8 +1,10 @@
 #!/bin/bash
 if [[ "$EUID" = 0 ]]; then
     echo "(1) already root"
+    # create udev rules
     cp li_firmware_updates/install/88-cyusb.rules /etc/udev/rules.d
     cp li_firmware_updates/install/cyusb.conf /etc
+    
     cp li_firmware_updates/install/cy_renumerate.sh /usr/local/bin
     echo "install successfully"
 else
