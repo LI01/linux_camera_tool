@@ -57,7 +57,6 @@ int address_width_flag;
 int value_width_flag;
 static GtkWidget *window = NULL; /** the main window */
 extern int v4l2_dev;
-extern int fw_rev;
 extern int gain_max;
 extern int exposure_max;
 /*****************************************************************************
@@ -483,7 +482,7 @@ void list_all_def_elements ()
 
     char fw_rev_buf[20];
     snprintf(fw_rev_buf, sizeof(fw_rev_buf), "Firmware Rev: %d",
-             fw_rev);
+             get_fw_rev());
 
     static def_element definitions[] = {
         {.widget = label_device,      .wid_type = GTK_WIDGET_TYPE_LABEL, .parent = NULL, .label_str = device_buf},

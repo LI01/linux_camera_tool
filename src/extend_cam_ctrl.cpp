@@ -28,7 +28,7 @@
  10. Close your descriptor to the device 
   
   Author: Danyu L
-  Last edit: 2019/06
+  Last edit: 2019/07
 *****************************************************************************/
 
 /** Include files to use OpenCV API */

@@ -87,32 +87,7 @@ void uvc_set_control(int fd, unsigned int id, int value)
     printf("Control 0x%08x set to %u, is %u\n", id, value,
            ctrl.value);
 }
-/**--------------------------------------------------------------------------- */
-void set_frame_rate(int fd, int fps)
-{
-    struct v4l2_streamparm param;
-    CLEAR(param);
-    param.type = (v4l2_buf_type) V4L2_CAP_VIDEO_CAPTURE;
-    param.parm.capture.timeperframe.numerator = 1;
-    param.parm.capture.timeperframe.denominator = fps;
-    if(ioctl(fd, VIDIOC_S_PARM, &param) < 0)
-        error_handle_cam_ctrl();
-    printf("Set Frame Rate = %d\n", fps);
-}
-
-int get_frame_rate(int fd)
-{
-    struct v4l2_streamparm param;
-    CLEAR(param);
-    param.type =  (v4l2_buf_type) V4L2_CAP_VIDEO_CAPTURE;
-    if(ioctl(fd, VIDIOC_G_PARM, &param) < 0)
-        error_handle_cam_ctrl();
-    printf("Get Current Frame Rate = %d\n", param.parm.capture.timeperframe.denominator);
-    //printf("Get frame rate num= %d\n", param.parm.capture.timeperframe.numerator);
-    return param.parm.capture.timeperframe.denominator;
-}
-
-/**--------------------------------------------------------------------------- */
+/**--------------------------------------------------------------------- */
 void set_gain_auto (int fd, int auto_gain)
 {
     uvc_set_control(fd, V4L2_CID_AUTOGAIN, auto_gain);
@@ -135,9 +110,6 @@ void get_gain(int fd)
 
 void set_exposure_absolute(int fd, int exposure_absolute)
 {
-    if(exposure_absolute < MIN_EXPOSURE || exposure_absolute > MAX_EXPOSURE)
-        return;
-
     uvc_set_control(fd, V4L2_CID_EXPOSURE_ABSOLUTE, exposure_absolute);
 }
 void get_exposure_absolute(int fd)
@@ -150,7 +122,8 @@ void get_exposure_absolute(int fd)
 /**  
  *  Enables automatic adjustments of the exposure time and/or iris aperture. 
  *  The effect of manual changes of the exposure time or iris aperture while 
- *  these features are enabled is undefined, drivers should ignore such requests. 
+ *  these features are enabled is undefined, drivers should ignore such 
+ *  requests. 
  *  
  *  Possible values are:
  *   V4L2_EXPOSURE_AUTO 	Automatic exposure time, automatic iris aperture.
@@ -203,7 +176,33 @@ void get_focus_absolute(int fd)
 {
     uvc_get_control(fd, V4L2_CID_FOCUS_ABSOLUTE);
 }
+/**--------------------------------------------------------------------- */
+void set_frame_rate(int fd, int fps)
+{
+    struct v4l2_streamparm param;
+    CLEAR(param);
+    param.type = (v4l2_buf_type) V4L2_CAP_VIDEO_CAPTURE;
+    param.parm.capture.timeperframe.numerator = 1;
+    param.parm.capture.timeperframe.denominator = fps;
+    if(ioctl(fd, VIDIOC_S_PARM, &param) < 0)
+        error_handle_cam_ctrl();
+    printf("Set Frame Rate = %d\n", fps);
+}
 
+int get_frame_rate(int fd)
+{
+    struct v4l2_streamparm param;
+    CLEAR(param);
+    param.type =  (v4l2_buf_type) V4L2_CAP_VIDEO_CAPTURE;
+    if(ioctl(fd, VIDIOC_G_PARM, &param) < 0)
+        error_handle_cam_ctrl();
+    printf("Get Current Frame Rate = %d\n", 
+        param.parm.capture.timeperframe.denominator);
+    //printf("Get frame rate num= %d\n", 
+    //    param.parm.capture.timeperframe.numerator);
+    return param.parm.capture.timeperframe.denominator;
+}
+/**------------------------------------------------------------------------ */
 void usage( const char *argv0)
 {
 	printf("Usage: %s [options]\n", argv0);

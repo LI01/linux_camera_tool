@@ -13,23 +13,16 @@
   Last edit: 2019/04
 *****************************************************************************/
 #pragma once
-/****************************************************************************
-**                      	Global data 
-*****************************************************************************/
-#define MIN_EXPOSURE 1
-#define MAX_EXPOSURE 4000
 
 /****************************************************************************
 **							 Function declaration
-*****************************************************************************/
-void error_handle_cam_ctrl();
 
+*****************************************************************************/
+/** --- helper function ---*/
+void error_handle_cam_ctrl();
 void uvc_get_control(int fd, unsigned int id);
 void uvc_set_control(int fd, unsigned int id, int value);
-
-void set_frame_rate(int fd, int fps);
-int get_frame_rate(int fd);
-
+/**--------------------------------------------------------------------- */
 void set_gain_auto(int fd, int auto_gain);
 void get_gain_auto(int fd);
 
@@ -53,5 +46,9 @@ void get_tilt_absolute(int fd);
 
 void set_focus_absolute(int fd, int focus_absolute);
 void get_focus_absolute(int fd);
+
+/**--------------------------------------------------------------------- */
+void set_frame_rate(int fd, int fps);
+int get_frame_rate(int fd);
 
 void usage( const char *argv0);

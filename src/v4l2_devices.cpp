@@ -10,14 +10,18 @@
   Author: Danyu L
   Last edit: 2019/04
 *****************************************************************************/
-
 #include "../includes/shortcuts.h"
 #include "../includes/v4l2_devices.h"
+/*****************************************************************************
+**                      	Global data 
+*****************************************************************************/
+char manufacturer[20]; // "Leopard Imaging"
+char product[20];      // usually sensor_name + serdes_name
+char serial[64];       // mostly camera driver won't support. Need to add sensor fuseId in driver
 
-char manufacturer[20];
-char product[20];
-char serial[64];
-
+/******************************************************************************
+**                           Function definition
+*****************************************************************************/
 char *get_manufacturer_name()
 {
     return manufacturer;

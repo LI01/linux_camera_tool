@@ -14,6 +14,7 @@
 #include <sys/fcntl.h> /** for open() syscall */ 
 #include <sys/mman.h> /** for using mmap */
 #include <math.h>       /** pow */
+#include "hardware.h"
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
