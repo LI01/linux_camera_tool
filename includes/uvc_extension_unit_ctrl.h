@@ -8,9 +8,8 @@
   UVC extension unit features, firmware will need to get updated.
   
   Author: Danyu L
-  Last edit: 2019/06
+  Last edit: 2019/07
 *****************************************************************************/
-
 #pragma once
 /*****************************************************************************
 **                      	Global data 
@@ -83,6 +82,10 @@ typedef struct reg_seq
 
 #define SENSOR_REG_WRITE_FLG    (1)
 #define SENSOR_REG_READ_FLG     (0)
+
+// /** --- for LI_XU_GENERIC_I2C_RW --- */
+// #define GENERIC_REG_WRITE_FLG (0x80)
+// #define GENERIC_REG_READ_FLG  (0x00)
 
 /** --- for LI_XU_SENSOR_REGISTER_CONFIGURATION --- */
 typedef struct reg_pair

@@ -1,3 +1,14 @@
+/*****************************************************************************
+  This sample is released as public domain.  It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  
+  This is the sample code for Leopard USB3.0 camera, shortcut.h stores all the
+  useful macro functions, common libraries, global data structures
+
+  Author: Danyu L
+  Last edit: 2019/07
+*****************************************************************************/
 #pragma once
 
 //#include <pthread.h>
@@ -11,9 +22,9 @@
 #include <linux/usb/video.h>
 #include <errno.h>
 #include <linux/uvcvideo.h>
-#include <sys/fcntl.h> /** for open() syscall */ 
-#include <sys/mman.h> /** for using mmap */
-#include <math.h>       /** pow */
+#include <sys/fcntl.h>      /** for open() syscall */ 
+#include <sys/mman.h>       /** for using mmap */
+#include <math.h>           /** pow */
 #include "hardware.h"
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
@@ -23,13 +34,13 @@
 
 
 /** Loop over an array of given size */
-#define FOREACH_NELEM(array, nelem, iter) \
-	for (__typeof__(*(array)) *iter = (array); \
-		iter < (array) + (nelem); \
+#define FOREACH_NELEM(array, nelem, iter)       \
+	for (__typeof__(*(array)) *iter = (array);  \
+		iter < (array) + (nelem);               \
 		iter++)
 
 /** Loop over an array of known size */
-#define FOREACH(array, iter) \
+#define FOREACH(array, iter)                    \
 	FOREACH_NELEM(array, SIZE(array), iter)
 
 /**clip value between 0 and 255*/
@@ -50,8 +61,6 @@
 #define _1MS    1
 #define _ESC_KEY 27
 
-#define V4L_BUFFERS_DEFAULT	2 //default set to 2 so frame rate is higher
-#define V4L_BUFFERS_MAX	32
 
 typedef enum { FALSE, TRUE } BOOL;
 
@@ -68,10 +77,4 @@ struct device
     unsigned int imagesize;
 };
 
-// default VID
-#define USB_VENDOR_ID (0x2A0B) // Leopard Imaging
 
-#define GENERIC_REG_WRITE_FLG (0x80)
-#define GENERIC_REG_READ_FLG  (0x00)
-
-#define UNDEFINED_MAX_EXPOSURE_LINE ((1<<16)-1)

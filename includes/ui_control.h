@@ -91,10 +91,7 @@ void enable_abc(GtkToggleButton *toggle_button);
 
 void toggled_addr_length(GtkWidget *widget, gpointer data);
 void toggled_val_length(GtkWidget *widget, gpointer data);
-int addr_width_for_rw(int address_width_flag);
-int val_width_for_rw(int value_width_flag);
 
-int hex_or_dec_interpreter_c_string(char *in_string);
 
 void register_write(GtkWidget *widget);
 void register_read(GtkWidget *widget);
@@ -110,6 +107,13 @@ void enable_trig(GtkWidget *widget);
 
 void exit_loop(GtkWidget *widget);
 gboolean check_escape(GtkWidget *widget, GdkEventKey *event);
+/*****************************************************************************
+**                      	Helper functions
+*****************************************************************************/
+int addr_width_for_rw(int address_width_flag);
+int val_width_for_rw(int value_width_flag);
+
+int hex_or_dec_interpreter_c_string(char *in_string);
 
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE

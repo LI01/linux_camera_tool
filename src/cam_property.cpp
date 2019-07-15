@@ -10,7 +10,7 @@
   driver support.
 
   Author: Danyu L
-  Last edit: 2019/04
+  Last edit: 2019/07
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/cam_property.h"
@@ -28,6 +28,12 @@ void error_handle_cam_ctrl()
     const char *err;
     switch (res)
     {
+    case EAGAIN:
+        err = "The device is in ther state where it can't perform";    
+        break;
+    case EBADF:
+        err = "File descriptor is not a valid";
+        break;
     case ERANGE:
         err = "Struct v4l2_control value is out of bounds";
         break;
@@ -36,6 +42,30 @@ void error_handle_cam_ctrl()
         break;
     case EBUSY:
         err = "Busy, another application took over the control";
+        break;
+    case EFAULT:
+        err = "Failed on copying data from/to userspace";
+        break;
+    case ENODEV:
+        err = "Device not found or was removed";
+        break;
+    case ENOMEM:
+        err = "Not enough memory to handle the desired operation";
+        break;
+    case ENOTTY:
+        err = "Required functionality is not available";
+        break;
+    case ENOSPC:
+        err = "Request overcommit USB bandwidth reserved for periodic transfers";
+        break;
+    case EPERM:
+        err = "Permission denied";
+        break;  
+    case EIO:
+        err = "I/O Error";
+        break;
+    case ENXIO:
+        err = "No device corresponding to this device special file exists";
         break;
     case EACCES:
         err = "Set a read-only control/get a write-only control";
@@ -87,6 +117,28 @@ void uvc_set_control(int fd, unsigned int id, int value)
     printf("Control 0x%08x set to %u, is %u\n", id, value,
            ctrl.value);
 }
+/**
+ * To query the attributes of a control applications
+ * __s32 minimum
+ * __s32 maximum
+ * __s32 step
+ * __s32 default_value
+ * args:
+ *      int fd - put buffers in
+ * 		control id
+ */
+long uvc_query_ctrl_max(int fd, int id)
+{
+    struct v4l2_queryctrl control;
+    CLEAR(control);
+    control.id = id;
+    if (ioctl(fd, VIDIOC_QUERYCTRL, &control) < 0)
+        error_handle_cam_ctrl();
+    long value;
+    value = control.maximum;
+    return value;
+}
+
 /**--------------------------------------------------------------------- */
 void set_gain_auto (int fd, int auto_gain)
 {
@@ -108,6 +160,11 @@ void get_gain(int fd)
     uvc_get_control(fd, V4L2_CID_GAIN);
 }
 
+int query_gain_max(int fd)
+{
+    return (int)uvc_query_ctrl_max(fd, V4L2_CID_GAIN);
+}
+
 void set_exposure_absolute(int fd, int exposure_absolute)
 {
     uvc_set_control(fd, V4L2_CID_EXPOSURE_ABSOLUTE, exposure_absolute);
@@ -115,6 +172,11 @@ void set_exposure_absolute(int fd, int exposure_absolute)
 void get_exposure_absolute(int fd)
 {
     uvc_get_control(fd, V4L2_CID_EXPOSURE_ABSOLUTE);
+}
+
+int query_exposure_absolute_max(int fd)
+{
+    return (int)uvc_query_ctrl_max(fd, V4L2_CID_EXPOSURE_ABSOLUTE);
 }
 
 // from below, it might not support by every camera
@@ -203,6 +265,28 @@ int get_frame_rate(int fd)
     return param.parm.capture.timeperframe.denominator;
 }
 /**------------------------------------------------------------------------ */
+/** Get current resolution height
+ *  args:
+ *      int fd - put buffers in
+ * 		control id
+ */
+int get_current_height(int fd)
+{
+    struct v4l2_format fmt;
+    int ret;
+    CLEAR(fmt);
+	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+	ret = ioctl(fd, VIDIOC_G_FMT, &fmt);
+	if (ret < 0)
+	{
+		printf("Unable to get format: %s (%d).\n", strerror(errno),
+			   errno);
+		return 0;
+	}
+    return fmt.fmt.pix.height;
+}
+
 void usage( const char *argv0)
 {
 	printf("Usage: %s [options]\n", argv0);

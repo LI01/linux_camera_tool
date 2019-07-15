@@ -15,25 +15,49 @@
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-char manufacturer[20]; // "Leopard Imaging"
-char product[20];      // usually sensor_name + serdes_name
-char serial[64];       // mostly camera driver won't support. Need to add sensor fuseId in driver
+char manufacturer[20]; 
+char product[20];      
+char serial[64];       
 
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
+/**
+ * Getter for manufacurer name: "Leopard Imaging"
+ * These USB descriptor are read-only 
+ */
 char *get_manufacturer_name()
 {
     return manufacturer;
 }
+
+/**
+ * Getter for product name 
+ * usually sensor_name + serdes_name
+ */
 char *get_product()
 {
     return product;
 }
+
+/**
+ * Getter for camera serial number
+ * Mostly camera driver don't support 
+ * (only put a default serial number string in the driver) 
+ * If you need to add sensor fuseId into driver, request for a firmware update
+ */
 char *get_serial()
 {
     return serial;
 }
+
+/**
+ * enumerate v4l2 device
+ * input device set to default /dev/video0
+ * will find any leopard image USB3 device and return the first found for fd
+ * FIXME: probably return too early before unref udev -> 
+ * two video devices for one camera, later one is dummy...
+ */
 char *enum_v4l2_device(char *dev_name)
 {
 

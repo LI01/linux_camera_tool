@@ -59,15 +59,19 @@ sudo make install -j6
 sudo sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf'
 sudo ldconfig
 ```
+To build __OpenCV CUDA__ support, please refer to ```install_opencv_cuda.md``` in current directory
 
 ### Build Camera Tool
+* Use __make or cmake__ when you don't need __OpenCV CUDA__ support
+* Use __cmake__ when you need __OpenCV CUDA__ support
+* To build Linux Camera Tool with __OpenCV CUDA__ support, open the macro ```HAVE_OPENCV_CUDA_SUPPORT``` in ```hardware.h```
 
-- Makefile
+1. Make
 ```sh
 make
 ```
 
-- CMake
+2. CMake
 ```sh
 mkdir build
 cd build
@@ -104,6 +108,7 @@ $ linux_camera_tool .
 ├── CMakeLists.txt
 │
 ├── README.md
+├── INSTALL_OPENCV_CUDA.md
 ├── CHANGELOG.md
 ├── LICENSE.md
 ├── AUTHOR.md
@@ -112,7 +117,8 @@ $ linux_camera_tool .
 ├── BatchCmd.txt
 |
 ├── includes
-│   ├── shortcuts.h                       # common header
+│   ├── shortcuts.h                       # common used macro function header 
+│   ├── hardware.h                        # for specific hardware feature support
 │   ├── cam_property.h
 │   ├── extend_cam_ctrl.h
 │   ├── core_io.h
@@ -123,8 +129,8 @@ $ linux_camera_tool .
 │   └── v4l2_devices.h
 │
 ├── src
-│   ├── cam_property.cpp                  # gain, exposure, ptz ctrl
-│   ├── extend_cam_ctrl.cpp               # camera stream. capture ctrl
+│   ├── cam_property.cpp                  # gain, exposure, ptz ctrl etc
+│   ├── extend_cam_ctrl.cpp               # camera stream, capture ctrl etc
 |   ├── core_io.cpp                       # string manipulation for parser
 |   ├── json_parser.cpp                   # json parser
 |   ├── batch_cmd_parser.cpp              # BatchCmd.txt parser
@@ -137,8 +143,8 @@ $ linux_camera_tool .
 ```
 ---
 ## Declarations 
-_Auto white balance_, _gamma correction_ and _auto brightness and contrast_ are done by mainly using opencv, since histogram matrix calculations are involved, enabling these features will slow down the streaming a lot.
-_Auto exposure_ is usually implemented on sensor/isp, which when enabled, won't further slow down the streaming, need to check with camera driver for auto exposure support. If some sensor don't have AE support built-in, this button won't work.
+__Auto white balance__, __gamma correction__ and __auto brightness and contrast__ are done by mainly using OpenCV, since histogram matrix calculations are involved, enabling these features will slow down the streaming a lot. If you build Linux Camera Tool with __OpenCV CUDA support__, these feature speed won't be compromised.
+__Auto exposure__ is usually implemented on sensor/ISP, which when enabled, won't further slow down the streaming. You need to check with camera driver for auto exposure support. If some sensor don't have AE support built-in, this button won't work.
 
 ## Regarding Exposure Time Calculation
 Since _Linux V4L2 API_ doesn't provide a easier way to tell you what exact exposure time in _ms_ like what _Windows_ does, here is the explanation for helping you figuring out your camera's current exposure time in _ms_:

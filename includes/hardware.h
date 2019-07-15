@@ -1,19 +1,49 @@
+/*****************************************************************************
+  This sample is released as public domain.  It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  
+  This is the sample code for Leopard USB3.0 camera, hardware.h stores macros
+  for spefic camera tool build. Please refer to the explanation below for 
+  customize build. 
+
+  Author: Danyu L
+  Last edit: 2019/07
+*****************************************************************************/
 #pragma once
+/**
+ * ------------------macros for your build------------------------
+ * 1. uncomment HAVE_OPENCV_CUDA_SUPPORT if you have OpenCV CUDA support and 
+ * want to accelerate RAW image processing speed
+ * 2. uncomment DUAL_CAM if you are using a stereo camera. It will display 
+ * left and right image in two different windows, e.g. AR0144_DUAL, AR0231_DUAL
+ * 3. uncomment USING_CLAHE if you want to use CLAHE for adjusting brightness
+ * and contrast instead of basic historgram ax+b
+ */
+// #define HAVE_OPENCV_CUDA_SUPPORT
+// #define DUAL_CAM
+#define USING_CLAHE
+
+/**
+ * ------------------camera specific test functions---------------
+ * The following macros are for specific cameras testing function. 
+ * Uncomment the specific one if you are using that one for demo
+ */
 // #define AP0202_WRITE_REG_ON_THE_FLY
 // #define AP0202_WRITE_REG_IN_FLASH
 // #define OS05A20_PTS_QUERY
 // #define AR0231_MIPI_TESTING
 // #define IMX334_MONO_MIPI_TESTING
 
+
 /** 
  * ---------------- 8-bit I2C slave address list -----------------
  * Put a list here so you don't ask me what is the slave address.
- * Note that for different hardware and revsion, we might have 
- * different slave address for same sensors, so try with the address
- * in the comment if possible.
- * If you still have problem to access the sensor registers, you can 
- * contact the support for a firmware update since most likely that 
- * driver wasn't enabling generic i2c slave register access.
+ * Note that for different hardware and revsion, we might have different slave
+ * address for same sensors, so try with the address in comment if possible.
+ * If you still have problem to access the sensor registers, you can contact
+ * our support for a firmware update since most likely that driver wasn't 
+ * enabling generic i2c slave register access.
  * Disclaimer: this list doesn't include all our USB3 slave address,
  * just all the cameras I got in touch before.
  */
@@ -67,3 +97,24 @@
 #define TI953_SER_I2C_ADDR      (0x60) 
 #define TI914_DESER_I2C_ADDR    (0xC0)
 #define TI954_DESER_I2C_ADDR    (0x30)
+
+/**
+ * --------------------for nbuf numbers---------------------------
+ * Currently, default nbufs = 2 so the frame rate is higher.
+ * Increasing nbufs will results in longer delay for ctrls like 
+ * exposure, gain since mmap will allocate buffers to cover more 
+ * frames.
+ */
+#define V4L_BUFFERS_DEFAULT	    (2) 
+#define V4L_BUFFERS_MAX	        (32)
+
+
+/**
+ * FYI: default VID for Leopard Imaging USB3 camera in case you 
+ * want to add your own udev rules for USB video device
+ */ 
+#define USB_VENDOR_ID           (0x2A0B) 
+
+/** --- for LI_XU_GENERIC_I2C_RW --- */
+#define GENERIC_REG_WRITE_FLG (0x80)
+#define GENERIC_REG_READ_FLG  (0x00)

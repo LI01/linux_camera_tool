@@ -1,4 +1,21 @@
 
+/*****************************************************************************
+  This sample is released as public domain.  It is distributed in the hope it
+  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  
+  This is the sample code for Leopard USB3.0 camera, main.cpp checks the camera
+  capabilities, open&close the camera device, forks two processes. For most things
+  you want to try, put the function before fork() is main.cpp is a good idea,
+  that way you won't be worry about variable memory sharing between two processes.
+  To change resolution, frame rate, and number of buffers, you need to exit the
+  program and re-enter leopard_cam with specific arguments. So far, this doesn't 
+  support dynamically change resolutions etc because we use mmap for camera device.
+
+  Author: Danyu L
+  Last edit: 2019/07
+*****************************************************************************/
+
 #include "../includes/shortcuts.h"
 #include <getopt.h>
 #include <chrono> //high resolution clock
@@ -14,8 +31,6 @@
 **                      	Global data
 *****************************************************************************/
 int v4l2_dev;	 /** global variable, file descriptor for camera device */
-int gain_max;	 /** global variable, update gain range in GUI, read from v4l2 */
-int exposure_max; /** global variable, update exposure range in GUI, read from v4l2 */
 
 struct v4l2_fract time_per_frame = {1, 15};
 static struct option opts[] = {
@@ -76,31 +91,6 @@ int main(int argc, char **argv)
 		printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
 		return -1;
 	}
-
-	/**
-	 * this part is to get the gain and exposure maximum value defined in firmware
-	 * and update the range in GUI
-	 * if MAX_EXPOSURE_TIME is undefined in firmware, will put a upper limit for 
-	 * exposure time range so the range won't be as large as 65535 which confuses people
-	 */
-	gain_max = std::stoi(get_stdout_from_cmd(
-		"v4l2-ctl --device=" + _dev_name +
-		" --all | grep gain | awk '{print $6}'| sed 's/max=//g'"));
-	exposure_max = std::stoi(get_stdout_from_cmd(
-		"v4l2-ctl --device=" + _dev_name +
-		" --all | grep exposure_absolute | awk '{print $6}'| sed 's/max=//g'"));
-	int height = std::stoi(get_stdout_from_cmd(
-		"v4l2-ctl --device=" + _dev_name +
-		" --all | grep Bounds | awk '{print $10}'"));
-	/**
-	 *  if UNSET_MAX_EXPOSURE_LINE, firmware didn't define MAX_EXPOSURE_TIME...
-	 * 	place holder = 3, it should be enough for most cases
-	 *  if you adjust exposure to maximum, and image is still dark 
-	 *  try to increase 3 to 4, 5, 6 etc
-	 *  or ask for a firmware update, firmware exposure time mapping might be wrong
-	 */
-	if (exposure_max == UNDEFINED_MAX_EXPOSURE_LINE)
-		exposure_max = height * 3;
 
 	printf("********************List Available Resolutions***************\n");
 	/** 

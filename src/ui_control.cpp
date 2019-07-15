@@ -9,7 +9,7 @@
   README.md guide to rebuild your opencv for supporting Gtk3.
 
   Author: Danyu L
-  Last edit: 2019/06
+  Last edit: 2019/07
 *****************************************************************************/
 
 #include "../includes/shortcuts.h"
@@ -51,14 +51,13 @@ GtkWidget *menu_bar, *config_file_item, *file_menu, *help_menu, *help_item;
 GtkWidget *device_menu, *device_item;
 GtkWidget *fw_update_item, *fw_update_menu;
 GtkWidget *file_dialog;
-//GtkWiget *progress_fw_update, *progress_flash_eeprom;
-
+static GtkWidget *window = NULL;    /** the main window */
 int address_width_flag;
 int value_width_flag;
-static GtkWidget *window = NULL; /** the main window */
+
 extern int v4l2_dev;
-extern int gain_max;
-extern int exposure_max;
+
+
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
@@ -213,39 +212,7 @@ void toggled_val_length(GtkWidget *widget, gpointer data)
         value_width_flag = _16BIT_FLG;
 }
 
-/** generate register address width flag for callback in register read/write */
-int addr_width_for_rw(int address_width_flag)
-{
-    if (address_width_flag == _8BIT_FLG)
-        return 1;
-    if (address_width_flag == _16BIT_FLG)
-        return 2;
-    return 1;
-}
 
-/** generate register value width flag for callback in register read/write */
-int val_width_for_rw(int value_width_flag)
-{
-    if (value_width_flag == _8BIT_FLG)
-        return 1;
-    if (value_width_flag == _16BIT_FLG)
-        return 2;
-    return 1;
-}
-
-int hex_or_dec_interpreter_c_string(char *in_string)
-{
-    int out_val;
-    char *hex_prefix = (char*)"0x";
-
-    char *pch =strstr(in_string, hex_prefix);
-    if (pch)
-        out_val = strtol(in_string, NULL, 16);
-    else
-        out_val = strtol(in_string, NULL, 10);
-    return out_val;
-    
-}
 
 /** callback for register write */
 void register_write(GtkWidget *widget)
@@ -419,10 +386,48 @@ gboolean check_escape(GtkWidget *widget, GdkEventKey *event)
     }
     return FALSE;
 }
-int count;
+
+
+/*****************************************************************************
+**                      	Helper functions
+*****************************************************************************/
+/// generate register address width flag for callback in register read/write 
+int addr_width_for_rw(int address_width_flag)
+{
+    if (address_width_flag == _8BIT_FLG)
+        return 1;
+    if (address_width_flag == _16BIT_FLG)
+        return 2;
+    return 1;
+}
+
+/// generate register value width flag for callback in register read/write 
+int val_width_for_rw(int value_width_flag)
+{
+    if (value_width_flag == _8BIT_FLG)
+        return 1;
+    if (value_width_flag == _16BIT_FLG)
+        return 2;
+    return 1;
+}
+/// interpret c string for both hex and decimal
+int hex_or_dec_interpreter_c_string(char *in_string)
+{
+    int out_val;
+    char *hex_prefix = (char*)"0x";
+
+    char *pch =strstr(in_string, hex_prefix);
+    if (pch)
+        out_val = strtol(in_string, NULL, 16);
+    else
+        out_val = strtol(in_string, NULL, 10);
+    return out_val;
+    
+}
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE
 *****************************************************************************/
+int count;
 void iterate_def_elements (
     def_element *definitions, size_t members)
 {   
@@ -711,6 +716,23 @@ void list_all_window_signals(GtkWidget *window)
 void init_all_widgets()
 {
       
+	/**
+	 * this part is to get the gain and exposure maximum value defined in firmware
+	 * and update the range in GUI
+	 * if MAX_EXPOSURE_TIME is undefined in firmware, will put a upper limit for 
+	 * exposure time range so the range won't be as large as 65535 which confuses people
+	 * 
+	 *  if UNSET_MAX_EXPOSURE_LINE, firmware didn't define MAX_EXPOSURE_TIME...
+	 * 	place holder = 3, it should be enough for most cases
+	 *  if you adjust exposure to maximum, and image is still dark 
+	 *  try to increase 3 to 4, 5, 6 etc
+	 *  or ask for a firmware update, firmware exposure time mapping might be wrong
+	 */
+    int exposure_max = query_exposure_absolute_max(v4l2_dev);
+    int gain_max = query_gain_max(v4l2_dev);
+    if (exposure_max == UNDEFINED_MAX_EXPOSURE_LINE)
+        exposure_max = get_current_height(v4l2_dev) * 3;
+
     label_device   = gtk_label_new(NULL);
     label_fw_rev   = gtk_label_new(NULL);
     label_datatype = gtk_label_new(NULL);
@@ -747,7 +769,6 @@ void init_all_widgets()
     entry_reg_val   = gtk_entry_new();
     entry_gamma     = gtk_entry_new();
     entry_blc       = gtk_entry_new();
-
 
     hscale_exposure = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
                                                0.0, (double)exposure_max, 1.0);
@@ -822,7 +843,17 @@ void grid_setup()
     gtk_container_set_border_width(GTK_CONTAINER(grid), 2);
     gtk_container_add(GTK_CONTAINER(maintable), grid);
 }
-
+void init_all_menus()
+{
+    device_menu = gtk_menu_new();
+    file_menu = gtk_menu_new();
+    fw_update_menu = gtk_menu_new();
+    help_menu = gtk_menu_new();
+}
+void list_all_menu_elements()
+{
+    
+}
 
 void menu_bar_setup()
 {
@@ -830,11 +861,7 @@ void menu_bar_setup()
     gtk_menu_bar_set_pack_direction(GTK_MENU_BAR(menu_bar), 
         GTK_PACK_DIRECTION_LTR); 
     
-    device_menu = gtk_menu_new();
-    file_menu = gtk_menu_new();
-    fw_update_menu = gtk_menu_new();
-    help_menu = gtk_menu_new();
-
+    init_all_menus();
 
     /** device items */
     device_item = gtk_menu_item_new_with_label("Devices");

@@ -17,17 +17,12 @@
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-static unsigned int m_rGain = 0x1;
+static unsigned int m_rGain  = 0x1;
 static unsigned int m_grGain = 0x1;
 static unsigned int m_gbGain = 0x1;
-static unsigned int m_bGain = 0x1;
+static unsigned int m_bGain  = 0x1;
 
-int hw_rev; // most likely 0x0102, cut MSB 4-bit for datatype
-/** 
- * firmware revision, to make it work, need to compile the driver from svn, 
- * if your firmware revision is 0 or 65535, mostly that version hasn't been
- * compiled at svn...  
- */
+int hw_rev; 
 int fw_rev;
 char uuid[64];
 /******************************************************************************
@@ -249,14 +244,28 @@ void set_sensor_gain_rgb(int fd, unsigned int rGain,
 						   LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE, buf4);
 }
 
+/**
+ * Getter for hardware revision
+ * Most likely 0x0102, cut MSB 4-bit for datatype
+ */ 
 int get_hw_rev()
 {
 	return hw_rev;
 }
+
+/**
+ * Getter for firmware revision 
+ * To make it work, need to compile the driver from svn. 
+ * If your firmware revision is 0 or 65535, mostly that version hasn't been
+ * compiled at svn...  
+ */
 int get_fw_rev()
 {
 	return fw_rev;
 }
+/**
+ * Getter for uuid
+ */
 char *get_uuid()
 {
 	return uuid;
