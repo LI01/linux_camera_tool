@@ -12,20 +12,30 @@
 *****************************************************************************/
 #pragma once
 /**
- * ------------------macros for your build------------------------
+ * ----------------------macros for your build--------------------------------
  * 1. uncomment HAVE_OPENCV_CUDA_SUPPORT if you have OpenCV CUDA support and 
  * want to accelerate RAW image processing speed
  * 2. uncomment DUAL_CAM if you are using a stereo camera. It will display 
  * left and right image in two different windows, e.g. AR0144_DUAL, AR0231_DUAL
  * 3. uncomment USING_CLAHE if you want to use CLAHE for adjusting brightness
  * and contrast instead of basic historgram ax+b
+ * 4. uncomment IMG_FLIP_VERTICALLY if you want to show image flip vertically, 
+ * noticing captured raw image wouldn't be flipped
+ * 5. uncomment IMG_FLIP_HORIZONTALLY if you want to show image flip 
+ * horizontally, noticing captured raw image wouldn't be flipped
+ * 6. uncomment DISPLAY_FRAME_RATE_RES_INFO if you want display info in "cam"
+ * 7. uncomment RESIZE_OPENCV_WINDOW if you want to resize window to 720p
  */
-// #define HAVE_OPENCV_CUDA_SUPPORT
+ #define HAVE_OPENCV_CUDA_SUPPORT
 // #define DUAL_CAM
 #define USING_CLAHE
+#define IMG_FLIP_VERTICALLY
+#define IMG_FLIP_HORIZONTALLY
+#define DISPLAY_FRAME_RATE_RES_INFO
+//#define RESIZE_OPENCV_WINDOW 
 
 /**
- * ------------------camera specific test functions---------------
+ * --------------------------camera specific test functions-------------------
  * The following macros are for specific cameras testing function. 
  * Uncomment the specific one if you are using that one for demo
  */
@@ -37,7 +47,7 @@
 
 
 /** 
- * ---------------- 8-bit I2C slave address list -----------------
+ * -------------------------- 8-bit I2C slave address list -------------------
  * Put a list here so you don't ask me what is the slave address.
  * Note that for different hardware and revsion, we might have different slave
  * address for same sensors, so try with the address in comment if possible.
@@ -99,7 +109,7 @@
 #define TI954_DESER_I2C_ADDR    (0x30)
 
 /**
- * --------------------for nbuf numbers---------------------------
+ * --------------------------for nbuf numbers---------------------------------
  * Currently, default nbufs = 2 so the frame rate is higher.
  * Increasing nbufs will results in longer delay for ctrls like 
  * exposure, gain since mmap will allocate buffers to cover more 

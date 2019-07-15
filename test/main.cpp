@@ -32,7 +32,6 @@
 *****************************************************************************/
 int v4l2_dev;	 /** global variable, file descriptor for camera device */
 
-struct v4l2_fract time_per_frame = {1, 15};
 static struct option opts[] = {
 
 	{"nbufs", 1, 0, 'n'},
@@ -78,7 +77,7 @@ int main(int argc, char **argv)
 	dev.nbufs = V4L_BUFFERS_DEFAULT;
 	int c;
 	int sys_ret;
-
+	struct v4l2_fract time_per_frame = {1, 15};
 	// record start time
 	auto start = std::chrono::high_resolution_clock::now();
 

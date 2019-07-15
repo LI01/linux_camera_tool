@@ -98,12 +98,12 @@ typedef struct reg_pair
 /** --- for FX3 EEPROM --- */
 typedef enum
 {
-    HEADER_EEPROM_VERIFY     = 0x00F9,     // verify a page
-    HEADER_EEPROM_PAGE_PROG  = 0x00FA,  // program one page
-    HEADER_EEPROM_BULK_ERASE = 0x00FB, // send bulk erase command
-    HEADER_EEPROM_UPDATE_BUF = 0x00FC, // update EEPROM page buffer, 256 bytes
-    HEADER_EEPROM_UPATE_ADDR = 0x00FD, // update EEPROM page address, 3 bytes
-    HEADER_EEPROM_RDSR       = 0x00FE,       // EEPROM read status
+    HEADER_EEPROM_VERIFY     = 0x00F9,      // verify a page
+    HEADER_EEPROM_PAGE_PROG  = 0x00FA,      // program one page
+    HEADER_EEPROM_BULK_ERASE = 0x00FB,      // send bulk erase command
+    HEADER_EEPROM_UPDATE_BUF = 0x00FC,      // update EEPROM page buffer, 256 bytes
+    HEADER_EEPROM_UPATE_ADDR = 0x00FD,      // update EEPROM page address, 3 bytes
+    HEADER_EEPROM_RDSR       = 0x00FE,      // EEPROM read status
 } fx3_eeprom_func;
 
 #define ERASE_EEPROM_FLG        (0x9a)
@@ -219,7 +219,7 @@ const reg_seq IMX334_MIPI_REG_TESTING[] =
 **							 Function declarations
 *****************************************************************************/
 
-/** --- helper function ---*/
+/** --------------------------- helper function ----------------------------*/
 void error_handle_extension_unit();
 
 void write_to_UVC_extension(int fd, int property_id,
@@ -230,9 +230,10 @@ void read_from_UVC_extension(int fd, int property_id,
 
 /**------------------------------------------------------------------------ */
 
-/** --- functions using extension unit call in camera driver --- */
-/** these functions down below are the API you want to look at(paste) if you 
- * try to implement some functionalities on your current software */
+/** ------- functions using extension unit call in camera driver ---------- 
+ * these functions down below are the API you want to look at(paste) if you 
+ * try to implement some functionalities on your current software 
+ */
 void set_sensor_mode(int fd, int mode);
 
 void set_pos(int fd, int start_x, int start_y);

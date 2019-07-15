@@ -35,8 +35,8 @@
 
 /** Loop over an array of given size */
 #define FOREACH_NELEM(array, nelem, iter)       \
-	for (__typeof__(*(array)) *iter = (array);  \
-		iter < (array) + (nelem);               \
+	for (__typeof__(*(array)) *iter = (array);    \
+		iter < (array) + (nelem);                   \
 		iter++)
 
 /** Loop over an array of known size */

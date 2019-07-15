@@ -170,7 +170,7 @@ inline void set_save_bmp_flag(int flag)
  * asserts:
  *   none
  */
-static int save_frame_image_bmp(cv::Mat opencvImage)
+static int save_frame_image_bmp(cv::InputOutputArray opencvImage)
 {
 
 	printf("save one capture bmp\n");
@@ -1011,17 +1011,6 @@ void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 			cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
 		#endif
 	}
-	#ifdef HAVE_OPENCV_CUDA_SUPPORT
-		/** 
-		 *   0 Flips around x-axis.
-		 * > 0 Flips around y-axis.
-		 * < 0 Flips around both axes.
-		 */
-		//cv::cuda::flip(opencvImage, opencvImage, 0); 
-	#else
-		cv::flip(opencvImage, opencvImage, 0); //mirror vertically
-		cv::flip(opencvImage, opencvImage, 1); //mirror horizontally
-	#endif
 
 	/** gamma correction functionality, only available for bayer camera */
 	if (*(gamma_val) != (float)1)
@@ -1040,6 +1029,7 @@ void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 			apply_auto_brightness_and_contrast(opencvImage);
 		#endif
 	}
+
 }
 
 /**
@@ -1049,11 +1039,12 @@ void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 static void streaming_put_text(cv::Mat opencvImage, 
 	const char *str, int cordinate_y)
 {
+	int scale = opencvImage.cols / 1000;
 	cv::putText(opencvImage,
 				str,
-				cv::Point(100, cordinate_y),	  	// Coordinates
+				cv::Point(scale * TEXT_SCALE_BASE, cordinate_y),	  	// Coordinates
 				cv::FONT_HERSHEY_SIMPLEX,  			// Font
-				2.0,					   			// Scale. 2.0 = 2x bigger
+				(float)scale,					   			// Scale. 2.0 = 2x bigger
 				cv::Scalar(255, 255, 255), 			// BGR Color - white
 				2						   			// Line Thickness (Optional)
 	);									   			// Anti-alias (Optional)
@@ -1144,6 +1135,13 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		share_img = img;
 	}
 
+	#ifdef IMG_FLIP_VERTICALLY
+		cv::flip(share_img, share_img, 0); 
+	#endif
+	#ifdef IMG_FLIP_HORIZONTALLY
+		cv::flip(share_img, share_img, 1); 
+	#endif
+
 	/** check for save capture bmp flag, after decode the image */
 	if (*(save_bmp))
 	{
@@ -1152,33 +1150,39 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		image_count++;
 		set_save_bmp_flag(0);
 	}
+	#ifdef RESIZE_OPENCV_WINDOW
+		/** if image larger than 720p by any dimension, resize the window */
+		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
+			cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
+	#endif
+	
+	#ifdef DISPLAY_FRAME_RATE_RES_INFO
+		int height_scale = (share_img.cols / 1000) ;
+		streaming_put_text(share_img, "ESC: close streaming window", 
+			height_scale * TEXT_SCALE_BASE);
 
-	/** if image larger than 720p by any dimension, resize the window */
-	if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
-		cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
+		char resolution[25];
+		sprintf(resolution, "Current Res:%dx%d", width, height);
+		streaming_put_text(share_img, resolution, 
+			height_scale * TEXT_SCALE_BASE * 2);
 
-
-	streaming_put_text(share_img, "ESC: close streaming window", 100);
-							   
-	char resolution[25];
-	sprintf(resolution, "Current Res:%dx%d", width, height);
-	streaming_put_text(share_img, resolution, 200);
-
-	/** 
-  	 * getTickcount: return number of ticks from OS
-	 * getTickFrequency: returns the number of ticks per second
-	 * t = ((double)getTickCount() - t)/getTickFrequency();
-	 * fps is t's reciprocal
-	 */
-	cur_time = ((double)cv::getTickCount() - cur_time) / cv::getTickFrequency();
-	double fps = 1.0 / cur_time;						// frame rate
-	char string_frame_rate[10];					// string to save the frame rate
-	sprintf(string_frame_rate, "%.2f", fps); 	// correct to two decimal places
-	char fpsString[20];
-	strcpy(fpsString, "Current Fps:");
-	strcat(fpsString, string_frame_rate);
-	streaming_put_text(share_img, fpsString, 300);
-
+		/** 
+  		 * getTickcount: return number of ticks from OS
+		 * getTickFrequency: returns the number of ticks per second
+		 * t = ((double)getTickCount() - t)/getTickFrequency();
+		 * fps is t's reciprocal
+		 */
+		cur_time = ((double)cv::getTickCount() - cur_time) / \
+		cv::getTickFrequency();
+		double fps = 1.0 / cur_time;						// frame rate
+		char string_frame_rate[10];					// string to save fps
+		sprintf(string_frame_rate, "%.2f", fps); 	// to 2 decimal places
+		char fpsString[20];
+		strcpy(fpsString, "Current Fps:");
+		strcat(fpsString, string_frame_rate);
+		streaming_put_text(share_img, fpsString, 
+			height_scale * TEXT_SCALE_BASE * 3);
+	#endif
 	cv::imshow("cam", share_img);
 	if (cv::waitKey(_1MS) == _ESC_KEY)
 	{

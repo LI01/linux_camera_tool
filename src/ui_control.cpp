@@ -536,7 +536,7 @@ void list_all_def_elements ()
         {.widget = radio_raw8,  .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_datatype, .label_str = "RAW8"},
         
         {.widget = radio_bg,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "BGGR"},
-        {.widget = radio_gb,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "GBBR"},
+        {.widget = radio_gb,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "GBRG"},
         {.widget = radio_rg,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "RGGB"},
         {.widget = radio_gr,   .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "GRBG"},
         {.widget = radio_mono, .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, .parent = hbox_bayer, .label_str = "MONO"},

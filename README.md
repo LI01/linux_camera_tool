@@ -59,7 +59,7 @@ sudo make install -j6
 sudo sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf'
 sudo ldconfig
 ```
-To build __OpenCV CUDA__ support, please refer to ```install_opencv_cuda.md``` in current directory
+To build __OpenCV CUDA__ support, please refer to ```INSTALL_OPENCV_CUDA.md``` in current directory
 
 ### Build Camera Tool
 * Use __make or cmake__ when you don't need __OpenCV CUDA__ support

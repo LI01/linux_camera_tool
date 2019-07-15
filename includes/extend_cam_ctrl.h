@@ -64,6 +64,8 @@ typedef enum
    CROPPED_WIDTH = 1280,
    CROPPED_HEIGHT = 720
 }cropped_resolution;
+
+#define TEXT_SCALE_BASE 50
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
