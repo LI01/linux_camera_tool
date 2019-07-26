@@ -155,10 +155,10 @@ void set_pos(int fd, int start_x, int start_y)
 {
 	unsigned char buf2[LI_XU_SENSOR_WINDOW_REPOSITION_SIZE] = {0};
 	CLEAR(buf2);
-	buf2[0] = start_x & 0xff;
-	buf2[1] = (start_x >> 8) & 0xff;
-	buf2[2] = start_y & 0xff;
-	buf2[3] = (start_y >> 8) & 0xff;
+	buf2[0] = LOWBYTE(start_x);
+	buf2[1] = HIGHBYTE(start_x); 
+	buf2[2] = LOWBYTE(start_y);
+	buf2[3] = HIGHBYTE(start_y);
 	write_to_UVC_extension(fd, LI_XU_SENSOR_WINDOW_REPOSITION,
 						   LI_XU_SENSOR_WINDOW_REPOSITION_SIZE, buf2);
 	printf("V4L2_CORE: set pos for start_x=%d, start_y=%d", start_x, start_y);
@@ -239,14 +239,14 @@ void set_sensor_gain_rgb(int fd, unsigned int rGain,
 		m_gbGain = gbGain;
 		m_bGain = bGain;
 
-		buf4[0] = m_rGain & 0xff;
-		buf4[1] = m_rGain >> 8;
-		buf4[2] = m_grGain & 0xff;
-		buf4[3] = m_grGain >> 8;
-		buf4[4] = m_rGain & 0xff;
-		buf4[5] = m_rGain >> 8;
-		buf4[6] = m_grGain & 0xff;
-		buf4[7] = m_grGain >> 8;
+		buf4[0] = LOWBYTE(m_rGain);
+		buf4[1] = HIGHBYTE(m_rGain);
+		buf4[2] = LOWBYTE(m_grGain);
+		buf4[3] = HIGHBYTE(m_grGain);
+		buf4[4] = LOWBYTE(m_gbGain);
+		buf4[5] = HIGHBYTE(m_gbGain);
+		buf4[6] = LOWBYTE(m_bGain);
+		buf4[7] = HIGHBYTE(m_bGain);
 	}
 
 	write_to_UVC_extension(fd, LI_XU_SENSOR_GAIN_CONTROL_RGB,
@@ -490,10 +490,10 @@ void load_register_setting_from_configuration(int fd, int regCount,
 			{
 				sensor_reg_write(fd, addr, val);
 			}
-			buf12[4 * i] = addr & 0xff;
-			buf12[4 * i + 1] = addr >> 8;
-			buf12[4 * i + 2] = val & 0xff;
-			buf12[4 * i + 3] = val >> 8;
+			buf12[4 * i] = LOWBYTE(addr);
+			buf12[4 * i + 1] = HIGHBYTE(addr);
+			buf12[4 * i + 2] = LOWBYTE(val);
+			buf12[4 * i + 3] = HIGHBYTE(val);
 		}
 		else
 		{
@@ -561,10 +561,10 @@ void sensor_reg_write(int fd, int regAddr, int regVal)
 	CLEAR(buf14);
 
 	buf14[0] = SENSOR_REG_WRITE_FLG;
-	buf14[1] = (regAddr >> 8) & 0xff;
-	buf14[2] = regAddr & 0xff;
-	buf14[3] = (regVal >> 8) & 0xff;
-	buf14[4] = regVal & 0xff;
+	buf14[1] = HIGHBYTE(regAddr);
+	buf14[2] = LOWBYTE(regAddr);
+	buf14[3] = HIGHBYTE(regVal);
+	buf14[4] = LOWBYTE(regVal);
 
 	write_to_UVC_extension(fd, LI_XU_SENSOR_REG_RW,
 						   LI_XU_SENSOR_REG_RW_SIZE, buf14);
@@ -586,8 +586,8 @@ int sensor_reg_read(int fd, int regAddr)
 	CLEAR(buf14);
 
 	buf14[0] = SENSOR_REG_READ_FLG;
-	buf14[1] = (regAddr >> 8) & 0xff;
-	buf14[2] = regAddr & 0xff;
+	buf14[1] = HIGHBYTE(regAddr);
+	buf14[2] = LOWBYTE(regAddr);
 
 	write_to_UVC_extension(fd, LI_XU_SENSOR_REG_RW,
 						   LI_XU_SENSOR_REG_RW_SIZE, buf14);
@@ -689,10 +689,10 @@ void generic_I2C_write(int fd, int rw_flag, int bufCnt,
 
 	buf16[0] = rw_flag;
 	buf16[1] = bufCnt - 1;
-	buf16[2] = slaveAddr >> 8;
-	buf16[3] = slaveAddr & 0xff;
-	buf16[4] = regAddr >> 8;
-	buf16[5] = regAddr & 0xff;
+	buf16[2] = HIGHBYTE(slaveAddr);
+	buf16[3] = LOWBYTE(slaveAddr);
+	buf16[4] = HIGHBYTE(regAddr);
+	buf16[5] = LOWBYTE(regAddr);
 
 	if (bufCnt == 1)
 	{
@@ -733,10 +733,10 @@ int generic_I2C_read(int fd, int rw_flag, int bufCnt,
 	CLEAR(buf16);
 	buf16[0] = rw_flag;
 	buf16[1] = bufCnt - 1;
-	buf16[2] = slaveAddr >> 8;
-	buf16[3] = slaveAddr & 0xff;
-	buf16[4] = regAddr >> 8;
-	buf16[5] = regAddr & 0xff;
+	buf16[2] = HIGHBYTE(slaveAddr);
+	buf16[3] = LOWBYTE(slaveAddr);
+	buf16[4] = HIGHBYTE(regAddr);
+	buf16[5] = LOWBYTE(regAddr);
 	write_to_UVC_extension(fd, LI_XU_GENERIC_I2C_RW,
 						   LI_XU_GENERIC_I2C_RW_SIZE, buf16);
 	buf16[6] = 0;
@@ -808,8 +808,8 @@ void ap020x_read_data(int fd, int reg_addr, int count)
 	unsigned char s_buf[4];
 	s_buf[0] = IMG_SENSOR_UPDATE_DPT_RD_FLG;
 	s_buf[1] = (unsigned char)count;
-	s_buf[2] = (unsigned char)((reg_addr >> 8) & 0xff);
-	s_buf[3] = (unsigned char)(reg_addr & 0xff);
+	s_buf[2] = HIGHBYTE(reg_addr);
+	s_buf[3] = LOWBYTE(reg_addr);
 	write_cam_defect_pixel_table(fd, s_buf);
 	read_cam_defect_pixel_table(fd, s_buf);
 	for (int i = 0; i < LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE; i++)
@@ -847,10 +847,10 @@ void ap020x_send_command(int fd, AP0200_CMD cmd, int time_out)
 
 	s_buf[0] = IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG;
 	s_buf[1] = 4; // command length = 4 bytes
-	s_buf[CMD_START_POS] = (AP020X_SYSCTL_REG >> 8) & 0xff;
-	s_buf[CMD_START_POS + 1] = AP020X_SYSCTL_REG & 0xff;
-	s_buf[CMD_START_POS + 2] = (unsigned char)((cmd >> 8) & 0xff);
-	s_buf[CMD_START_POS + 3] = (unsigned char)(cmd & 0xff);
+	s_buf[CMD_START_POS] = HIGHBYTE(AP020X_SYSCTL_REG);
+	s_buf[CMD_START_POS + 1] = LOWBYTE(AP020X_SYSCTL_REG);
+	s_buf[CMD_START_POS + 2] = HIGHBYTE(cmd);
+	s_buf[CMD_START_POS + 3] = LOWBYTE(cmd);
 
 	retry = 0;
 
@@ -898,8 +898,8 @@ void ap020x_program_flash_eeprom(int fd, unsigned char *bin_buf, int bin_size)
 	CLEAR(s_buf);
 	s_buf[0] = IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG;
 	s_buf[1] = (unsigned char)(8 + 2); //count
-	s_buf[CMD_START_POS] = (AP020X_HOST_CMD_PARAM_POOL >> 8) & 0xff;
-	s_buf[CMD_START_POS + 1] = (AP020X_HOST_CMD_PARAM_POOL & 0xff);
+	s_buf[CMD_START_POS] = HIGHBYTE(AP020X_HOST_CMD_PARAM_POOL);
+	s_buf[CMD_START_POS + 1] = LOWBYTE(AP020X_HOST_CMD_PARAM_POOL);
 	s_buf[CMD_START_POS + 2] = 2;
 	s_buf[CMD_START_POS + 3] = 0;
 	s_buf[CMD_START_POS + 4] = 3;
@@ -918,8 +918,8 @@ void ap020x_program_flash_eeprom(int fd, unsigned char *bin_buf, int bin_size)
 	CLEAR(s_buf);
 	s_buf[0] = IMG_SENSOR_UPDATE_DPT_CMD_WR_FLG;
 	s_buf[1] = (unsigned char)(CMD_START_POS + 16); //count
-	s_buf[CMD_START_POS] = (AP020X_HOST_CMD_PARAM_POOL >> 8) & 0xff;
-	s_buf[CMD_START_POS + 1] = (AP020X_HOST_CMD_PARAM_POOL & 0xff);
+	s_buf[CMD_START_POS] = HIGHBYTE(AP020X_HOST_CMD_PARAM_POOL);
+	s_buf[CMD_START_POS + 1] = LOWBYTE(AP020X_HOST_CMD_PARAM_POOL);
 	write_cam_defect_pixel_table(fd, s_buf);
 	usleep(50);
 

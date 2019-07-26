@@ -3,15 +3,26 @@ All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
 
-## v0.3.2 - 2019-07-15  
-**Changed:**
-- Makefile build with C++11 so it won't fail at build
-  
+## v0.0.0 - 2019-07-26  
 **Added:**
-- add OpenCV CUDA support, put gain,exp max query in cam_property to avoid device mismatch, refactor the code, put macros in hardware.h for customized build
+- add missing batchCmd and json
+
+**Changed:**
+- clean up ae code
+## v0.0.0 - 2019-07-25  
+**Added:**
+- add rgb gain and offset, rgb2rgb matrix, software ae support 
+## v0.3.2 - 2019-07-15  
+**Added:**
+- add OpenCV CUDA support, put gain,exp max query in cam_property to avoid device mismatch
+
+**Changed:**
+- Makefile build with C++11 so it won't fail at build 
+- refactor the code, put macros in hardware.h for customized build
+
 ## v0.3.1 - 2019-07-12  
 **Changed:**
-- correct the bug of finding wrong /dev/video  gain and exposure and resolutions infomation from v4l2
+- correct the bug of finding wrong /dev/video  gain and exposure and resolutions information from v4l2
 ## v0.3.0 - 2019-07-11
 **Changed:**  
 - correct frame rate calculation in >1 nbufs
@@ -23,7 +34,8 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - add exposure and gain maximum value in GUI that read from v4l2 so the range doesn't confuse people
 ## v0.2.7 - 2019-07-02  
 **Added:**
-- add lif firmware update support, add elaspe time count in main
+- add lif firmware update support
+- add elaspe time count in main
 ## v0.2.6 - 2019-07-02 
 **Changed:**
 - Merge pull request #6 from xiao6768/set_compiler_c11
@@ -60,7 +72,8 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - fix the bug of some register addr & val length don't work
 ## v0.1.7 - 2019-05-08
 **Changed:**  
-- fix the bug of camera tool exit when clicking 3a and choose mono, add icon for control window
+- fix the bug of camera tool exit when clicking 3a and choose mono
+- add icon for control window
 ## v0.1.6 - 2019-05-06
 **Changed:**  
 - reorg ui_ctrl, remove some warning messages
@@ -74,9 +87,13 @@ All notable changes to Linux Camera Tool will be documented in this file.
 **Changed:**  
 - put header files into includes
 ## v0.1.3 - 2019-04-18 
+**Added:**
+- add monochrome featured button in GUI
+
 **Changed:** 
 - use inline for short functions, use switch to substitute if etc
-- fix split screen issue bug  when use nbufs > 1, add monochrome featured button in GUI, clean up the code
+- fix split screen issue bug  when use nbufs > 1
+- clean up the code
 ## v0.1.2 - 2019-04-17
 **Changed:**  
 - correct udev for laptop with webcam, TODO: batchtxt etc

@@ -46,10 +46,27 @@
 /**
  * rgb gain and offset limits
  */
-#define MAX_RGB_GAIN 2000
-#define MIN_RGB_GAIN 1
-#define MAX_RGB_OFFSET 255
-#define MIN_RGB_OFFSET -255
+#define MAX_RGB_GAIN          (2000)
+#define MIN_RGB_GAIN          (1)
+#define GAIN_FACTOR           (256)
+#define MAX_RGB_OFFSET        (255)
+#define MIN_RGB_OFFSET        (-255)
+
+/**
+ * software AE limits
+ * you can adjust these values to better fit your sensor
+ */
+#define MIN_EXP_TIME          (50)
+#define MAX_EXP_TIME_FACTOR   (4)
+#define MIN_GAIN              (8)
+#define MAX_GAIN              (63)
+#define TARGET_MEAN_FACTOR    (1.2)
+#define ROI_SIZE              (256)
+
+/**
+ * OpenCV text scale 
+ */
+#define TEXT_SCALE_BASE       (50)
 
 /**
  * --------------------------camera specific test functions-------------------
@@ -143,5 +160,5 @@
 #define USB_VENDOR_ID           (0x2A0B) 
 
 /** --- for LI_XU_GENERIC_I2C_RW --- */
-#define GENERIC_REG_WRITE_FLG (0x80)
-#define GENERIC_REG_READ_FLG  (0x00)
+#define GENERIC_REG_WRITE_FLG   (0x80)
+#define GENERIC_REG_READ_FLG    (0x00)

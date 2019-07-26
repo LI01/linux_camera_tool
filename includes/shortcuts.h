@@ -36,12 +36,26 @@
 #include <math.h>           /** pow */
 #include "hardware.h"
 
-#define CLEAR(x) memset(&(x), 0, sizeof(x))
+/** ----------------------------------Bool----------------------------------*/
+typedef enum { FALSE, TRUE } BOOL;
 
+/* -----------------------------------Bits----------------------------------*/
+#define BIT(x)              (1<<(x))
+#define SETBIT(x,mask)      ((x)|(1<<(mask)))
+#define CLEARBIT(x,mask)    ((x)&(~(1<<(mask))))
+#define GETBIT(x,mask)      (((x)>>(mask))&1)
+#define TOGGLEBIT(x,mask)   ((x)^(1<<(mask)))
+
+#define LOWBYTE(x)          ((unsigned char) (x))
+#define HIGHBYTE(x)         ((unsigned char) (((unsigned int) (x)) >> 8))
+
+/** ------------------------------Arrays------------------------------------*/
+#define CLEAR(a)            memset(&(a), 0, sizeof(a))
 /** Get number of elements in an array */
-#define SIZE(a) (sizeof(a) / sizeof(*a)) 
+#define SIZE(a)             (sizeof(a) / sizeof(*a)) 
+#define IS_ARRAY(a)         ((void *)&a == (void *)a)
 
-
+/** ----------------------------------Loops---------------------------------*/
 /** Loop over an array of given size */
 #define FOREACH_NELEM(array, nelem, iter)       \
 	for (__typeof__(*(array)) *iter = (array);    \
@@ -52,26 +66,65 @@
 #define FOREACH(array, iter)                    \
 	FOREACH_NELEM(array, SIZE(array), iter)
 
-/**clip value between 0 and 255*/
+/**--------------------------------Maths------------------------------------*/
+#define PI                  3.14159265
+
+#define MIN(x,y)          ({ __typeof__ (x) _x = (x);   \
+                             __typeof__ (y) _y = (y);   \
+                            _x < _y ? _x : _y; })  
+#define MAX(x,y)          ({ __typeof__ (x) _x = (x);   \
+                             __typeof__ (y) _y = (y);   \
+                            _x > _y ? _x : _y; })
+
+#define ABS(x)              (((x) <  0)  ? -(x) : (x))
+#define DIFF(x,y)           ABS((x)-(y))
+#define SWAP(x, y)          do { x ^= y; y ^= x; x ^= y; } while ( 0 )
+#define IS_BETWEEN(x,L,H)   ((unsigned char)((x) >= (L) && (n) <= (H)))
+/** clip value between 0 and 255 */
 #define CLIP(value) (uint8_t)(((value)>0xFF)?0xff:(((value)<0)?0:(value)))
 
-#define __THREAD_TYPE pthread_t
+/**----------------------------------Pixels---------------------------------*/
+/** x is column number, y is row number */ 
+#define PIX(x, y, width)	        ((x) + (y) * (width))
+#define LEFT(x, y, width)	        ((x) - 1 + (y) * (width))
+#define RIGHT(x, y, width)	      ((x) + 1 + (y) * (width))
+#define TOP(x, y, width)	        ((x) + ((y) - 1) * (width))
+#define BOTTOM(x, y, width)	      ((x) + ((y) + 1) * (width))
+#define TOP_LEFT(x, y, width)	    ((x) - 1 + ((y) - 1) * (width))
+#define BOTTOM_LEFT(x, y, width)	((x) - 1 + ((y) + 1) * (width))
+#define TOP_RIGHT(x, y, width)	  ((x) + 1 + ((y) - 1) * (width))
+#define BOTTOM_RIGHT(x, y, width)	((x) + 1 + ((y) + 1) * (width))
+
+#define INTERPOLATE_V(in, x, y, w) \
+	(((uint32_t)in[TOP(x, y, w)] + in[BOT(x, y, w)]) / 2)
+
+#define INTERPOLATE_HV(in, x, y, w) \
+	(((uint32_t)in[LEFT(x, y, w)] + in[RIGHT(x, y, w)] + \
+		in[TOP(x, y, w)] + in[BOT(x, y, w)]) / 4)
+
+#define INTERPOLATE_X(in, x, y, w) \
+	(((uint32_t)in[TOP_LEFT(x, y, w)] + in[BOTTOM_LEFT(x, y, w)] + \
+		in[TOP_RIGHT(x, y, w)] + in[BOTTOM_RIGHT(x, y, w)]) / 4)
+
+/**-------------------------------Threads-----------------------------------*/
+#define __THREAD_TYPE       pthread_t
 #define __THREAD_CREATE(t,f,d) (pthread_create(t,NULL,f,d))
 #define __THREAD_CREATE_ATTRIB(t,a,f,d) (pthread_create(t,a,f,d))
-#define __THREAD_JOIN(t) (pthread_join(t, NULL))
+#define __THREAD_JOIN(t)    (pthread_join(t, NULL))
 
-#define __MUTEX_TYPE pthread_mutex_t
+#define __MUTEX_TYPE        pthread_mutex_t
 #define __STATIC_MUTEX_INIT PTHREAD_MUTEX_INITIALIZER
-#define __INIT_MUTEX(m) ( pthread_mutex_init(m, NULL) )
-#define __CLOSE_MUTEX(m) ( pthread_mutex_destroy(m) )
-#define __LOCK_MUTEX(m) ( pthread_mutex_lock(m) )
-#define __UNLOCK_MUTEX(m) ( pthread_mutex_unlock(m) )
+#define __INIT_MUTEX(m)     (pthread_mutex_init(m, NULL) )
+#define __CLOSE_MUTEX(m)    (pthread_mutex_destroy(m) )
+#define __LOCK_MUTEX(m)     (pthread_mutex_lock(m) )
+#define __UNLOCK_MUTEX(m)   (pthread_mutex_unlock(m) )
 
-#define _1MS    1
-#define _ESC_KEY 27
+/**-------------------------------OpenCV GUI Shortcuts-----------------------*/
+#define _1MS                 (1)
+#define _ESC_KEY_ASCII       (27)
+#define _SPACE_KEY_ASCII     (32)
+#define _Q_LETTER            (114)
 
-
-typedef enum { FALSE, TRUE } BOOL;
 
 struct device
 {

@@ -67,30 +67,34 @@ static int *save_raw;				/// flag for saving raw
 static int *bayer_flag;				/// flag for choosing bayer pattern
 static int *bpp;					/// flag for datatype bits per pixel
 static int *awb_flag;				/// flag for enable awb
-static int *abc_flag;				/// flag for enable brightness & contrast opt
+static int *abc_flag;				/// flag for enable brightness& contrast
 static float *gamma_val;			/// gamma correction value from gui
 static int *black_level_correction; /// black level correction value from gui
 static int *loop;					/// while (*loop)
-static int *rgb_gain_offset_flag;
-static int *rgb_matrix_flag;
-static int *r_gain, *b_gain, *g_gain;/// values for color correction 
-static int *r_offset, *b_offset, *g_offset;
-static int *rr, *rg, *rb;
+static int *rgb_gain_offset_flag;   /// flag for rgb gain and offset enable
+static int *r_gain;					/// values for rgb gain, offset correction
+static int *b_gain;
+static int *g_gain;
+static int *r_offset;
+static int *b_offset;
+static int *g_offset;
+static int *rgb_matrix_flag; /// flag for rgb2rgb matrix enable
+static int *rr, *rg, *rb;	/// values for rgb2rgb matrix
 static int *gr, *gg, *gb;
 static int *br, *bg, *bb;
-static int *soft_ae_flag;
-int *cur_exposure, *cur_gain;
+static int *soft_ae_flag; /// flag for software AE
+static int *rgb_ir_correction;
+int *cur_exposure;		  /// update current exposure for AE
+int *cur_gain;			  /// update current gain for AE
 
 static int image_count;			/// image count number add to capture name
 double cur_time = 0;			/// time measured in OpenCV for fps
-struct v4l2_buffer queuebuffer; /// queuebuffer for enqueue, dequeue buffers
+struct v4l2_buffer queuebuffer; /// queuebuffer for enqueue, dequeue buffer
 
-extern int v4l2_dev;
 /*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
 extern char *get_product(); /// put product name in captured image name
-extern int query_exposure_absolute_max(int fd);
 /// for software ae
 extern void set_gain(int fd, int analog_gain);
 extern void set_exposure_absolute(int fd, int exposure_absolute);
@@ -721,14 +725,14 @@ void mmap_variables()
 	gamma_val = (float *)mmap(NULL, sizeof *gamma_val, PROT_READ | PROT_WRITE,
 							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	black_level_correction = (int *)mmap(NULL, sizeof *black_level_correction,
-							PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+										 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	loop = (int *)mmap(NULL, sizeof *loop, PROT_READ | PROT_WRITE,
 					   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-	rgb_gain_offset_flag = (int *)mmap(NULL, sizeof *rgb_gain_offset_flag, 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	rgb_matrix_flag = (int *)mmap(NULL, sizeof *rgb_matrix_flag, 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	rgb_gain_offset_flag = (int *)mmap(NULL, sizeof *rgb_gain_offset_flag,
+									   PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	rgb_matrix_flag = (int *)mmap(NULL, sizeof *rgb_matrix_flag,
+								  PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	r_gain = (int *)mmap(NULL, sizeof *r_gain, PROT_READ | PROT_WRITE,
 						 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -763,11 +767,15 @@ void mmap_variables()
 					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	soft_ae_flag = (int *)mmap(NULL, sizeof *soft_ae_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+							   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	cur_exposure = (int *)mmap(NULL, sizeof *cur_exposure, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+							   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	cur_gain = (int *)mmap(NULL, sizeof *cur_gain, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	rgb_ir_correction = (int *)mmap(NULL, sizeof *rgb_ir_correction,
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
 }
 
 /** unmap all the variables after stream ends */
@@ -784,7 +792,6 @@ void unmap_variables()
 	munmap(loop, sizeof *loop);
 
 	munmap(rgb_gain_offset_flag, sizeof *rgb_gain_offset_flag);
-	munmap(rgb_matrix_flag, sizeof *rgb_matrix_flag);
 	munmap(r_gain, sizeof *r_gain);
 	munmap(g_gain, sizeof *g_gain);
 	munmap(b_gain, sizeof *b_gain);
@@ -792,6 +799,7 @@ void unmap_variables()
 	munmap(g_offset, sizeof *g_offset);
 	munmap(b_offset, sizeof *b_offset);
 
+	munmap(rgb_matrix_flag, sizeof *rgb_matrix_flag);
 	munmap(rr, sizeof *rr);
 	munmap(rg, sizeof *rg);
 	munmap(rb, sizeof *rb);
@@ -806,6 +814,7 @@ void unmap_variables()
 	munmap(cur_exposure, sizeof *cur_exposure);
 	munmap(cur_gain, sizeof *cur_gain);
 
+	munmap(rgb_ir_correction, sizeof *rgb_ir_correction);
 }
 
 /**
@@ -1038,36 +1047,43 @@ void soft_ae_enable(int enable)
  */
 double calc_mean(struct device *dev, const void *p)
 {
-	/// define ROI
-	int size = 256;
-	int start_x = (dev->width - size)/2;
-	int start_y = (dev->height - size)/2;
+	/// define ROI: 256x256 square pixels in the middle of image
+	int size = ROI_SIZE;
+	int width = dev->width;
+	int height = dev->height;
+	int start_x = (width - size) / 2;
+	int start_y = (height - size) / 2;
 	/// convert bits per pixel to bytes per pixel
-	int bytes_per_pixel = (*bpp -1 )/8 + 1; 
+	int bytes_per_pixel = (*bpp - 1) / 8 + 1;
 
-	int start_pos = (start_y * dev->width + start_x) * bytes_per_pixel;
+	int start_pos = PIX(start_x, start_y, width) * bytes_per_pixel;
 	double total = 0, mean = 0;
-	unsigned char *srcChar = (unsigned char *)p;
+	unsigned char *src_char = (unsigned char *)p;
 
-	if (bytes_per_pixel == 2) /// 16 bit mode
+	if (bytes_per_pixel == 2) 
 	{
-		for (int i=0; i < size; i++) {
-			for (int j=0; j < size; j++) {
-				total += (double) \
-				(srcChar[start_pos + (i * dev->width + j) *2] | \
-				srcChar[start_pos + (i * dev->width + j) *2 + 1 ] << 8);
+		for (int i = 0; i < size; i++)
+		{
+			for (int j = 0; j < size; j++)
+			{
+				/// upper and lower byte
+				total += (double)
+				(src_char[start_pos + PIX(j,i,width) * bytes_per_pixel] |
+				src_char[start_pos + PIX(j,i,width) * bytes_per_pixel + 1] << 8);
 			}
 		}
 	}
-	else /// 8 bit mode
+	else 
 	{
-		for (int i=0; i < size; i++) {
-			for (int j=0; j < size; j++) {
-				total += (double) srcChar[start_pos + (i * dev->width + j)] ;
+		for (int i = 0; i < size; i++)
+		{
+			for (int j = 0; j < size; j++)
+			{
+				total += (double)src_char[start_pos + PIX(j,i,width)];
 			}
 		}
 	}
-	mean = total/size/size;
+	mean = total / size / size;
 	return mean;
 }
 
@@ -1081,56 +1097,54 @@ double calc_mean(struct device *dev, const void *p)
  * 		struct device *dev - every infomation for camera
  * 		const void *p 		- camera streaming buffer pointer
  */
-void do_soft_ae(struct device *dev, const void *p)
+void apply_soft_ae(struct device *dev, const void *p)
 {
 	int local_gain = *cur_gain;
 	int local_exposure = *cur_exposure;
 	long cur_gain_x_exp = local_gain * local_exposure;
-	int max_exp_time = get_current_height(v4l2_dev) * 4; 
-	int min_exp_time = 50;
-	int min_gain = 8;
-	int max_gain = 63;
-	float target_mean_factor = 1.2;
-	float target_mean = (float) ((0x01) << ((*bpp) -2)) * target_mean_factor;
+	int max_exp_time = get_current_height(dev->fd) * MAX_EXP_TIME_FACTOR;
+	int min_exp_time = MIN_EXP_TIME;
+	int min_gain = MIN_GAIN;
+	int max_gain = MAX_GAIN;
+	float target_mean = (float)SETBIT(0x01, (*bpp) - 2) * TARGET_MEAN_FACTOR;
 	float image_mean = calc_mean(dev, p);
 	int ae_done = FALSE;
-	if (((image_mean > target_mean * 0.8) && (image_mean < target_mean * 1.2))
-	|| ((cur_gain_x_exp >= max_exp_time * max_gain) && (image_mean < target_mean * 0.8))
-	|| ((cur_gain_x_exp <= max_exp_time * min_gain) && (image_mean > target_mean * 1.2)))
+
+	if (((image_mean > target_mean * 0.8) 
+	&& (image_mean < target_mean * 1.2)) 
+	|| ((cur_gain_x_exp >= max_exp_time * max_gain) 
+	&& (image_mean < target_mean * 0.8)) 
+	|| ((cur_gain_x_exp <= max_exp_time * min_gain) 
+	&& (image_mean > target_mean * 1.2)))
 	{
 		ae_done = TRUE;
 		return;
 	}
+
 	ae_done = FALSE;
 	int cal_exp_x_gain = (int)(cur_gain_x_exp * (target_mean / image_mean));
-	cur_gain_x_exp = (cur_gain_x_exp + cal_exp_x_gain)/2;
-	int prev_image_mean = image_mean;
+	cur_gain_x_exp = (cur_gain_x_exp + cal_exp_x_gain) / 2;
+
 	if (cur_gain_x_exp >= max_exp_time * min_gain)
 	{
 		local_exposure = max_exp_time;
-		local_gain = local_gain * (target_mean/image_mean);
-		if (local_gain > max_gain)
-			local_gain = max_gain;
-		else if (local_gain < min_gain)
-			local_gain = min_gain;
-		
+		local_gain = local_gain * (target_mean / image_mean);
+		local_gain = set_limit(local_gain, max_gain, min_gain);
 	}
 	else if (cur_gain_x_exp < min_exp_time * min_gain)
 	{
 		local_exposure = min_exp_time;
 		local_gain = min_gain;
 	}
-	else 
+	else
 	{
 		local_gain = min_gain;
-		local_exposure = (int) local_exposure * (target_mean/image_mean);
+		local_exposure = (int)local_exposure * (target_mean / image_mean);
 	}
 	cur_gain_x_exp = local_exposure * local_gain;
-	set_exposure_absolute(v4l2_dev, local_exposure);
-	set_gain(v4l2_dev, local_gain);
-
+	set_exposure_absolute(dev->fd, local_exposure);
+	set_gain(dev->fd, local_gain);
 }
-
 
 /** 
  * Shift bits for 16-bit stream and get lower 8-bit for OpenCV debayering.
@@ -1143,7 +1157,7 @@ void do_soft_ae(struct device *dev, const void *p)
 void perform_shift(struct device *dev, const void *p, int shift)
 {
 	unsigned char tmp;
-	unsigned short *srcShort = (unsigned short *)p;
+	unsigned short *src_short = (unsigned short *)p;
 	unsigned char *dst = (unsigned char *)p;
 	unsigned short ts;
 
@@ -1159,14 +1173,12 @@ void perform_shift(struct device *dev, const void *p, int shift)
 	{
 		for (unsigned int j = 0; j < dev->width; j++)
 		{
-			ts = *(srcShort++);
+			ts = *(src_short++);
 			if (ts > *black_level_correction)
 				tmp = (ts - *black_level_correction) >> shift;
 			else
-			{
 				tmp = 0;
-			}
-
+			
 			*(dst++) = (unsigned char)tmp;
 		}
 	}
@@ -1184,34 +1196,247 @@ void swap_two_bytes(struct device *dev, const void *p)
 	uint16_t *dst = (uint16_t *)p;
 	uint16_t *src = (uint16_t *)p;
 	uint16_t tmp;
-	uint8_t hi_byte;
-	uint8_t lo_byte;
+
 	for (unsigned int i = 0; i < dev->height; i++)
 	{
 		for (unsigned int j = 0; j < dev->width; j++)
 		{
-
-			tmp = src[i * dev->width + j];
-			hi_byte = (tmp & 0xff00) >> 8;
-			lo_byte = (tmp & 0xff);
-			dst[i * dev->width + j] = lo_byte << 8 | hi_byte;
+			tmp = src[PIX(j,i, dev->width)];
+			dst[PIX(j,i, dev->width)] = LOWBYTE(tmp) << 8 | HIGHBYTE(tmp);
 		}
 	}
+}
+/**
+ * set rgb ir color correction flag 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void rgb_ir_correction_enable(int enable)
+{
+	switch (enable)
+	{
+	case 1:
+		*rgb_ir_correction = TRUE;
+		break;
+	case 0:
+		*rgb_ir_correction = FALSE;
+		break;
+	default:
+		*rgb_ir_correction = FALSE;
+		break;
+	}
+}
+/**
+ *  Bayer color correction for RGB-IR sensor
+ *
+ * This handle the conversion for bayer pattern that have infrared instead
+ * of a second green pixel. 
+ * The original pattern look like this:
+ * R  IR or IR R  or B  G  or G  B
+ * G  B     B  G     IR R     R  IR
+ * 
+ * change into this:
+ * R' G' or G' R' or B' G' or G' B'
+ * G' B'    B' G'    G' R'    R' G' 
+ *
+ * Procedure:
+ * 1. get individual bayer mosaic color channel
+ * 2. substract IR from red, green, blue color channel
+ * 		R' = R - IR * ir_r
+ * 		G' = G - IR * ir_g
+ * 		B' = B - IR * ir_b
+ * , where ir_r, ir_g, ir_b are pre-calibrated IR removel coefficient,
+ * ask sensor vendor for these coefficients
+ * 3. Need to apply AWB, gamma correction, black level correction beforeheads
+ * 4. Put the processed image into OpenCV for normal bayer pattern debayer
+ * args: 
+ * 		struct device *dev - every infomation for camera
+ * 		const void *p 		- camera streaming buffer pointer
+ */
+void color_correct_rgb_ir(struct device *dev, const void *p)
+{
+	int pixel_max_val = BIT(*bpp) - 1;
+	int height = dev->height;
+	int width = dev->width;
+	uint16_t b_orig, b_proc;
+	uint16_t g_orig, g_proc; 
+	uint16_t r_orig, r_proc;
+	uint16_t ir_orig;
+
+	float ir_r = 1.3;
+	float ir_g = 0.35;
+	float ir_b = 0.3;
+
+	uint16_t *src_short = (uint16_t *)p;
+	uint16_t *dst = (uint16_t *)p;
+
+	// switch (*bayer_flag)
+	// {
+	// 	/*
+	// 	 *	B  G    -> B' G'
+	// 	 * 	IR R	   G' R'
+	// 	 */
+	// 	case CV_BayerBG2BGR_FLG: 
+			for (int i = 0; i < height; i += 2)
+			{
+				for (int j = 0; j < width; j += 2)
+				{
+					// IR
+					ir_orig = src_short[BOTTOM(j,i,width)];
+					ir_orig = set_limit(ir_orig, pixel_max_val, 0);
+
+					// B
+					b_orig = src_short[PIX(j,i,width)];
+					b_orig = set_limit(b_orig, pixel_max_val, 0);
+					b_proc = b_orig - ir_orig * ir_b;
+					b_proc = set_limit(b_proc, pixel_max_val, 0);
+					dst[PIX(j,i,width)] = b_proc;
+
+					// G
+					g_orig = src_short[RIGHT(j,i,width)];
+					g_orig = set_limit(g_orig, pixel_max_val, 0);
+					g_proc = g_orig - ir_orig * ir_g;
+					g_proc = set_limit(g_proc, pixel_max_val, 0);
+					dst[RIGHT(j,i,width)] = g_proc;
+					dst[BOTTOM(j,i,width)] = g_proc;
+
+					// R
+					r_orig = src_short[BOTTOM_RIGHT(j,i,width)];
+					r_orig = set_limit(r_orig, pixel_max_val, 0);
+					r_proc = r_orig - ir_orig * ir_r;
+					r_proc = set_limit(r_proc, pixel_max_val, 0);
+					dst[BOTTOM_RIGHT(j,i,width)] = r_proc;
+				}
+			}
+	// 	/*
+	// 	 *	R IR    -> R' G'
+	// 	 * 	G B	   	   G' B'
+	// 	 */
+	// 	case CV_BayerRG2BGR_FLG: 
+	// 		for (int i = 0; i < height; i += 2)
+	// 		{
+	// 			for (int j = 0; j < width; j += 2)
+	// 			{
+	// 				// IR
+	// 				ir_orig = src_short[RIGHT(j,i,width)];
+	// 				ir_orig = set_limit(ir_orig, pixel_max_val, 0);
+
+	// 				// R
+	// 				r_orig = src_short[PIX(j,i,width)];
+	// 				r_orig = set_limit(r_orig, pixel_max_val, 0);
+	// 				r_proc = r_orig - ir_orig * ir_r;
+	// 				r_proc = set_limit(r_proc, pixel_max_val, 0);
+	// 				dst[PIX(j,i,width)] = r_proc;
+
+	// 				// G
+	// 				g_orig = src_short[BOTTOM(j,i,width)];
+	// 				g_orig = set_limit(g_orig, pixel_max_val, 0);
+	// 				g_proc = g_orig - ir_orig * ir_g;
+	// 				g_proc = set_limit(g_proc, pixel_max_val, 0);
+	// 				dst[BOTTOM(j,i,width)] = g_proc;
+	// 				dst[RIGHT(j,i,width)] = g_proc;
+					
+	// 				// B
+	// 				b_orig = src_short[BOTTOM_RIGHT(j,i,width)];
+	// 				b_orig = set_limit(b_orig, pixel_max_val, 0);
+	// 				b_proc = b_orig - ir_orig * ir_b;
+	// 				b_proc = set_limit(b_proc, pixel_max_val, 0);
+	// 				dst[BOTTOM_RIGHT(j,i,width)] = b_proc;
+	// 			}
+	// 		}
+
+	// 	/*
+	// 	 *	G  B    -> G' B'
+	// 	 * 	R  IR	   R' G'
+	// 	 */
+	// 	case CV_BayerGB2BGR_FLG: 
+	// 		for (int i = 0; i < height; i += 2)
+	// 		{
+	// 			for (int j = 0; j < width; j += 2)
+	// 			{
+	// 				// IR
+	// 				ir_orig = src_short[BOTTOM_RIGHT(j,i,width)];
+	// 				ir_orig = set_limit(ir_orig, pixel_max_val, 0);
+
+	// 				// G
+	// 				g_orig = src_short[PIX(j,i,width)];
+	// 				g_orig = set_limit(g_orig, pixel_max_val, 0);
+	// 				g_proc = g_orig - ir_orig * ir_g;
+	// 				g_proc = set_limit(g_proc, pixel_max_val, 0);
+	// 				dst[PIX(j,i,width)] = g_proc;
+	// 				dst[BOTTOM_RIGHT(j,i,width)] = g_proc;
+
+	// 				// B
+	// 				b_orig = src_short[RIGHT(j,i,width)];
+	// 				b_orig = set_limit(b_orig, pixel_max_val, 0);
+	// 				b_proc = b_orig - ir_orig * ir_b;
+	// 				b_proc = set_limit(b_proc, pixel_max_val, 0);
+	// 				dst[RIGHT(j,i,width)] = b_proc;
+
+	// 				// R
+	// 				r_orig = src_short[BOTTOM(j,i,width)];
+	// 				r_orig = set_limit(r_orig, pixel_max_val, 0);
+	// 				r_proc = r_orig - ir_orig * ir_r;
+	// 				r_proc = set_limit(r_proc, pixel_max_val, 0);
+	// 				dst[BOTTOM(j,i,width)] = r_proc;
+	// 			}
+	// 		}
+	// 	/*
+	// 	 *	IR  R    -> G' R'
+	// 	 * 	B   G	    B' G'
+	// 	 */
+	// 	case CV_BayerGR2BGR_FLG: 
+	// 		for (int i = 0; i < height; i += 2)
+	// 		{
+	// 			for (int j = 0; j < width; j += 2)
+	// 			{
+	// 				// IR
+	// 				ir_orig = src_short[PIX(j,i,width)];
+	// 				ir_orig = set_limit(ir_orig, pixel_max_val, 0);
+
+	// 				// G
+	// 				g_orig = src_short[BOTTOM_RIGHT(j,i,width)];
+	// 				g_orig = set_limit(g_orig, pixel_max_val, 0);
+	// 				g_proc = g_orig - ir_orig * ir_g;
+	// 				g_proc = set_limit(g_proc, pixel_max_val, 0);
+	// 				dst[PIX(j,i,width)] = g_proc;
+	// 				dst[BOTTOM_RIGHT(j,i,width)] = g_proc;
+
+	// 				// R
+	// 				r_orig = src_short[RIGHT(j,i,width)];
+	// 				r_orig = set_limit(r_orig, pixel_max_val, 0);
+	// 				r_proc = r_orig - ir_orig * ir_r;
+	// 				r_proc = set_limit(r_proc, pixel_max_val, 0);
+	// 				dst[RIGHT(j,i,width)] = r_proc;
+					
+	// 				// B
+	// 				b_orig = src_short[BOTTOM(j,i,width)];
+	// 				b_orig = set_limit(b_orig, pixel_max_val, 0);
+	// 				b_proc = b_orig - ir_orig * ir_b;
+	// 				b_proc = set_limit(b_proc, pixel_max_val, 0);
+	// 				dst[BOTTOM(j,i,width)] = b_proc;
+	// 			}
+	// 		}
+	// 	case CV_MONO_FLG:
+	// 		break;
+	// 	default:
+	// 		break;
+	// }
+
 }
 /**
  * set the limit for rgb color correction input value
  */
 int set_limit(int val, int max, int min)
 {
-    return val = val < min ? min : val > max ? max : val;
-    
+	return val = val < min ? min : val > max ? max : val;
 }
 /** pass the variable from GUI to camera streaming thread
  * and print out these values
  * set the flag on enable rgb_gain_offset
  */
-void enable_rgb_gain_offset (int red_gain, int green_gain, int blue_gain,
-				int red_offset, int green_offset, int blue_offset)
+void enable_rgb_gain_offset(int red_gain, int green_gain, int blue_gain,
+							int red_offset, int green_offset, int blue_offset)
 {
 	*r_gain = red_gain;
 	*g_gain = green_gain;
@@ -1222,8 +1447,8 @@ void enable_rgb_gain_offset (int red_gain, int green_gain, int blue_gain,
 	*rgb_gain_offset_flag = 1;
 	//printf("rgb gain and offset enabled\r\n");
 	printf("r gain = %d\tg gain = %d\tb gain = %d\r\n"
-	"r offset = %d\tg offset = %d\tb offset = %d\r\n ",
-	*r_gain, *g_gain, *b_gain, *r_offset, *g_offset, *b_offset);
+		   "r offset = %d\tg offset = %d\tb offset = %d\r\n ",
+		   *r_gain, *g_gain, *b_gain, *r_offset, *g_offset, *b_offset);
 }
 /**
  * disable the flag on rgb_gain_offset
@@ -1239,157 +1464,165 @@ void disable_rgb_gain_offset()
  */
 void apply_rgb_gain_offset_pre_debayer(struct device *dev, const void *p)
 {
-	int pixel_max_val = (1 << *bpp) - 1;
+	int pixel_max_val = BIT(*bpp) - 1;
 	int height = dev->height;
 	int width = dev->width;
 	int itmp;
 	uint16_t tmp;
-	uint16_t *srcShort = (uint16_t *)p;
+	uint16_t *src_short = (uint16_t *)p;
 	uint16_t *dst = (uint16_t *)p;
-	
+
 	switch (*bayer_flag)
 	{
-		case CV_BayerGR2BGR_FLG://GRBG
-			for (int i=0; i < height; i+=2) {
-				for (int j=0; j < width; j+=2) { 
-					// G 
-					tmp = srcShort[i * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j] = itmp;
-					// R
-					tmp = srcShort[i * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *r_offset;
-					itmp = (itmp * (*r_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j + 1] = itmp;
-					// B
-					tmp = srcShort[(i+1) * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *b_offset;
-					itmp = (itmp * (*b_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j] = itmp;
-					// G
-					tmp = srcShort[(i+1) * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j + 1] = itmp;
-				 }
+	case CV_BayerGR2BGR_FLG: //GRBG
+		for (int i = 0; i < height; i += 2)
+		{
+			for (int j = 0; j < width; j += 2)
+			{
+				// G
+				tmp = src_short[PIX(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = (itmp * (*g_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[PIX(j,i,width)] = itmp;
+				// R
+				tmp = src_short[RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *r_offset;
+				itmp = (itmp * (*r_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[RIGHT(j,i,width)] = itmp;
+				// B
+				tmp = src_short[BOTTOM(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *b_offset;
+				itmp = (itmp * (*b_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM(j,i,width)] = itmp;
+				// G
+				tmp = src_short[BOTTOM_RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = (itmp * (*g_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM_RIGHT(j,i,width)] = itmp;
 			}
+		}
 
-			break;
-		case CV_BayerGB2BGR_FLG: //GBRG
-			for (int i=0; i < height; i+=2) {
-				for (int j=0; j < width; j+=2) { 
-					// G
-					tmp = srcShort[i * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j] = itmp;
-					// B
-					tmp = srcShort[i * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *b_offset;
-					itmp = (itmp * (*b_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j + 1] = itmp;
-					// R
-					tmp = srcShort[(i+1) * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *r_offset;
-					itmp = (itmp * (*r_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j] = itmp;
-					// G
-					tmp = srcShort[(i+1) * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j + 1] = itmp;
-				 }
+		break;
+	case CV_BayerGB2BGR_FLG: //GBRG
+		for (int i = 0; i < height; i += 2)
+		{
+			for (int j = 0; j < width; j += 2)
+			{
+				// G
+				tmp = src_short[PIX(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = (itmp * (*g_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[PIX(j,i,width)] = itmp;
+				// B
+				tmp = src_short[RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *b_offset;
+				itmp = (itmp * (*b_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[RIGHT(j,i,width)] = itmp;
+				// R
+				tmp = src_short[BOTTOM(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *r_offset;
+				itmp = (itmp * (*r_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM(j,i,width)] = itmp;
+				// G
+				tmp = src_short[BOTTOM_RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = (itmp * (*g_gain)) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM_RIGHT(j,i,width)] = itmp;
 			}
-			break;
-		case CV_BayerRG2BGR_FLG: //RGGB
-			for (int i=0; i < height; i+=2) {
-				for (int j=0; j < width; j+=2) { 
-					// R
-					tmp = srcShort[i * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *r_offset;
-					itmp = itmp * (*r_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j] = itmp;
-					// G
-					tmp = srcShort[i * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = itmp * (*g_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j + 1] = itmp;
-					// G
-					tmp = srcShort[(i+1) * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = itmp * (*g_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j] = itmp;
-					// B
-					tmp = srcShort[(i+1) * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *b_offset;
-					itmp = itmp * (*b_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j + 1] = itmp;
-				 }
+		}
+		break;
+	case CV_BayerRG2BGR_FLG: //RGGB
+		for (int i = 0; i < height; i += 2)
+		{
+			for (int j = 0; j < width; j += 2)
+			{
+				// R
+				tmp = src_short[PIX(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *r_offset;
+				itmp = itmp * (*r_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[PIX(j,i,width)] = itmp;
+				// G
+				tmp = src_short[RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = itmp * (*g_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[RIGHT(j,i,width)] = itmp;
+				// G
+				tmp = src_short[BOTTOM(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = itmp * (*g_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM(j,i,width)] = itmp;
+				// B
+				tmp = src_short[BOTTOM_RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *b_offset;
+				itmp = itmp * (*b_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM_RIGHT(j,i,width)] = itmp;
 			}
-			break;
-		case CV_BayerBG2BGR_FLG://BGGR
-			for (int i=0; i < height; i+=2) {
-				for (int j=0; j < width; j+=2) { 
-					// B
-					tmp = srcShort[i * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *b_offset;
-					itmp = itmp * (*b_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j] = itmp;
-					// G
-					tmp = srcShort[i * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = itmp * (*g_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[i * width + j + 1] = itmp;
-					// G
-					tmp = srcShort[(i+1) * width + j];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *g_offset;
-					itmp = itmp * (*g_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j] = itmp;
-					// R
-					tmp = srcShort[(i+1) * width + j+1];
-					tmp = set_limit(tmp, pixel_max_val, 0);
-					itmp = tmp + *r_offset;
-					itmp = itmp * (*r_gain) /GAIN_FACTOR;
-					itmp = set_limit(itmp, pixel_max_val, 0);
-					dst[(i+1) * width + j + 1] = itmp;
-				 }
+		}
+		break;
+	case CV_BayerBG2BGR_FLG: //BGGR
+		for (int i = 0; i < height; i += 2)
+		{
+			for (int j = 0; j < width; j += 2)
+			{
+				// B
+				tmp = src_short[PIX(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *b_offset;
+				itmp = itmp * (*b_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[PIX(j,i,width)] = itmp;
+				// G
+				tmp = src_short[RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = itmp * (*g_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[RIGHT(j,i,width)] = itmp;
+				// G
+				tmp = src_short[BOTTOM(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *g_offset;
+				itmp = itmp * (*g_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM(j,i,width)] = itmp;
+				// R
+				tmp = src_short[BOTTOM_RIGHT(j,i,width)];
+				tmp = set_limit(tmp, pixel_max_val, 0);
+				itmp = tmp + *r_offset;
+				itmp = itmp * (*r_gain) / GAIN_FACTOR;
+				itmp = set_limit(itmp, pixel_max_val, 0);
+				dst[BOTTOM_RIGHT(j,i,width)] = itmp;
 			}
-			break;
-		case CV_MONO_FLG:
-			break;
-		default: 
-			break;
+		}
+		break;
+	case CV_MONO_FLG:
+		break;
+	default:
+		break;
 	}
 }
 
@@ -1399,10 +1632,10 @@ void apply_rgb_gain_offset_pre_debayer(struct device *dev, const void *p)
  * set the flag on enable rgb to rgb matrix
  */
 void enable_rgb_matrix(int red_red, int red_green, int red_blue,
-	int green_red, int green_green, int green_blue,
-	int blue_red, int blue_green, int blue_blue)
+					   int green_red, int green_green, int green_blue,
+					   int blue_red, int blue_green, int blue_blue)
 {
- 	*rr = red_red;
+	*rr = red_red;
 	*rg = red_green;
 	*rb = red_blue;
 	*gr = green_red;
@@ -1414,9 +1647,9 @@ void enable_rgb_matrix(int red_red, int red_green, int red_blue,
 	*rgb_matrix_flag = 1;
 	printf("rgb matrix enabled\r\n");
 	printf("rr = %d\trg = %d\trb = %d\r\n"
-	"gr = %d\tgg = %d\tgb = %d\r\n"
-	"br = %d\tbg = %d\tbb = %d\r\n",
-	*rr, *rg, *rb, *gr, *gg, *gb, *br, *bg, *bb);
+		   "gr = %d\tgg = %d\tgb = %d\r\n"
+		   "br = %d\tbg = %d\tbb = %d\r\n",
+		   *rr, *rg, *rb, *gr, *gg, *gb, *br, *bg, *bb);
 }
 
 /**
@@ -1432,6 +1665,7 @@ void disable_rgb_matrix()
 // bgr_planes[2];//red channel
 static void apply_rgb_matrix_post_debayer(cv::InputOutputArray _opencvImage)
 {
+
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
 	cv::cuda::GpuMat bgr_planes[3];
@@ -1440,19 +1674,19 @@ static void apply_rgb_matrix_post_debayer(cv::InputOutputArray _opencvImage)
 	//TODO: multiply the matrix etc
 	//cv::cuda::merge(output, 3, opencvImage);
 	cv::cuda::merge(bgr_planes, 3, opencvImage);
-	
+
 #else
 	cv::Mat opencvImage = _opencvImage.getMat();
 	cv::Mat bgr_planes[3];
 	cv::Mat output[3];
 	cv::split(opencvImage, bgr_planes);
 
-	output[0] = ((*bb) * bgr_planes[0] + (*bg) * bgr_planes[1] + (*br) * bgr_planes[2])/256; //blue
-	// FIXME: why every time adding bgr_planes[2] multiple 0 can even make color wrong?
+	output[0] = ((*bb) * bgr_planes[0] + (*bg) * bgr_planes[1] + (*br) * bgr_planes[2]) / 256; //blue
+	// FIXME: why every time adding bgr_planes[2] multiple 0 can even make color wrong? - remove all green
 	// so red-green and green-red don't work now because I couldn't add in
 	//output[1] = ((*gb) * bgr_planes[0] + (*gg) * bgr_planes[1] + (*gr) * bgr_planes[2])/256; // green
-	output[1] = ((*gb) * bgr_planes[0] + (*gg) * bgr_planes[1] )/256; // green
-	output[2] = ((*rb) * bgr_planes[0] + (*rg) * bgr_planes[1] + (*rr) * bgr_planes[2])/256;  // red
+	output[1] = ((*gb) * bgr_planes[0] + (*gg) * bgr_planes[1]) / 256;						   // green
+	output[2] = ((*rb) * bgr_planes[0] + (*rg) * bgr_planes[1] + (*rr) * bgr_planes[2]) / 256; // red
 
 	cv::merge(output, 3, opencvImage);
 #endif
@@ -1464,7 +1698,7 @@ static void apply_rgb_matrix_post_debayer(cv::InputOutputArray _opencvImage)
  */
 void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 {
-	
+
 	/** color output */
 	if (add_bayer_forcv(bayer_flag) != 4)
 	{
@@ -1478,8 +1712,8 @@ void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 					 cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
 
 #endif
-	if (*rgb_matrix_flag == TRUE)
-		apply_rgb_matrix_post_debayer(opencvImage);
+		if (*rgb_matrix_flag == TRUE)
+			apply_rgb_matrix_post_debayer(opencvImage);
 	}
 	/** mono output */
 	if (add_bayer_forcv(bayer_flag) == 4)
@@ -1552,15 +1786,16 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	cv::cuda::GpuMat gpu_img;
 #endif
 	//TODO:
-	if (*(soft_ae_flag) == TRUE) 
-	 	do_soft_ae(dev, p);
-	
+	if (*(soft_ae_flag) == TRUE)
+		apply_soft_ae(dev, p);
 
 	/** --- for raw10, raw12 bayer camera ---*/
 	if (shift > 0)
 	{
 		if (*rgb_gain_offset_flag == 1)
 			apply_rgb_gain_offset_pre_debayer(dev, p);
+		if (*rgb_ir_correction == 1)
+			color_correct_rgb_ir(dev,p);
 		/** 
 		 * tried with CV_16UC1 and then cast back, it doesn't really improve fps
 		 * since even I comment out perform_shift(), it doesn't improve fps
@@ -1568,6 +1803,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		 */
 		perform_shift(dev, p, shift);
 		//swap_two_bytes(dev, p);
+		
 
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
@@ -1675,7 +1911,7 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 					   height_scale * TEXT_SCALE_BASE * 3);
 #endif
 	cv::imshow("cam", share_img);
-	if (cv::waitKey(_1MS) == _ESC_KEY)
+	if (cv::waitKey(_1MS) == _ESC_KEY_ASCII)
 	{
 		cv::destroyWindow("cam");
 		exit(0);

@@ -69,13 +69,12 @@ GtkWidget *entry_red_red, *entry_red_green, *entry_red_blue;
 GtkWidget *entry_green_red, *entry_green_green, *entry_green_blue; 
 GtkWidget *entry_blue_red, *entry_blue_green, *entry_blue_blue; 
 GtkWidget *check_button_soft_ae;
+GtkWidget *check_button_rgb_ir;
 
-
-int address_width_flag;
-int value_width_flag;
+static int address_width_flag;
+static int value_width_flag;
 
 extern int v4l2_dev;
-
 
 /*****************************************************************************
 **                      	Internal Callbacks
@@ -192,6 +191,19 @@ void enable_soft_ae(GtkToggleButton *toggle_button)
     }
 }
 
+void enable_rgb_ir(GtkToggleButton *toggle_button)
+{
+    if (gtk_toggle_button_get_active(toggle_button))
+    {
+        g_print("RGB-IR color correction enable\n");
+        rgb_ir_correction_enable(1);
+    }
+    else
+    {
+        g_print("RGB-IR color correction disable\n");
+        rgb_ir_correction_enable(0);
+    }
+}
 /**---------------------------------menu bar callbacks--------------------- */
 void about_info(GtkWidget *widget, gpointer window)
 {
@@ -591,11 +603,9 @@ int hex_or_dec_interpreter_c_string(char *in_string)
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE
 *****************************************************************************/
-int count;
 void iterate_def_elements (
     def_element *definitions, size_t members)
 {   
-    count = 0;
     FOREACH_NELEM(definitions, members, def)
     {
 
@@ -1132,6 +1142,11 @@ void grid2_setup()
     // snprintf(gain_buf, sizeof(gain_buf), "current gain=%d", get_gain(v4l2_dev));
     // gtk_label_set_text(GTK_LABEL(label_cur_gain), gain_buf);
     // gtk_grid_attach(GTK_GRID(grid2), label_cur_gain, 2, 10, 2, 1);
+
+    check_button_rgb_ir = gtk_check_button_new();
+    gtk_button_set_label(GTK_BUTTON(check_button_rgb_ir), "Enable RGB-IR Color Correction");
+    gtk_grid_attach(GTK_GRID(grid2), check_button_rgb_ir, 0, 10, 1, 1);
+    g_signal_connect(check_button_rgb_ir, "toggled", G_CALLBACK(enable_rgb_ir), NULL);
 
     /** --- Grid 2 Setup --- */
     gtk_grid_set_column_homogeneous(GTK_GRID(grid2), FALSE);

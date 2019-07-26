@@ -3,26 +3,27 @@
   This is the sample code for Leopard USB3.0 camera linux camera tool. It is a simple interface for capturing, viewing, controlling video from v4l2 devices, with a special emphasis for the linux uvc driver. 
   
 
-- [Leopard USB3.0 Camera Linux Camera Tool](#Leopard-USB30-Camera-Linux-Camera-Tool)
-  - [Installation](#Installation)
-    - [Dependencies](#Dependencies)
-    - [OpenCV Prerequisites](#OpenCV-Prerequisites)
-    - [Build Camera Tool](#Build-Camera-Tool)
-    - [Install leopard_cam](#Install-leopard_cam)
-    - [Uninstall leopard_cam](#Uninstall-leopard_cam)
-  - [Code Structure](#Code-Structure)
-  - [Declarations](#Declarations)
-  - [Regarding Exposure Time Calculation](#Regarding-Exposure-Time-Calculation)
-    - [Examples](#Examples)
-      - [Test on RAW sensor 12 Megapixel IMX477](#Test-on-RAW-sensor-12-Megapixel-IMX477)
-      - [Test on RAW sensor 5 Megapixel OS05A20](#Test-on-RAW-sensor-5-Megapixel-OS05A20)
-      - [Test on AR1335-ICP3 YUV 12 Megapixel Cam](#Test-on-AR1335-ICP3-YUV-12-Megapixel-Cam)
-      - [Exit Camera Tool](#Exit-Camera-Tool)
-      - [Kill Camera Tool Windows Left Over](#Kill-Camera-Tool-Windows-Left-Over)
-  - [Test Platforms](#Test-Platforms)
-  - [Known Bugs](#Known-Bugs)
-    - [Exposure & Gain Control Momentarily Split Screen](#Exposure--Gain-Control-Momentarily-Split-Screen)
-    - [SerDes Camera Experiences First Frame Bad When Uses Trigger](#SerDes-Camera-Experiences-First-Frame-Bad-When-Uses-Trigger)
+- [Leopard USB3.0 Camera Linux Camera Tool](#leopard-usb30-camera-linux-camera-tool)
+  - [Installation](#installation)
+    - [Dependencies](#dependencies)
+    - [OpenCV Prerequisites](#opencv-prerequisites)
+    - [Build Camera Tool](#build-camera-tool)
+    - [Install leopard_cam](#install-leopard_cam)
+    - [Uninstall leopard_cam](#uninstall-leopard_cam)
+  - [Code Structure](#code-structure)
+  - [Declarations](#declarations)
+  - [Regarding Exposure Time Calculation](#regarding-exposure-time-calculation)
+    - [Examples](#examples)
+      - [Test on RAW sensor 12 Megapixel IMX477](#test-on-raw-sensor-12-megapixel-imx477)
+      - [Test on RAW sensor 5 Megapixel OS05A20](#test-on-raw-sensor-5-megapixel-os05a20)
+      - [Test on AR1335-ICP3 YUV 12 Megapixel Cam](#test-on-ar1335-icp3-yuv-12-megapixel-cam)
+      - [Exit Camera Tool](#exit-camera-tool)
+      - [Kill Camera Tool Windows Left Over](#kill-camera-tool-windows-left-over)
+  - [Test Platforms](#test-platforms)
+  - [Known Bugs](#known-bugs)
+    - [Exposure & Gain Control Momentarily Split Screen](#exposure--gain-control-momentarily-split-screen)
+    - [SerDes Camera Experiences First Frame Bad When Uses Trigger](#serdes-camera-experiences-first-frame-bad-when-uses-trigger)
+    - [RGB2RGB Matrix Red and Green Channel Bug](#rgb2rgb-matrix-red-and-green-channel-bug)
 
 ---
 ## Installation
@@ -144,7 +145,7 @@ $ linux_camera_tool .
 ---
 ## Declarations 
 __Auto white balance__, __gamma correction__ and __auto brightness and contrast__ are done by mainly using OpenCV, since histogram matrix calculations are involved, enabling these features will slow down the streaming a lot. If you build Linux Camera Tool with __OpenCV CUDA support__, these feature speed won't be compromised.
-__Auto exposure__ is usually implemented on sensor/ISP, which when enabled, won't further slow down the streaming. You need to check with camera driver for auto exposure support. If some sensor don't have AE support built-in, this button won't work.
+__Auto exposure__ is usually implemented on sensor/ISP, which when enabled, won't further slow down the streaming. You need to check with camera driver for auto exposure support. If some sensor don't have AE support built-in, this button won't work. There is a software generated auto exposure support in "Tab2" (__Software AE__), you can enable that if you really need AE support for the camera. Since adjusting gain and exposure under linux will experience split screen issue, same thing will happen to this __Software AE__.
 
 ## Regarding Exposure Time Calculation
 Since _Linux V4L2 API_ doesn't provide a easier way to tell you what exact exposure time in _ms_ like what _Windows_ does, here is the explanation for helping you figuring out your camera's current exposure time in _ms_:
@@ -239,6 +240,7 @@ When use triggering mode instead of master free running mode for USB3 SerDes cam
 
 The included "shot 1 trigger" function is only a demonstration on generating one pulse and let camera output one frame after "shot 1 trigger" is clicked once. User should not fully rely on this software generated trigger but use a hardware trigger for sync the camera streaming.
 
-
+### RGB2RGB Matrix Red and Green Channel Bug
+RGB2RGB Matrix green-red channel doesn't work now. Still debugging...
 
 
