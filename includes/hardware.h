@@ -1,7 +1,16 @@
 /*****************************************************************************
-  This sample is released as public domain.  It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
   
   This is the sample code for Leopard USB3.0 camera, hardware.h stores macros
   for spefic camera tool build. Please refer to the explanation below for 
@@ -26,13 +35,21 @@
  * 6. uncomment DISPLAY_FRAME_RATE_RES_INFO if you want display info in "cam"
  * 7. uncomment RESIZE_OPENCV_WINDOW if you want to resize window to 720p
  */
- #define HAVE_OPENCV_CUDA_SUPPORT
-// #define DUAL_CAM
+ //#define HAVE_OPENCV_CUDA_SUPPORT
+ //#define DUAL_CAM
 #define USING_CLAHE
-#define IMG_FLIP_VERTICALLY
-#define IMG_FLIP_HORIZONTALLY
+//#define IMG_FLIP_VERTICALLY
+//#define IMG_FLIP_HORIZONTALLY
 #define DISPLAY_FRAME_RATE_RES_INFO
-//#define RESIZE_OPENCV_WINDOW 
+#define RESIZE_OPENCV_WINDOW 
+
+/**
+ * rgb gain and offset limits
+ */
+#define MAX_RGB_GAIN 2000
+#define MIN_RGB_GAIN 1
+#define MAX_RGB_OFFSET 255
+#define MIN_RGB_OFFSET -255
 
 /**
  * --------------------------camera specific test functions-------------------

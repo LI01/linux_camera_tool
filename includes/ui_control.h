@@ -1,7 +1,16 @@
 /****************************************************************************
-  This sample is released as public domain.  It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
   
   This is the sample code for Leopard USB3.0 camera, mainly for the camera tool
   control GUI using Gtk3. Gtk3 asnd Gtk2 don't live together paceful. If you 
@@ -19,7 +28,8 @@
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-// Hold init data for GTK signals
+
+/// Hold init data for GTK signals
 typedef struct
 {
   const gchar *signal_name;
@@ -74,7 +84,8 @@ typedef enum
 **                      	Internal Callbacks
 *****************************************************************************/
 int gui_attach_gtk3_menu(GtkWidget *parent);
-
+void about_info(GtkWidget *widget, gpointer window);
+void exit_from_help(GtkWidget *widget);
 void open_config_dialog(GtkWidget *widget, gpointer window);
 void config_profile_clicked (GtkWidget *item);
 void fw_update_clicked (GtkWidget *item);
@@ -141,7 +152,8 @@ void init_all_widgets();
 **                      	Main GUI
 *****************************************************************************/
 int gui_init();
-void grid_setup();
+void grid1_setup();
+void notebook_setup();
 void menu_bar_setup();
 void gui_run();
 void ctrl_gui_main();

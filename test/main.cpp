@@ -158,6 +158,8 @@ int main(int argc, char **argv)
 	printf("********************Device Infomation************************\n");
 	/** try to get all the static camera info before fork */
 	read_cam_uuid_hwfw_rev(v4l2_dev);
+	get_gain(v4l2_dev);
+	get_exposure_absolute(v4l2_dev);
 	check_dev_cap(&dev);
 	video_get_format(&dev);   /** list the current resolution etc */
 	get_frame_rate(v4l2_dev); /** list the current frame rate */

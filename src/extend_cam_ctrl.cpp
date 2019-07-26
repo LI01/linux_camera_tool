@@ -1,7 +1,16 @@
 /*****************************************************************************
-  This sample is released as public domain.  It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
 
   This is the sample code for Leopard USB3.0 camera use v4l2 and opencv for 
   camera streaming and display.
@@ -44,7 +53,7 @@
 #include <opencv4/opencv2/cudaarithm.hpp>
 #endif
 
-#include <omp.h>  /**for openmp */
+#include <omp.h> /**for openmp */
 
 /*****************************************************************************
 **                      	Global data 
@@ -56,22 +65,36 @@
 static int *save_bmp;				/// flag for saving bmp
 static int *save_raw;				/// flag for saving raw
 static int *bayer_flag;				/// flag for choosing bayer pattern
-static int *shift_flag;				/// flag for shift raw data 
+static int *bpp;					/// flag for datatype bits per pixel
 static int *awb_flag;				/// flag for enable awb
-static int *abc_flag;				/// flag for enable brightness & contrast opt 
-static float *gamma_val;			/// gamma correction value from gui 
-static int *black_level_correction; /// black level correction value from gui 
+static int *abc_flag;				/// flag for enable brightness & contrast opt
+static float *gamma_val;			/// gamma correction value from gui
+static int *black_level_correction; /// black level correction value from gui
 static int *loop;					/// while (*loop)
+static int *rgb_gain_offset_flag;
+static int *rgb_matrix_flag;
+static int *r_gain, *b_gain, *g_gain;/// values for color correction 
+static int *r_offset, *b_offset, *g_offset;
+static int *rr, *rg, *rb;
+static int *gr, *gg, *gb;
+static int *br, *bg, *bb;
+static int *soft_ae_flag;
+int *cur_exposure, *cur_gain;
 
-static int image_count;				/// image count number add to capture name 
-double cur_time = 0;				/// time measured in OpenCV for fps 
-struct v4l2_buffer queuebuffer; 	/// queuebuffer for enqueue, dequeue buffers
+static int image_count;			/// image count number add to capture name
+double cur_time = 0;			/// time measured in OpenCV for fps
+struct v4l2_buffer queuebuffer; /// queuebuffer for enqueue, dequeue buffers
 
+extern int v4l2_dev;
 /*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
-extern char *get_product(); 		/// put product name in captured image name
-
+extern char *get_product(); /// put product name in captured image name
+extern int query_exposure_absolute_max(int fd);
+/// for software ae
+extern void set_gain(int fd, int analog_gain);
+extern void set_exposure_absolute(int fd, int exposure_absolute);
+extern int get_current_height(int fd);
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
@@ -114,8 +137,8 @@ inline void set_save_raw_flag(int flag)
  *
  * returns: error code
  */
-int v4l2_core_save_data_to_file(const char *filename, 
-	const void *data, int size)
+int v4l2_core_save_data_to_file(const char *filename,
+								const void *data, int size)
 {
 	FILE *fp;
 	int ret = 0;
@@ -190,18 +213,18 @@ static int save_frame_image_bmp(cv::InputOutputArray opencvImage)
  * Crosslink doesn't support decode RAW14, RAW16 so far,
  * these two datatypes weren't used in USB3 camera
  */
-inline int set_shift(int *shift_flag)
+inline int set_shift(int *bpp)
 {
-	int cmp = *shift_flag;
+	int cmp = *bpp;
 	switch (cmp)
 	{
-	case RAW10_2BIT_SHIFT_FLG:
+	case RAW10_FLG:
 		return 2;
-	case RAW12_4BIT_SHIFT_FLG:
+	case RAW12_FLG:
 		return 4;
-	case YUYV_0BIT_SHIFT_FLG:
+	case YUYV_FLG:
 		return 0;
-	case RAW8_0BIT_SHIFT_FLG:
+	case RAW8_FLG:
 		return -1;
 	default:
 		return 2;
@@ -211,7 +234,7 @@ inline int set_shift(int *shift_flag)
 /**
  * callback for change sensor datatype shift flag
  * args:
- * 		datatype - RAW10  -> set *shift_flag accordingly
+ * 		datatype - RAW10  -> set *bpp accordingly
  *  			   RAW12  
  * 				   YUV422 
  * 				   RAW8   
@@ -219,13 +242,13 @@ inline int set_shift(int *shift_flag)
 void change_datatype(void *datatype)
 {
 	if (strcmp((char *)datatype, "1") == 0)
-		*shift_flag = RAW10_2BIT_SHIFT_FLG;
+		*bpp = RAW10_FLG;
 	if (strcmp((char *)datatype, "2") == 0)
-		*shift_flag = RAW12_4BIT_SHIFT_FLG;
+		*bpp = RAW12_FLG;
 	if (strcmp((char *)datatype, "3") == 0)
-		*shift_flag = YUYV_0BIT_SHIFT_FLG;
+		*bpp = YUYV_FLG;
 	if (strcmp((char *)datatype, "4") == 0)
-		*shift_flag = RAW8_0BIT_SHIFT_FLG;
+		*bpp = RAW8_FLG;
 }
 
 /**
@@ -307,7 +330,7 @@ void add_gamma_val(float gamma_val_from_gui)
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
  */
-void apply_gamma_correction(const cv::InputOutputArray opencvImage)
+static void apply_gamma_correction(const cv::InputOutputArray opencvImage)
 {
 	cv::Mat look_up_table(1, 256, CV_8U);
 	uchar *p = look_up_table.ptr();
@@ -315,13 +338,13 @@ void apply_gamma_correction(const cv::InputOutputArray opencvImage)
 	{
 		p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, *gamma_val) * 255.0);
 	}
-	#ifdef HAVE_OPENCV_CUDA_SUPPORT
-		cv::Ptr<cv::cuda::LookUpTable> lutAlg = 
-			cv::cuda::createLookUpTable(look_up_table);
-		lutAlg->transform(opencvImage, opencvImage);
-	#else
-		LUT(opencvImage, look_up_table, opencvImage);
-	#endif
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+	cv::Ptr<cv::cuda::LookUpTable> lutAlg =
+		cv::cuda::createLookUpTable(look_up_table);
+	lutAlg->transform(opencvImage, opencvImage);
+#else
+	LUT(opencvImage, look_up_table, opencvImage);
+#endif
 }
 
 /**
@@ -355,75 +378,74 @@ void awb_enable(int enable)
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
  */
-void apply_white_balance(cv::InputOutputArray opencvImage)
+static void apply_white_balance(cv::InputOutputArray opencvImage)
 {
 	/// if it is grey image, do nothing
 	if (opencvImage.type() == CV_8UC1)
 		return;
-	#ifdef HAVE_OPENCV_CUDA_SUPPORT
-		cv::cuda::GpuMat _opencvImage = opencvImage.getGpuMat();
-		std::vector<cv::cuda::GpuMat> bgr_planes;
-		cv::cuda::split(_opencvImage, bgr_planes);
-		cv::cuda::equalizeHist(bgr_planes[0], bgr_planes[0]);
-		cv::cuda::equalizeHist(bgr_planes[1], bgr_planes[1]);
-		cv::cuda::equalizeHist(bgr_planes[2], bgr_planes[2]);
-		cv::cuda::merge(bgr_planes, _opencvImage);
-	#else
-	 	/// ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
-		cv::Mat _opencvImage = opencvImage.getMat();
-		double discard_ratio = 0.05;
-		int hists[3][256];
-		CLEAR(hists);
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+	cv::cuda::GpuMat _opencvImage = opencvImage.getGpuMat();
+	std::vector<cv::cuda::GpuMat> bgr_planes;
+	cv::cuda::split(_opencvImage, bgr_planes);
+	cv::cuda::equalizeHist(bgr_planes[0], bgr_planes[0]);
+	cv::cuda::equalizeHist(bgr_planes[1], bgr_planes[1]);
+	cv::cuda::equalizeHist(bgr_planes[2], bgr_planes[2]);
+	cv::cuda::merge(bgr_planes, _opencvImage);
+#else
+	/// ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
+	cv::Mat _opencvImage = opencvImage.getMat();
+	double discard_ratio = 0.05;
+	int hists[3][256];
+	CLEAR(hists);
 
-		for (int y = 0; y < _opencvImage.rows; ++y)
+	for (int y = 0; y < _opencvImage.rows; ++y)
+	{
+		uchar *ptr = _opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < _opencvImage.cols; ++x)
 		{
-			uchar *ptr = _opencvImage.ptr<uchar>(y);
-			for (int x = 0; x < _opencvImage.cols; ++x)
+			for (int j = 0; j < 3; ++j)
 			{
-				for (int j = 0; j < 3; ++j)
-				{
-					hists[j][ptr[x * 3 + j]] += 1;
-				}
+				hists[j][ptr[x * 3 + j]] += 1;
 			}
 		}
+	}
 
-		/// cumulative hist
-		int total = _opencvImage.cols * _opencvImage.rows;
-		int vmin[3], vmax[3];
-		for (int i = 0; i < 3; ++i)
+	/// cumulative hist
+	int total = _opencvImage.cols * _opencvImage.rows;
+	int vmin[3], vmax[3];
+	for (int i = 0; i < 3; ++i)
+	{
+		for (int j = 0; j < 255; ++j)
 		{
-			for (int j = 0; j < 255; ++j)
-			{
-				hists[i][j + 1] += hists[i][j];
-			}
-			vmin[i] = 0;
-			vmax[i] = 255;
-			while (hists[i][vmin[i]] < discard_ratio * total)
-				vmin[i] += 1;
-			while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
-				vmax[i] -= 1;
-			if (vmax[i] < 255 - 1)
-				vmax[i] += 1;
+			hists[i][j + 1] += hists[i][j];
 		}
+		vmin[i] = 0;
+		vmax[i] = 255;
+		while (hists[i][vmin[i]] < discard_ratio * total)
+			vmin[i] += 1;
+		while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
+			vmax[i] -= 1;
+		if (vmax[i] < 255 - 1)
+			vmax[i] += 1;
+	}
 
-		for (int y = 0; y < _opencvImage.rows; ++y)
+	for (int y = 0; y < _opencvImage.rows; ++y)
+	{
+		uchar *ptr = _opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < _opencvImage.cols; ++x)
 		{
-			uchar *ptr = _opencvImage.ptr<uchar>(y);
-			for (int x = 0; x < _opencvImage.cols; ++x)
+			for (int j = 0; j < 3; ++j)
 			{
-				for (int j = 0; j < 3; ++j)
-				{
-					int val = ptr[x * 3 + j];
-					if (val < vmin[j])
-						val = vmin[j];
-					if (val > vmax[j])
-						val = vmax[j];
-					ptr[x * 3 + j] = static_cast<uchar> \
-					((val - vmin[j]) * 255.0 / (vmax[j] - vmin[j]));
-				}
+				int val = ptr[x * 3 + j];
+				if (val < vmin[j])
+					val = vmin[j];
+				if (val > vmax[j])
+					val = vmax[j];
+				ptr[x * 3 + j] = static_cast<uchar>((val - vmin[j]) * 255.0 / (vmax[j] - vmin[j]));
 			}
 		}
-	#endif
+	}
+#endif
 }
 
 /**
@@ -446,6 +468,7 @@ void abc_enable(int enable)
 		break;
 	}
 }
+
 /** 
  * In-place camera stream apply auto adjusting brightness and contrast 
  * using historgram 
@@ -455,11 +478,11 @@ void abc_enable(int enable)
  * 		float clipHistPercent 			- clip histogram percentage
  */
 #ifndef USING_CLAHE
-void apply_auto_brightness_and_contrast(
+static void apply_auto_brightness_and_contrast(
 	cv::InputOutputArray opencvImage,
 	float clipHistPercent = 0)
 #else
-void apply_auto_brightness_and_contrast(
+static void apply_auto_brightness_and_contrast(
 	cv::InputOutputArray opencvImage)
 #endif
 {
@@ -467,8 +490,8 @@ void apply_auto_brightness_and_contrast(
 	if (opencvImage.type() == CV_8UC1)
 		return;
 
-	#ifndef USING_CLAHE
-		/** Method 1:
+#ifndef USING_CLAHE
+	/** Method 1:
 		 * Automatic brightness and contrast optimization with 
 		 * optional histogram clipping. Looking at histogram, 
 		 * alpha operates as color range amplifier, beta operates
@@ -481,117 +504,117 @@ void apply_auto_brightness_and_contrast(
 		 * 	 clipHistPercent - cut wings of histogram at given percent
 		 * 		typical=>1, 0=>Disabled
 		 */
-		int hist_size = 256;
-		float alpha, beta;
-		double min_gray = 0, max_gray = 0;
+	int hist_size = 256;
+	float alpha, beta;
+	double min_gray = 0, max_gray = 0;
 
-		/// to calculate grayscale histogram 
-		cv::Mat gray;
-		cv::cvtColor(opencvImage, gray, CV_BGR2GRAY);
+	/// to calculate grayscale histogram
+	cv::Mat gray;
+	cv::cvtColor(opencvImage, gray, CV_BGR2GRAY);
 
-		if (clipHistPercent == 0)
+	if (clipHistPercent == 0)
+	{
+		/// keep full available range
+		cv::minMaxLoc(gray, &min_gray, &max_gray);
+	}
+	else
+	{
+		/// the grayscale histogram
+		cv::Mat hist;
+
+		float range[] = {0, 256};
+		const float *histRange = {range};
+		bool uniform = true;
+		bool accumulate = false;
+		// void calcHist(img_orig, n_images, channels(gray=0), mask(for ROi),
+		//               mat hist, dimemsion, histSize=bins=256,
+		//               ranges_for_pixel, bool uniform, bool accumulate);
+		calcHist(&gray, 1, 0, cv::Mat(), hist, 1,
+				 &hist_size, &histRange, uniform, accumulate);
+
+		/// calculate cumulative distribution from the histogram
+		std::vector<float> accumulator(hist_size);
+		accumulator[0] = hist.at<float>(0);
+		for (int i = 1; i < hist_size; i++)
 		{
-			/// keep full available range 
-			cv::minMaxLoc(gray, &min_gray, &max_gray);
-		}
-		else
-		{
-			/// the grayscale histogram 
-			cv::Mat hist;
-
-			float range[] = {0, 256};
-			const float *histRange = {range};
-			bool uniform = true;
-			bool accumulate = false;
-			// void calcHist(img_orig, n_images, channels(gray=0), mask(for ROi),
-		    //               mat hist, dimemsion, histSize=bins=256,
-		    //               ranges_for_pixel, bool uniform, bool accumulate);
-			calcHist(&gray, 1, 0, cv::Mat(), hist, 1, \
-			&hist_size, &histRange, uniform, accumulate);
-
-			/// calculate cumulative distribution from the histogram 
-			std::vector<float> accumulator(hist_size);
-			accumulator[0] = hist.at<float>(0);
-			for (int i = 1; i < hist_size; i++)
-			{
-				accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
-			}
-
-			/// locate points that cuts at required value 
-			float max = accumulator.back();
-			clipHistPercent *= (max / 100.0); /// make percent as absolute
-			clipHistPercent /= 2.0;			  /// left and right wings
-			/// locate left cut 
-			min_gray = 0;
-			while (accumulator[min_gray] < clipHistPercent)
-				min_gray++;
-
-			/// locate right cut 
-			max_gray = hist_size - 1;
-			while (accumulator[max_gray] >= (max - clipHistPercent))
-				max_gray--;
+			accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
 		}
 
-		/// current range 
-		float input_range = max_gray - min_gray;
-		/// alpha expands current range to histsize range
-		alpha = (hist_size - 1) / input_range; 
-		/// beta shifts current range so that minGray will go to 0
-		beta = -min_gray * alpha;			   
+		/// locate points that cuts at required value
+		float max = accumulator.back();
+		clipHistPercent *= (max / 100.0); /// make percent as absolute
+		clipHistPercent /= 2.0;			  /// left and right wings
+		/// locate left cut
+		min_gray = 0;
+		while (accumulator[min_gray] < clipHistPercent)
+			min_gray++;
 
-		/**
+		/// locate right cut
+		max_gray = hist_size - 1;
+		while (accumulator[max_gray] >= (max - clipHistPercent))
+			max_gray--;
+	}
+
+	/// current range
+	float input_range = max_gray - min_gray;
+	/// alpha expands current range to histsize range
+	alpha = (hist_size - 1) / input_range;
+	/// beta shifts current range so that minGray will go to 0
+	beta = -min_gray * alpha;
+
+	/**
 		* Apply brightness and contrast normalization
 		* convertTo operates with saturate_cast
 		*/
-		cv::Mat _opencvImage = opencvImage.getMat();
-		_opencvImage.convertTo(opencvImage, -1, alpha, beta);
+	cv::Mat _opencvImage = opencvImage.getMat();
+	_opencvImage.convertTo(opencvImage, -1, alpha, beta);
 
-	#else
-		/** Method 2:
+#else
+/** Method 2:
 		 * Contrast Limited Adaptive Histogram Equalization) algorithm
 		 * ref: https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
 		 */
-		#ifdef HAVE_OPENCV_CUDA_SUPPORT
-			cv::cuda::GpuMat lab_image;
-			cv::cuda::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
-			/// Extract the L channel 
-			std::vector<cv::cuda::GpuMat> lab_planes(3);
-			cv::cuda::split(lab_image, lab_planes); // now we have the L image in lab_planes[0]
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+	cv::cuda::GpuMat lab_image;
+	cv::cuda::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
+	/// Extract the L channel
+	std::vector<cv::cuda::GpuMat> lab_planes(3);
+	cv::cuda::split(lab_image, lab_planes); // now we have the L image in lab_planes[0]
 
-			/// apply the CLAHE algorithm to the L channel 
-			cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
-			clahe->setClipLimit(4);
-			cv::cuda::GpuMat dst;
-			clahe->apply(lab_planes[0], dst);
+	/// apply the CLAHE algorithm to the L channel
+	cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
+	clahe->setClipLimit(4);
+	cv::cuda::GpuMat dst;
+	clahe->apply(lab_planes[0], dst);
 
-			/// Merge the the color planes back into an Lab image 
-			dst.copyTo(lab_planes[0]);
-			cv::cuda::merge(lab_planes, lab_image);
+	/// Merge the the color planes back into an Lab image
+	dst.copyTo(lab_planes[0]);
+	cv::cuda::merge(lab_planes, lab_image);
 
-			/// convert back to RGB
-			cv::cuda::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
-		#else
-			cv::Mat lab_image;
-			cv::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
-			/// Extract the L channel 
-			std::vector<cv::Mat> lab_planes(3);
-			/// now we have the L image in lab_planes[0]
-			cv::split(lab_image, lab_planes); 
+	/// convert back to RGB
+	cv::cuda::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
+#else
+	cv::Mat lab_image;
+	cv::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
+	/// Extract the L channel
+	std::vector<cv::Mat> lab_planes(3);
+	/// now we have the L image in lab_planes[0]
+	cv::split(lab_image, lab_planes);
 
-			/// apply the CLAHE algorithm to the L channel
-			cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
-			clahe->setClipLimit(4);
-			cv::Mat dst;
-			clahe->apply(lab_planes[0], dst);
+	/// apply the CLAHE algorithm to the L channel
+	cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+	clahe->setClipLimit(4);
+	cv::Mat dst;
+	clahe->apply(lab_planes[0], dst);
 
-			/// Merge the the color planes back into an Lab image 
-			dst.copyTo(lab_planes[0]);
-			cv::merge(lab_planes, lab_image);
+	/// Merge the the color planes back into an Lab image
+	dst.copyTo(lab_planes[0]);
+	cv::merge(lab_planes, lab_image);
 
-			/// convert back to RGB
-			cv::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
-		#endif
-	#endif
+	/// convert back to RGB
+	cv::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
+#endif
+#endif
 }
 
 /** 
@@ -636,7 +659,8 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	mmap_variables();
 	*gamma_val = 1.0;
 	*black_level_correction = 0;
-
+	*bpp = 10;
+	*bayer_flag = 2;
 	return v4l2_dev;
 }
 
@@ -686,20 +710,64 @@ void mmap_variables()
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	save_raw = (int *)mmap(NULL, sizeof *save_raw, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	shift_flag = (int *)mmap(NULL, sizeof *shift_flag, PROT_READ | PROT_WRITE,
-							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	bpp = (int *)mmap(NULL, sizeof *bpp, PROT_READ | PROT_WRITE,
+					  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	awb_flag = (int *)mmap(NULL, sizeof *awb_flag, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	abc_flag = (int *)mmap(NULL, sizeof *abc_flag, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	gamma_val = (float *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
+	gamma_val = (float *)mmap(NULL, sizeof *gamma_val, PROT_READ | PROT_WRITE,
 							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	black_level_correction = (int *)mmap(NULL, sizeof *black_level_correction,
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+							PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	loop = (int *)mmap(NULL, sizeof *loop, PROT_READ | PROT_WRITE,
 					   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	rgb_gain_offset_flag = (int *)mmap(NULL, sizeof *rgb_gain_offset_flag, 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	rgb_matrix_flag = (int *)mmap(NULL, sizeof *rgb_matrix_flag, 
+	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	r_gain = (int *)mmap(NULL, sizeof *r_gain, PROT_READ | PROT_WRITE,
+						 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	g_gain = (int *)mmap(NULL, sizeof *g_gain, PROT_READ | PROT_WRITE,
+						 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	b_gain = (int *)mmap(NULL, sizeof *b_gain, PROT_READ | PROT_WRITE,
+						 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	r_offset = (int *)mmap(NULL, sizeof *r_offset, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	g_offset = (int *)mmap(NULL, sizeof *g_offset, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	b_offset = (int *)mmap(NULL, sizeof *b_offset, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	rr = (int *)mmap(NULL, sizeof *rr, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	rg = (int *)mmap(NULL, sizeof *rg, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	rb = (int *)mmap(NULL, sizeof *rb, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	gr = (int *)mmap(NULL, sizeof *gr, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	gg = (int *)mmap(NULL, sizeof *gg, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	gb = (int *)mmap(NULL, sizeof *gb, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	br = (int *)mmap(NULL, sizeof *br, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	bg = (int *)mmap(NULL, sizeof *bg, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	bb = (int *)mmap(NULL, sizeof *bb, PROT_READ | PROT_WRITE,
+					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	soft_ae_flag = (int *)mmap(NULL, sizeof *soft_ae_flag, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	cur_exposure = (int *)mmap(NULL, sizeof *cur_exposure, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	cur_gain = (int *)mmap(NULL, sizeof *cur_gain, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 }
 
 /** unmap all the variables after stream ends */
@@ -707,13 +775,37 @@ void unmap_variables()
 {
 	munmap(save_bmp, sizeof *save_bmp);
 	munmap(save_raw, sizeof *save_raw);
-	munmap(shift_flag, sizeof *shift_flag);
+	munmap(bpp, sizeof *bpp);
 	munmap(bayer_flag, sizeof *bayer_flag);
 	munmap(awb_flag, sizeof *awb_flag);
 	munmap(abc_flag, sizeof *abc_flag);
 	munmap(gamma_val, sizeof *gamma_val);
 	munmap(black_level_correction, sizeof *black_level_correction);
 	munmap(loop, sizeof *loop);
+
+	munmap(rgb_gain_offset_flag, sizeof *rgb_gain_offset_flag);
+	munmap(rgb_matrix_flag, sizeof *rgb_matrix_flag);
+	munmap(r_gain, sizeof *r_gain);
+	munmap(g_gain, sizeof *g_gain);
+	munmap(b_gain, sizeof *b_gain);
+	munmap(r_offset, sizeof *r_offset);
+	munmap(g_offset, sizeof *g_offset);
+	munmap(b_offset, sizeof *b_offset);
+
+	munmap(rr, sizeof *rr);
+	munmap(rg, sizeof *rg);
+	munmap(rb, sizeof *rb);
+	munmap(gr, sizeof *gr);
+	munmap(gg, sizeof *gg);
+	munmap(gb, sizeof *gb);
+	munmap(br, sizeof *br);
+	munmap(bg, sizeof *bg);
+	munmap(bb, sizeof *bb);
+
+	munmap(soft_ae_flag, sizeof *soft_ae_flag);
+	munmap(cur_exposure, sizeof *cur_exposure);
+	munmap(cur_gain, sizeof *cur_gain);
+
 }
 
 /**
@@ -862,7 +954,7 @@ void streaming_loop(struct device *dev)
 	*loop = 1;
 	while (*loop)
 	{
-		
+
 		get_a_frame(dev);
 	}
 	unmap_variables();
@@ -891,7 +983,7 @@ void get_a_frame(struct device *dev)
 			return;
 		}
 
-		/// check the capture raw image flag, do this before decode a frame 
+		/// check the capture raw image flag, do this before decode a frame
 		if (*(save_raw))
 		{
 			printf("save a raw\n");
@@ -904,7 +996,7 @@ void get_a_frame(struct device *dev)
 			set_save_raw_flag(0);
 		}
 
-		decode_a_frame(dev, dev->buffers[i].start, set_shift(shift_flag));
+		decode_a_frame(dev, dev->buffers[i].start, set_shift(bpp));
 
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
 		{
@@ -915,6 +1007,130 @@ void get_a_frame(struct device *dev)
 
 	return;
 }
+
+/**
+ * set software ae 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void soft_ae_enable(int enable)
+{
+	switch (enable)
+	{
+	case 1:
+		*soft_ae_flag = TRUE;
+		break;
+	case 0:
+		*soft_ae_flag = FALSE;
+		break;
+	default:
+		*soft_ae_flag = FALSE;
+		break;
+	}
+}
+
+/**
+ * calculate the mean value of a given unprocessed image for a defined ROI
+ * return the value used for software AE
+ * args: 
+ * 		struct device *dev - every infomation for camera
+ * 		const void *p 		- camera streaming buffer pointer
+ */
+double calc_mean(struct device *dev, const void *p)
+{
+	/// define ROI
+	int size = 256;
+	int start_x = (dev->width - size)/2;
+	int start_y = (dev->height - size)/2;
+	/// convert bits per pixel to bytes per pixel
+	int bytes_per_pixel = (*bpp -1 )/8 + 1; 
+
+	int start_pos = (start_y * dev->width + start_x) * bytes_per_pixel;
+	double total = 0, mean = 0;
+	unsigned char *srcChar = (unsigned char *)p;
+
+	if (bytes_per_pixel == 2) /// 16 bit mode
+	{
+		for (int i=0; i < size; i++) {
+			for (int j=0; j < size; j++) {
+				total += (double) \
+				(srcChar[start_pos + (i * dev->width + j) *2] | \
+				srcChar[start_pos + (i * dev->width + j) *2 + 1 ] << 8);
+			}
+		}
+	}
+	else /// 8 bit mode
+	{
+		for (int i=0; i < size; i++) {
+			for (int j=0; j < size; j++) {
+				total += (double) srcChar[start_pos + (i * dev->width + j)] ;
+			}
+		}
+	}
+	mean = total/size/size;
+	return mean;
+}
+
+/**
+ * simple and brute software generate auto exposure
+ * set a target mean value and the range, if the current image illuminance 
+ * is smaller than the target mean, increase exposure until the max_exp_time,
+ * if it still not enough, starting to increase gain. Do the similar thing for 
+ * decrease gain, exposure 
+ * args: 
+ * 		struct device *dev - every infomation for camera
+ * 		const void *p 		- camera streaming buffer pointer
+ */
+void do_soft_ae(struct device *dev, const void *p)
+{
+	int local_gain = *cur_gain;
+	int local_exposure = *cur_exposure;
+	long cur_gain_x_exp = local_gain * local_exposure;
+	int max_exp_time = get_current_height(v4l2_dev) * 4; 
+	int min_exp_time = 50;
+	int min_gain = 8;
+	int max_gain = 63;
+	float target_mean_factor = 1.2;
+	float target_mean = (float) ((0x01) << ((*bpp) -2)) * target_mean_factor;
+	float image_mean = calc_mean(dev, p);
+	int ae_done = FALSE;
+	if (((image_mean > target_mean * 0.8) && (image_mean < target_mean * 1.2))
+	|| ((cur_gain_x_exp >= max_exp_time * max_gain) && (image_mean < target_mean * 0.8))
+	|| ((cur_gain_x_exp <= max_exp_time * min_gain) && (image_mean > target_mean * 1.2)))
+	{
+		ae_done = TRUE;
+		return;
+	}
+	ae_done = FALSE;
+	int cal_exp_x_gain = (int)(cur_gain_x_exp * (target_mean / image_mean));
+	cur_gain_x_exp = (cur_gain_x_exp + cal_exp_x_gain)/2;
+	int prev_image_mean = image_mean;
+	if (cur_gain_x_exp >= max_exp_time * min_gain)
+	{
+		local_exposure = max_exp_time;
+		local_gain = local_gain * (target_mean/image_mean);
+		if (local_gain > max_gain)
+			local_gain = max_gain;
+		else if (local_gain < min_gain)
+			local_gain = min_gain;
+		
+	}
+	else if (cur_gain_x_exp < min_exp_time * min_gain)
+	{
+		local_exposure = min_exp_time;
+		local_gain = min_gain;
+	}
+	else 
+	{
+		local_gain = min_gain;
+		local_exposure = (int) local_exposure * (target_mean/image_mean);
+	}
+	cur_gain_x_exp = local_exposure * local_gain;
+	set_exposure_absolute(v4l2_dev, local_exposure);
+	set_gain(v4l2_dev, local_gain);
+
+}
+
 
 /** 
  * Shift bits for 16-bit stream and get lower 8-bit for OpenCV debayering.
@@ -931,37 +1147,38 @@ void perform_shift(struct device *dev, const void *p, int shift)
 	unsigned char *dst = (unsigned char *)p;
 	unsigned short ts;
 
-	/** 
+/** 
 	 * use OpenMP loop parallelism to accelerate shifting 
 	 * If there is no speed up, that is because this operation is heavily 
 	 * memory bound. All the cores share one memory bus, so using more threads 
 	 * does not give you more bandwidth and speedup.
 	 * This will change if the resolution is smaller so buffer size is smaller. 
 	 */
-	#pragma omp for nowait
-		for (unsigned int i = 0; i < dev->height; i++)
+#pragma omp for nowait
+	for (unsigned int i = 0; i < dev->height; i++)
+	{
+		for (unsigned int j = 0; j < dev->width; j++)
 		{
-			for (unsigned int j = 0; j < dev->width; j++)
+			ts = *(srcShort++);
+			if (ts > *black_level_correction)
+				tmp = (ts - *black_level_correction) >> shift;
+			else
 			{
-				ts = *(srcShort++);
-				if (ts > *black_level_correction)
-					tmp = (ts - *black_level_correction) >> shift;
-				else
-				{
-					tmp = 0;
-				}
-
-				*(dst++) = (unsigned char)tmp;
+				tmp = 0;
 			}
+
+			*(dst++) = (unsigned char)tmp;
 		}
+	}
 }
+
 /** 
  * Easier way to debug if it is FPGA byte swap problem
  * Swap higher and lower 8-bit to see if there is still artifact exists
  * args: 
  * 		struct device *dev - every infomation for camera
  * 		const void *p 		- camera streaming buffer pointer
- */ 
+ */
 void swap_two_bytes(struct device *dev, const void *p)
 {
 	uint16_t *dst = (uint16_t *)p;
@@ -971,14 +1188,274 @@ void swap_two_bytes(struct device *dev, const void *p)
 	uint8_t lo_byte;
 	for (unsigned int i = 0; i < dev->height; i++)
 	{
-		for (unsigned int j = 0; j < dev->width; j++) {
-			
-			tmp = src[i*dev->width + j];
-			hi_byte = ( tmp & 0xff00) >> 8;
-			lo_byte = ( tmp & 0xff);
-			dst[i*dev->width + j] = lo_byte << 8 | hi_byte;  
+		for (unsigned int j = 0; j < dev->width; j++)
+		{
+
+			tmp = src[i * dev->width + j];
+			hi_byte = (tmp & 0xff00) >> 8;
+			lo_byte = (tmp & 0xff);
+			dst[i * dev->width + j] = lo_byte << 8 | hi_byte;
 		}
 	}
+}
+/**
+ * set the limit for rgb color correction input value
+ */
+int set_limit(int val, int max, int min)
+{
+    return val = val < min ? min : val > max ? max : val;
+    
+}
+/** pass the variable from GUI to camera streaming thread
+ * and print out these values
+ * set the flag on enable rgb_gain_offset
+ */
+void enable_rgb_gain_offset (int red_gain, int green_gain, int blue_gain,
+				int red_offset, int green_offset, int blue_offset)
+{
+	*r_gain = red_gain;
+	*g_gain = green_gain;
+	*b_gain = blue_gain;
+	*r_offset = red_offset;
+	*g_offset = green_offset;
+	*b_offset = blue_offset;
+	*rgb_gain_offset_flag = 1;
+	//printf("rgb gain and offset enabled\r\n");
+	printf("r gain = %d\tg gain = %d\tb gain = %d\r\n"
+	"r offset = %d\tg offset = %d\tb offset = %d\r\n ",
+	*r_gain, *g_gain, *b_gain, *r_offset, *g_offset, *b_offset);
+}
+/**
+ * disable the flag on rgb_gain_offset
+ */
+void disable_rgb_gain_offset()
+{
+	*rgb_gain_offset_flag = 0;
+}
+
+/**
+ * apply rgb gain and offset color correction before debayering
+ * only support four bayer patterns now: GRBG, GBRG, RGGB, BGGR
+ */
+void apply_rgb_gain_offset_pre_debayer(struct device *dev, const void *p)
+{
+	int pixel_max_val = (1 << *bpp) - 1;
+	int height = dev->height;
+	int width = dev->width;
+	int itmp;
+	uint16_t tmp;
+	uint16_t *srcShort = (uint16_t *)p;
+	uint16_t *dst = (uint16_t *)p;
+	
+	switch (*bayer_flag)
+	{
+		case CV_BayerGR2BGR_FLG://GRBG
+			for (int i=0; i < height; i+=2) {
+				for (int j=0; j < width; j+=2) { 
+					// G 
+					tmp = srcShort[i * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j] = itmp;
+					// R
+					tmp = srcShort[i * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *r_offset;
+					itmp = (itmp * (*r_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j + 1] = itmp;
+					// B
+					tmp = srcShort[(i+1) * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *b_offset;
+					itmp = (itmp * (*b_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j] = itmp;
+					// G
+					tmp = srcShort[(i+1) * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j + 1] = itmp;
+				 }
+			}
+
+			break;
+		case CV_BayerGB2BGR_FLG: //GBRG
+			for (int i=0; i < height; i+=2) {
+				for (int j=0; j < width; j+=2) { 
+					// G
+					tmp = srcShort[i * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j] = itmp;
+					// B
+					tmp = srcShort[i * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *b_offset;
+					itmp = (itmp * (*b_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j + 1] = itmp;
+					// R
+					tmp = srcShort[(i+1) * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *r_offset;
+					itmp = (itmp * (*r_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j] = itmp;
+					// G
+					tmp = srcShort[(i+1) * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = (itmp * (*g_gain)) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j + 1] = itmp;
+				 }
+			}
+			break;
+		case CV_BayerRG2BGR_FLG: //RGGB
+			for (int i=0; i < height; i+=2) {
+				for (int j=0; j < width; j+=2) { 
+					// R
+					tmp = srcShort[i * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *r_offset;
+					itmp = itmp * (*r_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j] = itmp;
+					// G
+					tmp = srcShort[i * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = itmp * (*g_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j + 1] = itmp;
+					// G
+					tmp = srcShort[(i+1) * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = itmp * (*g_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j] = itmp;
+					// B
+					tmp = srcShort[(i+1) * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *b_offset;
+					itmp = itmp * (*b_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j + 1] = itmp;
+				 }
+			}
+			break;
+		case CV_BayerBG2BGR_FLG://BGGR
+			for (int i=0; i < height; i+=2) {
+				for (int j=0; j < width; j+=2) { 
+					// B
+					tmp = srcShort[i * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *b_offset;
+					itmp = itmp * (*b_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j] = itmp;
+					// G
+					tmp = srcShort[i * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = itmp * (*g_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[i * width + j + 1] = itmp;
+					// G
+					tmp = srcShort[(i+1) * width + j];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *g_offset;
+					itmp = itmp * (*g_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j] = itmp;
+					// R
+					tmp = srcShort[(i+1) * width + j+1];
+					tmp = set_limit(tmp, pixel_max_val, 0);
+					itmp = tmp + *r_offset;
+					itmp = itmp * (*r_gain) /GAIN_FACTOR;
+					itmp = set_limit(itmp, pixel_max_val, 0);
+					dst[(i+1) * width + j + 1] = itmp;
+				 }
+			}
+			break;
+		case CV_MONO_FLG:
+			break;
+		default: 
+			break;
+	}
+}
+
+/** 
+ * pass the variable from GUI to camera streaming thread
+ * and print out these values
+ * set the flag on enable rgb to rgb matrix
+ */
+void enable_rgb_matrix(int red_red, int red_green, int red_blue,
+	int green_red, int green_green, int green_blue,
+	int blue_red, int blue_green, int blue_blue)
+{
+ 	*rr = red_red;
+	*rg = red_green;
+	*rb = red_blue;
+	*gr = green_red;
+	*gg = green_green;
+	*gb = green_blue;
+	*br = blue_red;
+	*bg = blue_green;
+	*bb = blue_blue;
+	*rgb_matrix_flag = 1;
+	printf("rgb matrix enabled\r\n");
+	printf("rr = %d\trg = %d\trb = %d\r\n"
+	"gr = %d\tgg = %d\tgb = %d\r\n"
+	"br = %d\tbg = %d\tbb = %d\r\n",
+	*rr, *rg, *rb, *gr, *gg, *gb, *br, *bg, *bb);
+}
+
+/**
+ * disable the flag on rgb to rgb matrix
+ */
+void disable_rgb_matrix()
+{
+	*rgb_matrix_flag = 0;
+}
+
+// bgr_planes[0];//blue channel
+// bgr_planes[1];//green channel
+// bgr_planes[2];//red channel
+static void apply_rgb_matrix_post_debayer(cv::InputOutputArray _opencvImage)
+{
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
+	cv::cuda::GpuMat bgr_planes[3];
+	cv::cuda::GpuMat output[3];
+	cv::cuda::split(opencvImage, bgr_planes);
+	//TODO: multiply the matrix etc
+	//cv::cuda::merge(output, 3, opencvImage);
+	cv::cuda::merge(bgr_planes, 3, opencvImage);
+	
+#else
+	cv::Mat opencvImage = _opencvImage.getMat();
+	cv::Mat bgr_planes[3];
+	cv::Mat output[3];
+	cv::split(opencvImage, bgr_planes);
+
+	output[0] = ((*bb) * bgr_planes[0] + (*bg) * bgr_planes[1] + (*br) * bgr_planes[2])/256; //blue
+	// FIXME: why every time adding bgr_planes[2] multiple 0 can even make color wrong?
+	// so red-green and green-red don't work now because I couldn't add in
+	//output[1] = ((*gb) * bgr_planes[0] + (*gg) * bgr_planes[1] + (*gr) * bgr_planes[2])/256; // green
+	output[1] = ((*gb) * bgr_planes[0] + (*gg) * bgr_planes[1] )/256; // green
+	output[2] = ((*rb) * bgr_planes[0] + (*rg) * bgr_planes[1] + (*rr) * bgr_planes[2])/256;  // red
+
+	cv::merge(output, 3, opencvImage);
+#endif
 }
 
 /**
@@ -987,29 +1464,34 @@ void swap_two_bytes(struct device *dev, const void *p)
  */
 void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 {
+	
 	/** color output */
-	if (add_bayer_forcv(bayer_flag) != 4) {
-		#ifdef HAVE_OPENCV_CUDA_SUPPORT
-			// cv::cuda::cvtColor(opencvImage, opencvImage,
-			// cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-			cv::cuda::demosaicing(opencvImage, opencvImage,
-			cv::cuda::COLOR_BayerBG2BGR_MHT + add_bayer_forcv(bayer_flag));
-		#else
-			cv::cvtColor(opencvImage, opencvImage,
-			cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-		#endif
+	if (add_bayer_forcv(bayer_flag) != 4)
+	{
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+		// cv::cuda::cvtColor(opencvImage, opencvImage,
+		// cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		cv::cuda::demosaicing(opencvImage, opencvImage,
+							  cv::cuda::COLOR_BayerBG2BGR_MHT + add_bayer_forcv(bayer_flag));
+#else
+		cv::cvtColor(opencvImage, opencvImage,
+					 cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+
+#endif
+	if (*rgb_matrix_flag == TRUE)
+		apply_rgb_matrix_post_debayer(opencvImage);
 	}
 	/** mono output */
 	if (add_bayer_forcv(bayer_flag) == 4)
 	{
 		CV_Assert((opencvImage.type() == CV_8UC1) || (opencvImage.type() == CV_8UC3));
-		#ifdef HAVE_OPENCV_CUDA_SUPPORT
-			cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-			cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
-		#else 
-			cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-			cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
-		#endif
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
+		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
+#else
+		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
+		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
+#endif
 	}
 
 	/** gamma correction functionality, only available for bayer camera */
@@ -1023,31 +1505,30 @@ void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
 	/** check abc flag, abc functionality, only available for bayer camera */
 	if (*(abc_flag) == TRUE)
 	{
-		#ifndef USING_CLAHE
-			apply_auto_brightness_and_contrast(opencvImage, 1);
-		#else
-			apply_auto_brightness_and_contrast(opencvImage);
-		#endif
+#ifndef USING_CLAHE
+		apply_auto_brightness_and_contrast(opencvImage, 1);
+#else
+		apply_auto_brightness_and_contrast(opencvImage);
+#endif
 	}
-
 }
 
 /**
  * unify putting text in opencv image
  * a wrapper for put_text()
  */
-static void streaming_put_text(cv::Mat opencvImage, 
-	const char *str, int cordinate_y)
+static void streaming_put_text(cv::Mat opencvImage,
+							   const char *str, int cordinate_y)
 {
 	int scale = opencvImage.cols / 1000;
 	cv::putText(opencvImage,
 				str,
-				cv::Point(scale * TEXT_SCALE_BASE, cordinate_y),	  	// Coordinates
-				cv::FONT_HERSHEY_SIMPLEX,  			// Font
-				(float)scale,					   			// Scale. 2.0 = 2x bigger
-				cv::Scalar(255, 255, 255), 			// BGR Color - white
-				2						   			// Line Thickness (Optional)
-	);									   			// Anti-alias (Optional)
+				cv::Point(scale * TEXT_SCALE_BASE, cordinate_y), // Coordinates
+				cv::FONT_HERSHEY_SIMPLEX,						 // Font
+				(float)scale,									 // Scale. 2.0 = 2x bigger
+				cv::Scalar(255, 255, 255),						 // BGR Color - white
+				2												 // Line Thickness (Optional)
+	);															 // Anti-alias (Optional)
 }
 
 /** 
@@ -1067,12 +1548,19 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	int width = dev->width;
 
 	cv::Mat share_img;
-	#ifdef HAVE_OPENCV_CUDA_SUPPORT
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
 	cv::cuda::GpuMat gpu_img;
-	#endif
+#endif
+	//TODO:
+	if (*(soft_ae_flag) == TRUE) 
+	 	do_soft_ae(dev, p);
+	
+
 	/** --- for raw10, raw12 bayer camera ---*/
 	if (shift > 0)
 	{
+		if (*rgb_gain_offset_flag == 1)
+			apply_rgb_gain_offset_pre_debayer(dev, p);
 		/** 
 		 * tried with CV_16UC1 and then cast back, it doesn't really improve fps
 		 * since even I comment out perform_shift(), it doesn't improve fps
@@ -1080,32 +1568,32 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		 */
 		perform_shift(dev, p, shift);
 		//swap_two_bytes(dev, p);
-		cv::Mat img(height, width, CV_8UC1, (void *)p);
-		#ifdef HAVE_OPENCV_CUDA_SUPPORT
-			gpu_img.upload(img);
-			group_3a_ctrl_flags_for_raw_camera(gpu_img);
-			gpu_img.download(img);		
-		#else
-			group_3a_ctrl_flags_for_raw_camera(img);
-		#endif
-		
-		#ifdef DUAL_CAM
-			/// define region of interest for cropped Mat for AR0231 DUAL
-			cv::Rect roi_left(0, 0, dev->width/2, dev->height);
-			cv::Mat cropped_ref_left(img, roi_left);
-			cv::Mat cropped_left;
-			cropped_ref_left.copyTo(cropped_left);
-			cv::imshow("cam_left", cropped_left);
 
-			cv::Rect roi_right(dev->width/2, 0, dev->width/2, dev->height);
-			cv::Mat cropped_ref_right(img, roi_right);
-			cv::Mat cropped_right;
-			cropped_ref_right.copyTo(cropped_right);
-			cv::imshow("cam_right", cropped_right);
-		#endif
+		cv::Mat img(height, width, CV_8UC1, (void *)p);
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+		gpu_img.upload(img);
+		group_3a_ctrl_flags_for_raw_camera(gpu_img);
+		gpu_img.download(img);
+#else
+		group_3a_ctrl_flags_for_raw_camera(img);
+#endif
+
+#ifdef DUAL_CAM
+		/// define region of interest for cropped Mat for AR0231 DUAL
+		cv::Rect roi_left(0, 0, dev->width / 2, dev->height);
+		cv::Mat cropped_ref_left(img, roi_left);
+		cv::Mat cropped_left;
+		cropped_ref_left.copyTo(cropped_left);
+		cv::imshow("cam_left", cropped_left);
+
+		cv::Rect roi_right(dev->width / 2, 0, dev->width / 2, dev->height);
+		cv::Mat cropped_ref_right(img, roi_right);
+		cv::Mat cropped_right;
+		cropped_ref_right.copyTo(cropped_right);
+		cv::imshow("cam_right", cropped_right);
+#endif
 
 		share_img = img;
-
 	}
 
 	/** --- for yuv camera ---*/
@@ -1123,25 +1611,28 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	{
 		// each pixel is 8-bit instead of 16-bit now
 		// need to adjust read width
-		width = width * 2; 
+		width = width * 2;
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
-		#ifdef HAVE_OPENCV_CUDA_SUPPORT
-			gpu_img.upload(img);
-			group_3a_ctrl_flags_for_raw_camera(gpu_img);
-			gpu_img.download(img);
-		#else
-			group_3a_ctrl_flags_for_raw_camera(img);
-		#endif
+		if (*rgb_gain_offset_flag == 1)
+			apply_rgb_gain_offset_pre_debayer(dev, p);
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+		gpu_img.upload(img);
+		group_3a_ctrl_flags_for_raw_camera(gpu_img);
+		gpu_img.download(img);
+#else
+		group_3a_ctrl_flags_for_raw_camera(img);
+#endif
 		share_img = img;
 	}
 
-	#ifdef IMG_FLIP_VERTICALLY
-		cv::flip(share_img, share_img, 0); 
-	#endif
-	#ifdef IMG_FLIP_HORIZONTALLY
-		cv::flip(share_img, share_img, 1); 
-	#endif
-
+#ifdef IMG_FLIP_VERTICALLY
+	cv::flip(share_img, share_img, 0);
+#endif
+#ifdef IMG_FLIP_HORIZONTALLY
+	cv::flip(share_img, share_img, 1);
+#endif
+	//printf("mean is =%d\r\n",calc_mat_mean(share_img));
+	//dewarp(share_img);
 	/** check for save capture bmp flag, after decode the image */
 	if (*(save_bmp))
 	{
@@ -1150,39 +1641,39 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 		image_count++;
 		set_save_bmp_flag(0);
 	}
-	#ifdef RESIZE_OPENCV_WINDOW
-		/** if image larger than 720p by any dimension, resize the window */
-		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
-			cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
-	#endif
-	
-	#ifdef DISPLAY_FRAME_RATE_RES_INFO
-		int height_scale = (share_img.cols / 1000) ;
-		streaming_put_text(share_img, "ESC: close streaming window", 
-			height_scale * TEXT_SCALE_BASE);
+#ifdef RESIZE_OPENCV_WINDOW
+	/** if image larger than 720p by any dimension, resize the window */
+	if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
+		cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
+#endif
 
-		char resolution[25];
-		sprintf(resolution, "Current Res:%dx%d", width, height);
-		streaming_put_text(share_img, resolution, 
-			height_scale * TEXT_SCALE_BASE * 2);
+#ifdef DISPLAY_FRAME_RATE_RES_INFO
+	int height_scale = (share_img.cols / 1000);
+	streaming_put_text(share_img, "ESC: close streaming window",
+					   height_scale * TEXT_SCALE_BASE);
 
-		/** 
+	char resolution[25];
+	sprintf(resolution, "Current Res:%dx%d", width, height);
+	streaming_put_text(share_img, resolution,
+					   height_scale * TEXT_SCALE_BASE * 2);
+
+	/** 
   		 * getTickcount: return number of ticks from OS
 		 * getTickFrequency: returns the number of ticks per second
 		 * t = ((double)getTickCount() - t)/getTickFrequency();
 		 * fps is t's reciprocal
 		 */
-		cur_time = ((double)cv::getTickCount() - cur_time) / \
-		cv::getTickFrequency();
-		double fps = 1.0 / cur_time;						// frame rate
-		char string_frame_rate[10];					// string to save fps
-		sprintf(string_frame_rate, "%.2f", fps); 	// to 2 decimal places
-		char fpsString[20];
-		strcpy(fpsString, "Current Fps:");
-		strcat(fpsString, string_frame_rate);
-		streaming_put_text(share_img, fpsString, 
-			height_scale * TEXT_SCALE_BASE * 3);
-	#endif
+	cur_time = ((double)cv::getTickCount() - cur_time) /
+			   cv::getTickFrequency();
+	double fps = 1.0 / cur_time;			 // frame rate
+	char string_frame_rate[10];				 // string to save fps
+	sprintf(string_frame_rate, "%.2f", fps); // to 2 decimal places
+	char fpsString[20];
+	strcpy(fpsString, "Current Fps:");
+	strcat(fpsString, string_frame_rate);
+	streaming_put_text(share_img, fpsString,
+					   height_scale * TEXT_SCALE_BASE * 3);
+#endif
 	cv::imshow("cam", share_img);
 	if (cv::waitKey(_1MS) == _ESC_KEY)
 	{

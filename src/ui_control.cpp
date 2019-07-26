@@ -1,7 +1,16 @@
 /*****************************************************************************
-  This sample is released as public domain.  It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
   
   This is the sample code for Leopard USB3.0 camera, mainly for the camera tool
   control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you 
@@ -24,6 +33,12 @@
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
+static GtkWidget *window = NULL;    /// the main window 
+GtkWidget *maintable;               /// menu bar's elements are put local
+GtkWidget *notebook; 
+GtkWidget *tab1, *tab2;
+GtkWidget *grid1, *grid2;
+/// grid1 elements
 GtkWidget *label_device, *label_hw_rev, *label_fw_rev, *button_exit_streaming;
 GtkWidget *label_datatype, *hbox_datatype;
 GtkWidget *radio_raw10, *radio_raw12, *radio_yuyv, *radio_raw8;
@@ -45,13 +60,17 @@ GtkWidget *label_capture, *button_capture_bmp, *button_capture_raw;
 GtkWidget *label_gamma, *entry_gamma, *button_apply_gamma;
 GtkWidget *label_trig, *check_button_trig_en, *button_trig;
 GtkWidget *label_blc, *entry_blc, *button_apply_blc;
-GtkWidget *grid;
-GtkWidget *maintable;
-GtkWidget *menu_bar, *config_file_item, *file_menu, *help_menu, *help_item;
-GtkWidget *device_menu, *device_item;
-GtkWidget *fw_update_item, *fw_update_menu;
-GtkWidget *file_dialog;
-static GtkWidget *window = NULL;    /** the main window */
+/// grid2 elements
+GtkWidget *check_button_rgb_gain, *button_update_rgb_gain;
+GtkWidget *entry_red_gain, *entry_green_gain, *entry_blue_gain;
+GtkWidget *entry_red_offset, *entry_green_offset, *entry_blue_offset;
+GtkWidget *check_button_rgb_matrix, *button_update_rgb_matrix;
+GtkWidget *entry_red_red, *entry_red_green, *entry_red_blue; 
+GtkWidget *entry_green_red, *entry_green_green, *entry_green_blue; 
+GtkWidget *entry_blue_red, *entry_blue_green, *entry_blue_blue; 
+GtkWidget *check_button_soft_ae;
+
+
 int address_width_flag;
 int value_width_flag;
 
@@ -62,10 +81,153 @@ extern int v4l2_dev;
 **                      	Internal Callbacks
 *****************************************************************************/
 
+/** 
+ * callback for update rgb gain
+ * limit the input on MAX/MIN_RGB macros
+ */
+void set_rgb_gain_offset(GtkWidget *widget)
+{
+    (void) widget;
+    int red_gain = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_red_gain)));
+    red_gain = set_limit(red_gain, MAX_RGB_GAIN, MIN_RGB_GAIN);
+
+    int green_gain = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_green_gain)));
+    green_gain = set_limit(green_gain, MAX_RGB_GAIN, MIN_RGB_GAIN);
+    
+    int blue_gain = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_blue_gain)));
+    blue_gain = set_limit(blue_gain, MAX_RGB_GAIN, MIN_RGB_GAIN);
+    
+    int red_offset = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_red_offset)));
+    red_offset = set_limit(red_offset, MAX_RGB_OFFSET, MIN_RGB_OFFSET);
+
+    int green_offset = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_green_offset)));
+    green_offset = set_limit(green_offset, MAX_RGB_OFFSET, MIN_RGB_OFFSET);
+
+    int blue_offset = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_blue_offset)));
+    blue_offset = set_limit(blue_offset, MAX_RGB_OFFSET, MIN_RGB_OFFSET);
+
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_rgb_gain))) {
+        enable_rgb_gain_offset (red_gain, green_gain, blue_gain, red_offset, 
+        green_offset, blue_offset);
+    }
+    else
+    {
+        disable_rgb_gain_offset(); 
+        g_print("set rgb gain offset disabled\r\n");
+    }
+    
+
+}
+// http://www.imatest.com/docs/colormatrix/
+void set_rgb_matrix(GtkWidget *widget)
+{
+    (void) widget;
+    int red_red = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_red_red)));
+    red_red = set_limit (red_red, 512, -512);
+
+    int red_green = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_red_green)));
+    red_green = set_limit (red_green, 512, -512);
+
+    int red_blue = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_red_blue)));
+    red_blue = set_limit (red_blue, 512, -512);
+
+    int green_red = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_green_red)));
+    green_red = set_limit (green_red, 512, -512);
+
+    int green_green = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_green_green)));
+    green_green = set_limit (green_green, 512, -512);
+
+    int green_blue = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_green_blue)));
+    green_blue = set_limit (green_blue, 512, -512);
+
+    int blue_red = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_blue_red)));
+    blue_red = set_limit (blue_red, 512, -512);
+
+    int blue_green = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_blue_green)));
+    blue_green = set_limit (blue_green, 512, -512);
+
+    int blue_blue = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_blue_blue)));
+    blue_blue = set_limit (blue_blue, 512, -512);
+
+    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_rgb_matrix))) {
+        enable_rgb_matrix (red_red, red_green, red_blue, 
+        green_red, green_green, green_blue,
+        blue_red, blue_green, blue_blue);
+    }
+    else
+    {
+        disable_rgb_matrix(); 
+        g_print("set rgb matrix disabled\r\n");        
+    }
+    
+
+}
+/** callback for enabling/disabling auto white balance */
+void enable_soft_ae(GtkToggleButton *toggle_button)
+{
+    if (gtk_toggle_button_get_active(toggle_button))
+    {
+        g_print("software ae enable\n");
+        soft_ae_enable(1);
+    }
+    else
+    {
+        g_print("software ae disable\n");
+        soft_ae_enable(0);
+    }
+}
+
+/**---------------------------------menu bar callbacks--------------------- */
+void about_info(GtkWidget *widget, gpointer window)
+{
+    char buf[100];
+    snprintf(buf, sizeof(buf), "Linux Camera Tool for Leopard Imaging "
+    "USB3.0 Cameras\nLeopard Imaging Inc, 2019" );
+
+    (void)widget;
+    GtkWidget *label_about, *dialog_about, *content_area;
+    dialog_about = gtk_dialog_new_with_buttons("About", GTK_WINDOW(window),
+    GTK_DIALOG_MODAL, "_OK", GTK_RESPONSE_OK, NULL);
+    gtk_window_set_default_size(GTK_WINDOW(dialog_about), 250, -1);
+    label_about = gtk_label_new(buf);
+    gtk_label_set_use_markup(GTK_LABEL(label_about), TRUE);
+    g_object_set(label_about, "margin", 20, NULL);
+    gtk_label_set_line_wrap (GTK_LABEL(label_about), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(label_about), 40);
+    content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog_about));
+    gtk_container_add(GTK_CONTAINER(content_area), label_about);
+    gtk_widget_show_all(dialog_about);
+    gint response = gtk_dialog_run(GTK_DIALOG(dialog_about));
+    if (response == GTK_RESPONSE_OK)
+        g_print("OK is pressed");
+    gtk_widget_destroy(dialog_about);
+
+}
+
+void exit_from_help(GtkWidget *widget)
+{
+    exit_loop(widget);
+}
+
 void open_config_dialog(GtkWidget *widget, gpointer window)
 {
     (void)widget;
-    file_dialog = gtk_file_chooser_dialog_new("Load Config File",
+    GtkWidget *file_dialog = gtk_file_chooser_dialog_new("Load Config File",
     GTK_WINDOW(window),
     GTK_FILE_CHOOSER_ACTION_OPEN,
     ("_Open"),
@@ -104,7 +266,8 @@ void open_config_dialog(GtkWidget *widget, gpointer window)
 
 void fw_update_clicked (GtkWidget *item)
 {
-    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Erase Firmware") == 0 )
+    if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)),
+         "Erase Firmware") == 0 )
     {
         /// close the camera first before erase 
         set_loop(0);
@@ -112,13 +275,14 @@ void fw_update_clicked (GtkWidget *item)
         gtk_main_quit();
         
     }
-    else if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), "Reset Camera") == 0 )
+    else if (strcmp(gtk_menu_item_get_label(GTK_MENU_ITEM(item)), 
+        "Reset Camera") == 0 )
     {
         reboot_camera(v4l2_dev);
     }
 
 }
-
+/**---------------------------------grid callbacks------------------------------- */
 /** callback for sensor datatype updates*/
 void radio_datatype(GtkWidget *widget, gpointer data)
 {
@@ -139,7 +303,7 @@ void hscale_exposure_up(GtkRange *widget)
     int exposure_time;
     exposure_time = (int)gtk_range_get_value(widget);
     set_exposure_absolute(v4l2_dev, exposure_time);
-    g_print("exposure is %d lines\n", exposure_time);
+    g_print("exposure is %d lines\n",get_exposure_absolute(v4l2_dev));
 }
 
 /** callback for updating analog gain */
@@ -148,7 +312,7 @@ void hscale_gain_up(GtkRange *widget)
     int gain;
     gain = (int)gtk_range_get_value(widget);
     set_gain(v4l2_dev, gain);
-    g_print("gain is %d\n", gain);
+    g_print("gain is %d\n", get_gain(v4l2_dev));
 }
 
 /** callback for enabling/disabling auto exposure */
@@ -243,9 +407,9 @@ void register_write(GtkWidget *widget)
         buf[1] = (regVal >> 8) & 0xff;
 
         /** write 8/16 bit register addr and register data */
-        generic_I2C_write(v4l2_dev, (GENERIC_REG_WRITE_FLG | 
-            addr_width_for_rw(address_width_flag)),
-            val_width_for_rw(value_width_flag), 
+        generic_I2C_write(v4l2_dev, (GENERIC_REG_WRITE_FLG | \
+            addr_width_for_rw(address_width_flag)),         
+            val_width_for_rw(value_width_flag),             
             slaveAddr, regAddr, buf);
     }
 }
@@ -438,38 +602,26 @@ void iterate_def_elements (
         switch (def->wid_type) 
         {
             case GTK_WIDGET_TYPE_LABEL:
-                //def->widget = gtk_label_new(NULL);
-                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_label_set_text(GTK_LABEL(def->widget), def->label_str);
                break;
             case GTK_WIDGET_TYPE_BUTTON:
-                //def->widget = gtk_button_new();
-               // printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
                 break;
             case GTK_WIDGET_TYPE_VBOX:
-                //def->widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
-            
-                //printf("widget %d is %x\r\n", count++, def->widget);
                 break;
-            case GTK_WIDGET_TYPE_RADIO_BUTTON:
-                //printf("widget %d is %x\r\n", count++, def->widget);
+            case GTK_WIDGET_TYPE_RADIO_BUTTON:  
                 gtk_box_pack_start(GTK_BOX(def->parent), def->widget, 0, 0, 0);
                 gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
                 break;
             case GTK_WIDGET_TYPE_CHECK_BUTTON:
-                //def->widget =  gtk_check_button_new();
-                //printf("widget %d is %x\r\n", count++, def->widget);
+
                 gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
                 break;
             case GTK_WIDGET_TYPE_ENTRY:
-                //def->widget =  gtk_entry_new();
-                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_entry_set_text(GTK_ENTRY(def->widget), def->label_str);
                 gtk_entry_set_width_chars(GTK_ENTRY(def->widget), -1);
                 break;
             case GTK_WIDGET_TYPE_HSCALE:
-                //printf("widget %d is %x\r\n", count++, def->widget);
                 gtk_widget_set_hexpand(def->widget, TRUE);
                 break;
             default:
@@ -560,7 +712,7 @@ void iterate_grid_elements(
     {
        // printf("element is %x, col=%d, row=%d\r\n", ele->widget, ele->col, ele->row);
         g_assert(ele->widget != NULL);
-        gtk_grid_attach(GTK_GRID(grid), ele->widget, ele->col,
+        gtk_grid_attach(GTK_GRID(grid1), ele->widget, ele->col,
                         ele->row, ele->width, 1);
     }
 }
@@ -824,53 +976,212 @@ int gui_init()
     return 0;
 }
 
-void grid_setup()
-{
-    grid = gtk_grid_new();
 
-    /** --- Grid Layout, DON'T CHANGE --- */
+void grid1_setup()
+{
+    /** --- Grid 1 Layout, DON'T CHANGE --- */
     init_all_widgets();
     list_all_def_elements ();
     list_all_grid_elements();
     list_all_element_callbacks();
 
-    /** --- Grid Setup --- */
-    gtk_grid_set_column_homogeneous(GTK_GRID(grid), FALSE);
-    gtk_widget_set_hexpand(grid, TRUE);
-    gtk_widget_set_halign(grid, GTK_ALIGN_FILL);
-    gtk_grid_set_row_spacing(GTK_GRID(grid), 6);
-    gtk_grid_set_column_spacing(GTK_GRID(grid), 6);
-    gtk_container_set_border_width(GTK_CONTAINER(grid), 2);
-    gtk_container_add(GTK_CONTAINER(maintable), grid);
+    /** --- Grid 1 Setup --- */
+    gtk_grid_set_column_homogeneous(GTK_GRID(grid1), FALSE);
+    gtk_widget_set_hexpand(grid1, TRUE);
+    gtk_widget_set_halign(grid1, GTK_ALIGN_FILL);
+    gtk_grid_set_row_spacing(GTK_GRID(grid1), 6);
+    gtk_grid_set_column_spacing(GTK_GRID(grid1), 6);
+    gtk_container_set_border_width(GTK_CONTAINER(grid1), 2);
+
 }
-void init_all_menus()
+void grid2_setup()
 {
-    device_menu = gtk_menu_new();
-    file_menu = gtk_menu_new();
-    fw_update_menu = gtk_menu_new();
-    help_menu = gtk_menu_new();
-}
-void list_all_menu_elements()
-{
+
+    check_button_rgb_gain  = gtk_check_button_new();
+    gtk_button_set_label(GTK_BUTTON(check_button_rgb_gain), "RGBGainOffsetEna");
+    gtk_grid_attach(GTK_GRID(grid2), check_button_rgb_gain, 0, 0, 2, 1);
     
+    button_update_rgb_gain = gtk_button_new();
+    gtk_button_set_label(GTK_BUTTON(button_update_rgb_gain), "Update");
+    gtk_grid_attach(GTK_GRID(grid2), button_update_rgb_gain, 3, 0, 1, 1);
+   
+
+    GtkWidget *label_red_gain = gtk_label_new("Red Gain:");
+    GtkWidget *label_green_gain = gtk_label_new("Green Gain:");
+    GtkWidget *label_blue_gain = gtk_label_new("Blue Gain:");
+    gtk_grid_attach(GTK_GRID(grid2), label_red_gain, 0, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_green_gain, 0, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_blue_gain, 0, 3, 1, 1);
+
+    entry_red_gain = gtk_entry_new();
+    entry_green_gain = gtk_entry_new();
+    entry_blue_gain = gtk_entry_new();
+    gtk_entry_set_text(GTK_ENTRY(entry_red_gain), "512");
+    gtk_entry_set_text(GTK_ENTRY(entry_green_gain), "512");
+    gtk_entry_set_text(GTK_ENTRY(entry_blue_gain), "512");
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_red_gain), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_green_gain), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_blue_gain), -1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_red_gain, 1, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_green_gain, 1, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_blue_gain, 1, 3, 1, 1);
+
+
+    GtkWidget *label_red_offset = gtk_label_new("Red Offset:");
+    GtkWidget *label_green_offset = gtk_label_new("Green Offset:");
+    GtkWidget *label_blue_offset = gtk_label_new("Blue Offset:");
+    gtk_grid_attach(GTK_GRID(grid2), label_red_offset, 2, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_green_offset, 2, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_blue_offset, 2, 3, 1, 1);
+
+    entry_red_offset = gtk_entry_new();
+    entry_green_offset = gtk_entry_new();
+    entry_blue_offset = gtk_entry_new();
+    gtk_entry_set_text(GTK_ENTRY(entry_red_offset), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_green_offset), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_blue_offset), "0");
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_red_offset), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_green_offset), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_blue_offset), -1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_red_offset, 3, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_green_offset, 3, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_blue_offset, 3, 3, 1, 1);
+
+
+    g_signal_connect (button_update_rgb_gain, "clicked", G_CALLBACK(set_rgb_gain_offset), NULL);
+
+    check_button_rgb_matrix  = gtk_check_button_new();
+    gtk_button_set_label(GTK_BUTTON(check_button_rgb_matrix), "RGB2RGBMatrixEna");
+    gtk_grid_attach(GTK_GRID(grid2), check_button_rgb_matrix, 0, 4, 2, 1);
+
+    button_update_rgb_matrix = gtk_button_new();
+    gtk_button_set_label(GTK_BUTTON(button_update_rgb_matrix), "Update");
+    gtk_grid_attach(GTK_GRID(grid2), button_update_rgb_matrix, 3, 4, 1, 1);
+
+    GtkWidget *label_red_hor = gtk_label_new("Red");
+    GtkWidget *label_green_hor = gtk_label_new("Green");
+    GtkWidget *label_blue_hor = gtk_label_new("Blue");
+    gtk_grid_attach(GTK_GRID(grid2), label_red_hor, 1, 5, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_green_hor, 2, 5, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_blue_hor, 3, 5, 1, 1);
+
+    GtkWidget *label_red_ver = gtk_label_new("Red");
+    GtkWidget *label_green_ver = gtk_label_new("Green");
+    GtkWidget *label_blue_ver = gtk_label_new("Blue");
+    gtk_grid_attach(GTK_GRID(grid2), label_red_ver, 0, 6, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_green_ver, 0, 7, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), label_blue_ver, 0, 8, 1, 1);
+
+
+    entry_red_red = gtk_entry_new();
+    entry_red_green = gtk_entry_new();
+    entry_red_blue = gtk_entry_new();
+    entry_green_red = gtk_entry_new();
+    entry_green_green = gtk_entry_new();
+    entry_green_blue = gtk_entry_new();
+    entry_blue_red = gtk_entry_new();
+    entry_blue_green = gtk_entry_new();
+    entry_blue_blue = gtk_entry_new();
+    
+    gtk_entry_set_text(GTK_ENTRY(entry_red_red), "256");
+    gtk_entry_set_text(GTK_ENTRY(entry_red_green), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_red_blue), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_green_red), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_green_green), "256");
+    gtk_entry_set_text(GTK_ENTRY(entry_green_blue), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_blue_red), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_blue_green), "0");
+    gtk_entry_set_text(GTK_ENTRY(entry_blue_blue), "256");
+
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_red_red), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_red_green), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_red_blue), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_green_red), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_green_green), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_green_blue),-1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_blue_red), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_blue_green), -1);
+    gtk_entry_set_width_chars(GTK_ENTRY(entry_blue_blue), -1);
+
+
+    gtk_grid_attach(GTK_GRID(grid2), entry_red_red, 1, 6, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_red_green, 2, 6, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_red_blue, 3, 6, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_green_red, 1, 7, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_green_green, 2, 7, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_green_blue, 3, 7, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_blue_red, 1, 8, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_blue_green, 2, 8, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid2), entry_blue_blue, 3, 8, 1, 1);
+
+    g_signal_connect (button_update_rgb_matrix, "clicked", G_CALLBACK(set_rgb_matrix), NULL);
+
+    check_button_soft_ae  = gtk_check_button_new();
+    gtk_button_set_label(GTK_BUTTON(check_button_soft_ae), "Software AE");
+    gtk_grid_attach(GTK_GRID(grid2), check_button_soft_ae, 0, 9, 1, 1);
+    g_signal_connect (check_button_soft_ae, "toggled", G_CALLBACK(enable_soft_ae), NULL);
+    
+    // GtkWidget *label_cur_exp = gtk_label_new(NULL);
+    // char exp_buf[25]; 
+    // snprintf(exp_buf, sizeof(exp_buf), "current exposure=%d", get_exposure_absolute(v4l2_dev));
+    // gtk_label_set_text(GTK_LABEL(label_cur_exp), exp_buf);
+    // gtk_grid_attach(GTK_GRID(grid2), label_cur_exp, 0, 10, 2, 1);
+
+    // GtkWidget *label_cur_gain = gtk_label_new(NULL);
+    // char gain_buf[20]; 
+    // snprintf(gain_buf, sizeof(gain_buf), "current gain=%d", get_gain(v4l2_dev));
+    // gtk_label_set_text(GTK_LABEL(label_cur_gain), gain_buf);
+    // gtk_grid_attach(GTK_GRID(grid2), label_cur_gain, 2, 10, 2, 1);
+
+    /** --- Grid 2 Setup --- */
+    gtk_grid_set_column_homogeneous(GTK_GRID(grid2), FALSE);
+    gtk_widget_set_hexpand(grid2, TRUE);
+    gtk_widget_set_halign(grid2, GTK_ALIGN_FILL);
+    gtk_grid_set_row_spacing(GTK_GRID(grid2), 6);
+    gtk_grid_set_column_spacing(GTK_GRID(grid2), 6);
+    gtk_container_set_border_width(GTK_CONTAINER(grid2), 2);
+
+}
+void notebook_setup()
+{
+    notebook = gtk_notebook_new();
+    gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_BOTTOM);
+ 
+    tab1 = gtk_label_new("tab1");
+    tab2 = gtk_label_new("tab2");
+
+    grid1 = gtk_grid_new();
+    grid2 = gtk_grid_new();
+
+    grid1_setup();
+    grid2_setup();
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid1, tab1);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid2, tab2);
+    gtk_container_add(GTK_CONTAINER(maintable), notebook);
+
 }
 
 void menu_bar_setup()
 {
-    menu_bar = gtk_menu_bar_new();
+
+    GtkWidget *menu_bar = gtk_menu_bar_new();
     gtk_menu_bar_set_pack_direction(GTK_MENU_BAR(menu_bar), 
         GTK_PACK_DIRECTION_LTR); 
     
-    init_all_menus();
+    /** init all menus */
+    GtkWidget *device_menu = gtk_menu_new();
+    GtkWidget *file_menu = gtk_menu_new();
+    GtkWidget *fw_update_menu = gtk_menu_new();
+    GtkWidget *help_menu = gtk_menu_new();
 
     /** device items */
-    device_item = gtk_menu_item_new_with_label("Devices");
+    GtkWidget *device_item = gtk_menu_item_new_with_label("Devices");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(device_item), device_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), device_item);
 
 
     /** config file items */
-    config_file_item = gtk_menu_item_new_with_label("Config File");
+    GtkWidget *config_file_item = gtk_menu_item_new_with_label("Config File");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(config_file_item), file_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), config_file_item);
 
@@ -892,7 +1203,7 @@ void menu_bar_setup()
     
 
     /** firmware update items */
-    fw_update_item = gtk_menu_item_new_with_label("FW Update");
+    GtkWidget *fw_update_item = gtk_menu_item_new_with_label("FW Update");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(fw_update_item), fw_update_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), fw_update_item);
 
@@ -904,19 +1215,18 @@ void menu_bar_setup()
     gtk_menu_shell_append(GTK_MENU_SHELL(fw_update_menu), fw_update_item);
     g_signal_connect(fw_update_item, "activate", G_CALLBACK(fw_update_clicked), NULL);
 
-
     /** help items */
-    help_item = gtk_menu_item_new_with_label("Help");
+    GtkWidget *help_item = gtk_menu_item_new_with_label("Help");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(help_item), help_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), help_item);
-    //g_signal_connect(help_item, "activate", G_CALLBACK(menu_response), NULL);
-
 
     help_item = gtk_menu_item_new_with_label("About");
     gtk_menu_shell_append(GTK_MENU_SHELL(help_menu), help_item);
+    g_signal_connect(help_item, "activate", G_CALLBACK(about_info), NULL);
 
     help_item = gtk_menu_item_new_with_label("Exit");
     gtk_menu_shell_append(GTK_MENU_SHELL(help_menu), help_item);
+    g_signal_connect(help_item, "activate", G_CALLBACK(exit_loop), NULL);
 
     gtk_container_add(GTK_CONTAINER(maintable), menu_bar);
 }
@@ -934,7 +1244,7 @@ void gui_run()
 
     maintable = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
     menu_bar_setup();
-    grid_setup();
+    notebook_setup();
     gtk_container_add(GTK_CONTAINER(window), maintable);
 
 

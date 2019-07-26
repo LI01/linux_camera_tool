@@ -1,7 +1,16 @@
 /*****************************************************************************
-  This sample is released as public domain.  It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
 
   This is the sample code for Leopard USB3.0 camera for register control & 
   trigger/strobe & fw&hw revision under Linux using V4L2. For supporting more
@@ -298,6 +307,11 @@ void read_cam_uuid_hwfw_rev(int fd)
 
 /**
  * set sensor serial number/ uuid number
+ * used for mass production camera that got the official serial numbers
+ * and use this for group program the serial number from a serial number doc 
+ * This is not available for normal released camera.
+ * If serial number is still needed, one can ask for a firmware update that 
+ * read the fuse ID from sensor/FX3 for serial number.
  */
 void sensor_set_serial_number(int fd, char *sn)
 {
@@ -591,8 +605,8 @@ int sensor_reg_read(int fd, int regAddr)
 /** 
  * This call will erase firmware saved in FX3 EEPROM, and then issue a reset for FX3 
  * !!!!!!!!!!!CALL IT WITH CAUTION!!!!!!!!!!!! 
- * For firmware update and further, refer to FX3 API:
- * https://github.com/nickdademo/cypress-fx3-sdk-linux/tree/master/util/cyusb_linux_1.0.4/src
+ * args: 
+ * 		fd 		- file descriptor
  */
 void firmware_erase(int fd)
 {
@@ -610,6 +624,8 @@ void firmware_erase(int fd)
 /** 
  * This call will issue a reset for FX3 
  * !!!!!!!!!!!CALL IT WITH CAUTION!!!!!!!!!!!!  
+ * args: 
+ * 		fd 		- file descriptor
  */
 void reboot_camera(int fd)
 {
@@ -626,7 +642,9 @@ void reboot_camera(int fd)
 
 /** 
  * ONLY some of YUV camera driver will support this
- * TODO: find the corresponding firmware code
+ * args: 
+ * 		fd 		- file descriptor
+ * 		mode
  */
 void set_spi_port_select(int fd, int mode)
 {
@@ -698,7 +716,7 @@ void generic_I2C_write(int fd, int rw_flag, int bufCnt,
  *  register read/write for different slaves on I2C line
  *
  *  Register data starts from Byte4(8bit address) or Byte5(16bit address)
- * args:	
+ *  args:	
  * 		fd 		 - file descriptor
  * 		rw_flag	 - please read the above for details
  * 		bufCnt	 - define register data length(8-bit/16-bit)
@@ -738,7 +756,8 @@ int generic_I2C_read(int fd, int rw_flag, int bufCnt,
 	return regVal;
 }
 
-/** write to camera defect pixel table
+/** 
+ *  write to camera defect pixel table
  *  args:	
  * 		fd 		 - file descriptor
  * 		w_buf	 - write data buffer
@@ -753,7 +772,8 @@ void write_cam_defect_pixel_table(int fd, unsigned char *w_buf)
 	printf("V4L2_CORE: Write Camera Defect Pixel Table: %s\r\n", w_buf);
 }
 
-/** read from camera defect pixel table
+/** 
+ *  read from camera defect pixel table
  *  args:	
  * 		fd 		 - file descriptor
  * 		r_buf	 - read data buffer

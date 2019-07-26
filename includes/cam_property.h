@@ -1,7 +1,16 @@
 /****************************************************************************
-  This sample is released as public domain.  It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
   
   This is the sample code for Leopard USB3.0 camera, mainly uses v4l2 system 
   call to obtain camera information on: exposure, gain, pan, tilt, zoom etc.
@@ -23,7 +32,7 @@
 /** --- helper function ---*/
 void error_handle_cam_ctrl();
 
-void uvc_get_control(int fd, unsigned int id);
+long uvc_get_control(int fd, unsigned int id);
 void uvc_set_control(int fd, unsigned int id, int value);
 
 long uvc_query_ctrl_max(int fd, int id);
@@ -32,15 +41,15 @@ void set_gain_auto(int fd, int auto_gain);
 void get_gain_auto(int fd);
 
 void set_gain(int fd, int analog_gain);
-void get_gain(int fd);
+int get_gain(int fd);
 int query_gain_max(int fd);
 
 void set_exposure_absolute(int fd, int exposure_absolute);
-void get_exposure_absolute(int fd);
+int get_exposure_absolute(int fd);
+int query_exposure_absolute_max(int fd);
 
 void set_exposure_auto(int fd, int exposure_auto);
 void get_exposure_auto(int fd);
-int query_exposure_absolute_max(int fd);
 
 void set_zoom_absolute(int fd, int zoom_absolute);
 void get_zoom_absolute(int fd);

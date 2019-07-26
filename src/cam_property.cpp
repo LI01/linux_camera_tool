@@ -1,7 +1,16 @@
 /*****************************************************************************
-  This sample is released as public domain.  It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc.,
   
   This is the sample code for Leopard USB3.0 camera, mainly uses v4l2 system 
   call to obtain camera information on: exposure, gain, pan, tilt, zoom etc.
@@ -14,6 +23,10 @@
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/cam_property.h"
+
+extern int *cur_exposure; /// use shared memory for multiprocess for soft ae
+extern int *cur_gain;   /// use shared memory for multiprocess for soft ae
+
 /**
  * handle the error for camera control
  * args:
@@ -86,7 +99,7 @@ void error_handle_cam_ctrl()
  * 		int fd - put buffers in
  * 		control id
  */
-void uvc_get_control(int fd, unsigned int id)
+long uvc_get_control(int fd, unsigned int id)
 {
     struct v4l2_control ctrl;
     ctrl.id = id;
@@ -95,6 +108,7 @@ void uvc_get_control(int fd, unsigned int id)
         error_handle_cam_ctrl();
 
     printf("Control 0x%08x value %u\n", id, ctrl.value);
+    return ctrl.value;
 }
 
 /**
@@ -149,29 +163,42 @@ void get_gain_auto (int fd)
 {
     uvc_get_control(fd, V4L2_CID_AUTOGAIN);
 }
-
+/**
+ * add this check to minimize the occurrence of split screen
+ */
 void set_gain(int fd, int analog_gain)
 {
-    uvc_set_control(fd, V4L2_CID_GAIN, analog_gain);
+    if (analog_gain != *cur_gain) 
+    {   
+        *cur_gain = analog_gain;
+        uvc_set_control(fd, V4L2_CID_GAIN, analog_gain);
+    }
 }
 
-void get_gain(int fd)
+int get_gain(int fd)
 {
-    uvc_get_control(fd, V4L2_CID_GAIN);
+    *cur_gain = (int)uvc_get_control(fd, V4L2_CID_GAIN);
+    return *cur_gain;
 }
 
 int query_gain_max(int fd)
 {
     return (int)uvc_query_ctrl_max(fd, V4L2_CID_GAIN);
 }
-
+/**
+ * add this check to minimize the occurrence of split screen
+ */
 void set_exposure_absolute(int fd, int exposure_absolute)
 {
-    uvc_set_control(fd, V4L2_CID_EXPOSURE_ABSOLUTE, exposure_absolute);
+    if (exposure_absolute != *cur_exposure) 
+    {   *cur_exposure = exposure_absolute;
+        uvc_set_control(fd, V4L2_CID_EXPOSURE_ABSOLUTE, exposure_absolute);
+    }
 }
-void get_exposure_absolute(int fd)
+int get_exposure_absolute(int fd)
 {
-    uvc_get_control(fd, V4L2_CID_EXPOSURE_ABSOLUTE);
+    *cur_exposure = (int)uvc_get_control(fd, V4L2_CID_EXPOSURE_ABSOLUTE);
+    return *cur_exposure;
 }
 
 int query_exposure_absolute_max(int fd)

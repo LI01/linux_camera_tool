@@ -1,7 +1,16 @@
 /****************************************************************************
-  This sample is released as public domain. It is distributed in the hope it
-  will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
 
   This is the sample code for Leopard USB3.0 camera use v4l2 and opencv for 
   camera streaming and display.
@@ -28,14 +37,12 @@
  10. Close your descriptor to the device 
   
   Author: Danyu L
-  Last edit: 2019/04
+  Last edit: 2019/07
 *****************************************************************************/
 #pragma once
-
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-
 struct buffer
 {
 	void *start;
@@ -44,11 +51,11 @@ struct buffer
 
 typedef enum 
 {
-   RAW10_2BIT_SHIFT_FLG = 1,
-   RAW12_4BIT_SHIFT_FLG,
-   YUYV_0BIT_SHIFT_FLG,
-   RAW8_0BIT_SHIFT_FLG
-}datatype_shift_flag;
+   RAW10_FLG = 10,
+   RAW12_FLG = 12,
+   YUYV_FLG = 16,
+   RAW8_FLG = 8
+}bit_per_pixel_flag;
 
 typedef enum
 {
@@ -65,6 +72,7 @@ typedef enum
    CROPPED_HEIGHT = 720
 }cropped_resolution;
 
+#define GAIN_FACTOR 256
 #define TEXT_SCALE_BASE 50
 /****************************************************************************
 **							 Function declaration
@@ -107,14 +115,28 @@ void video_get_format(struct device *dev);
 void streaming_loop(struct device *dev);
 
 void get_a_frame(struct device *dev);
+void soft_ae_enable(int enable);
+double calc_mean(struct device *dev, const void *p);
+void do_soft_ae(struct device *dev, const void *p);
+
 void perform_shift(struct device *dev, const void *p, int shift);
 void swap_two_bytes(struct device *dev, const void *p);
+
+int set_limit(int val, int max, int min);
+void enable_rgb_gain_offset (int red_gain, int green_gain, int blue_gain,
+				int red_offset, int green_offset, int blue_offset);
+void disable_rgb_gain_offset();
+void apply_rgb_gain_offset_pre_debayer(struct device *dev, const void *p);
+
+void enable_rgb_matrix(int red_red, int red_green, int red_blue,
+	int green_red, int green_green, int green_blue,
+	int blue_red, int blue_green, int blue_blue);
+void disable_rgb_matrix();
+
 void decode_a_frame(struct device *dev, const void *p, int shift);
 
- 
 int video_alloc_buffers(struct device *dev, int nbufs);
 int video_free_buffers(struct device *dev);
-
 
 void set_loop(int exit);
 
