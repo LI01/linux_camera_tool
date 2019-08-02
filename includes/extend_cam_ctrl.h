@@ -77,15 +77,12 @@ typedef enum
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
-
-int v4l2_core_save_data_to_file(const char *filename,
-                                const void *data, int size);
-
-inline void set_save_raw_flag(int flag);
 void video_capture_save_raw();
+inline void set_save_raw_flag(int flag);
+int v4l2_core_save_data_to_file(const void *data, int size);
 
-inline void set_save_bmp_flag(int flag);
 void video_capture_save_bmp();
+inline void set_save_bmp_flag(int flag);
 
 inline int set_shift(int *shift_flag);
 void change_datatype(void *datatype);
@@ -103,6 +100,7 @@ int open_v4l2_device(char *device_name, struct device *dev);
 int check_dev_cap(struct device *dev);
 
 void mmap_variables();
+void initialize_shared_memory_var();
 void unmap_variables();
 
 void start_camera(struct device *dev);
@@ -115,6 +113,7 @@ void video_get_format(struct device *dev);
 void streaming_loop(struct device *dev);
 
 void get_a_frame(struct device *dev);
+
 void soft_ae_enable(int enable);
 double calc_mean(struct device *dev, const void *p);
 void apply_soft_ae(struct device *dev, const void *p);
@@ -123,7 +122,7 @@ void perform_shift(struct device *dev, const void *p, int shift);
 void swap_two_bytes(struct device *dev, const void *p);
 
 void rgb_ir_correction_enable(int enable);
-void color_correct_rgb_ir(struct device *dev, const void *p);
+void apply_color_correction_rgb_ir(struct device *dev, const void *p);
 
 int set_limit(int val, int max, int min);
 void enable_rgb_gain_offset(int red_gain, int green_gain, int blue_gain,
@@ -135,6 +134,21 @@ void enable_rgb_matrix(int red_red, int red_green, int red_blue,
                        int green_red, int green_green, int green_blue,
                        int blue_red, int blue_green, int blue_blue);
 void disable_rgb_matrix();
+
+void flip_enable(int enable);
+void mirror_enable(int enable);
+void canny_filter_enable(int enable);
+void rgb_ir_correction_enable(int enable);
+void apply_color_correction_rgb_ir(struct device *dev, const void *p);
+void rgb_ir_ir_display_enable(int enable);
+void apply_color_correction_rgb_ir_test(struct device *dev, 
+   const void *p);
+void seperate_dual_display_enable(int enable);
+void display_mat_info_enable(int enable);
+void add_alpha_val(int alpha_val_from_gui);
+void add_beta_val(int beta_val_from_gui);
+void add_sharpness_val(int sharpness_val_from_gui);
+void add_edge_thres_val(int edge_low_thres_val_from_gui);
 
 void decode_a_frame(struct device *dev, const void *p, int shift);
 

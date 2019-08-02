@@ -24,24 +24,13 @@
  * ----------------------macros for your build--------------------------------
  * 1. uncomment HAVE_OPENCV_CUDA_SUPPORT if you have OpenCV CUDA support and 
  * want to accelerate RAW image processing speed
- * 2. uncomment DUAL_CAM if you are using a stereo camera. It will display 
- * left and right image in two different windows, e.g. AR0144_DUAL, AR0231_DUAL
- * 3. uncomment USING_CLAHE if you want to use CLAHE for adjusting brightness
+ * 2. uncomment USING_CLAHE if you want to use CLAHE for adjusting brightness
  * and contrast instead of basic historgram ax+b
- * 4. uncomment IMG_FLIP_VERTICALLY if you want to show image flip vertically, 
- * noticing captured raw image wouldn't be flipped
- * 5. uncomment IMG_FLIP_HORIZONTALLY if you want to show image flip 
- * horizontally, noticing captured raw image wouldn't be flipped
- * 6. uncomment DISPLAY_FRAME_RATE_RES_INFO if you want display info in "cam"
- * 7. uncomment RESIZE_OPENCV_WINDOW if you want to resize window to 720p
+ * 3. uncomment RESIZE_OPENCV_WINDOW if you want to resize window to 720p
  */
  //#define HAVE_OPENCV_CUDA_SUPPORT
- //#define DUAL_CAM
 #define USING_CLAHE
-//#define IMG_FLIP_VERTICALLY
-//#define IMG_FLIP_HORIZONTALLY
-#define DISPLAY_FRAME_RATE_RES_INFO
-#define RESIZE_OPENCV_WINDOW 
+//#define RESIZE_OPENCV_WINDOW 
 
 /**
  * rgb gain and offset limits
@@ -68,6 +57,10 @@
  */
 #define TEXT_SCALE_BASE       (50)
 
+#define ALPHA_MAX             (5)
+#define BETA_MAX              (125)
+#define SHARPNESS_MAX         (20)
+#define LOW_THRESHOLD_MAX     (100)
 /**
  * --------------------------camera specific test functions-------------------
  * The following macros are for specific cameras testing function. 

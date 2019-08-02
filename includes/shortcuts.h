@@ -95,13 +95,25 @@ typedef enum { FALSE, TRUE } BOOL;
 #define TOP_RIGHT(x, y, width)	  ((x) + 1 + ((y) - 1) * (width))
 #define BOTTOM_RIGHT(x, y, width)	((x) + 1 + ((y) + 1) * (width))
 
-#define INTERPOLATE_V(in, x, y, w) \
-	(((uint32_t)in[TOP(x, y, w)] + in[BOT(x, y, w)]) / 2)
+#define AVE_DIAGONAL_CFA(in, x, y, width) \
+ (uint16_t) ((in[PIX(x, y, width)] + in[BOTTOM_RIGHT(x, y, width)]) / 2)
+#define AVE_DIAGONAL_PAN(in, x, y, width) \
+ (uint16_t) ((in[RIGHT(x, y, width)] + in[BOTTOM(x, y, width)]) / 2)
 
-#define INTERPOLATE_HV(in, x, y, w) \
-	(((uint32_t)in[LEFT(x, y, w)] + in[RIGHT(x, y, w)] + \
-		in[TOP(x, y, w)] + in[BOT(x, y, w)]) / 4)
+/** interpolate vertically */
+#define INTERPOLATE_V(in, x, y, width) \
+	(uint16_t)((in[TOP(x, y, width)] + in[BOTTOM(x, y, width)]) / 2)
 
+/** interpolate horizontally */
+#define INTERPOLATE_H(in, x, y, width) \
+	(uint16_t)((in[RIGHT(x, y, width)] + in[LEFT(x, y, width)]) / 2)
+
+/** bilinear interpolation, horizontally and vertically */
+#define INTERPOLATE_HV(in, x, y, width) \
+	(uint16_t)((in[LEFT(x, y, width)] + in[RIGHT(x, y, width)] + \
+		in[TOP(x, y, width)] + in[BOTTOM(x, y, width)]) / 4)
+    
+/**  bilinear interpolation, 4 edges */
 #define INTERPOLATE_X(in, x, y, w) \
 	(((uint32_t)in[TOP_LEFT(x, y, w)] + in[BOTTOM_LEFT(x, y, w)] + \
 		in[TOP_RIGHT(x, y, w)] + in[BOTTOM_RIGHT(x, y, w)]) / 4)

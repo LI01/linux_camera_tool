@@ -83,13 +83,13 @@ typedef enum
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-int gui_attach_gtk3_menu(GtkWidget *parent);
+
+/**-------------------------menu bar callbacks------------------------------*/
+void open_config_dialog(GtkWidget *widget, gpointer window);
+void fw_update_clicked (GtkWidget *item);
 void about_info(GtkWidget *widget, gpointer window);
 void exit_from_help(GtkWidget *widget);
-void open_config_dialog(GtkWidget *widget, gpointer window);
-void config_profile_clicked (GtkWidget *item);
-void fw_update_clicked (GtkWidget *item);
-
+/**-------------------------grid1 callbacks---------------------------------*/
 void radio_datatype(GtkWidget *widget, gpointer data);
 void radio_bayerpattern(GtkWidget *widget, gpointer data);
 
@@ -103,7 +103,6 @@ void enable_abc(GtkToggleButton *toggle_button);
 void toggled_addr_length(GtkWidget *widget, gpointer data);
 void toggled_val_length(GtkWidget *widget, gpointer data);
 
-
 void register_write(GtkWidget *widget);
 void register_read(GtkWidget *widget);
 
@@ -111,11 +110,27 @@ void capture_bmp(GtkWidget *widget);
 void capture_raw(GtkWidget *widget);
 
 void gamma_correction(GtkWidget *widget);
-void black_level_correction(GtkWidget *widget);
-
 void send_trigger(GtkWidget *widget);
 void enable_trig(GtkWidget *widget);
+void black_level_correction(GtkWidget *widget);
+/**-------------------------grid2 callbacks-------------------------------*/
+void set_rgb_gain_offset(GtkWidget *widget);
+void set_rgb_matrix(GtkWidget *widget);
 
+void enable_soft_ae(GtkToggleButton *toggle_button);
+void enable_flip(GtkToggleButton *toggle_button);
+void enable_mirror(GtkToggleButton *toggle_button);
+void enable_show_edge(GtkToggleButton *toggle_button);
+void enable_rgb_ir_color(GtkToggleButton *toggle_button);
+void enable_rgb_ir_ir(GtkToggleButton *toggle_button);
+void enable_display_dual_stereo(GtkToggleButton *toggle_button);
+void enable_display_mat_info(GtkToggleButton *toggle_button);
+
+void hscale_alpha_up(GtkRange *widget);
+void hscale_beta_up(GtkRange *widget);
+void hscale_sharpness_up(GtkRange *widget);
+void hscale_edge_thres_up(GtkRange *widget);
+/**-------------------------micellanous callbacks---------------------------*/
 void exit_loop(GtkWidget *widget);
 gboolean check_escape(GtkWidget *widget, GdkEventKey *event);
 /*****************************************************************************
@@ -123,31 +138,37 @@ gboolean check_escape(GtkWidget *widget, GdkEventKey *event);
 *****************************************************************************/
 int addr_width_for_rw(int address_width_flag);
 int val_width_for_rw(int value_width_flag);
-
 int hex_or_dec_interpreter_c_string(char *in_string);
 
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE
 *****************************************************************************/
+void init_grid1_widgets();
+void init_grid2_widgets();
 
 void iterate_def_elements(
     def_element *definitions, size_t members);
 
-void list_all_def_elements();
+void init_grid1_def_elements();
+void init_grid2_def_elements();
 
-void iterate_grid_elements(
+void iterate_grid1_elements(
     grid_elements *elements, size_t members);
-void list_all_grid_elements();
+void iterate_grid2_elements(
+    grid_elements *elements, size_t members);
+void list_all_grid1_elements();
+void list_all_grid2_elements();
 
 void iterate_element_cb(element_callback *callbacks,
                         size_t members);
-void list_all_element_callbacks();
+void list_all_grid1_element_callbacks();
+void list_all_grid2_element_callbacks();
 
 void iterate_window_signals(GtkWidget *widget,
                             window_signal *signals, size_t members);
 void list_all_window_signals(GtkWidget *window);
 
-void init_all_widgets();
+
 /*****************************************************************************
 **                      	Main GUI
 *****************************************************************************/
