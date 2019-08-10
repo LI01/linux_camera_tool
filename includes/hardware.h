@@ -20,17 +20,8 @@
   Last edit: 2019/07
 *****************************************************************************/
 #pragma once
-/**
- * ----------------------macros for your build--------------------------------
- * 1. uncomment HAVE_OPENCV_CUDA_SUPPORT if you have OpenCV CUDA support and 
- * want to accelerate RAW image processing speed
- * 2. uncomment USING_CLAHE if you want to use CLAHE for adjusting brightness
- * and contrast instead of basic historgram ax+b
- * 3. uncomment RESIZE_OPENCV_WINDOW if you want to resize window to 720p
- */
- //#define HAVE_OPENCV_CUDA_SUPPORT
-#define USING_CLAHE
-//#define RESIZE_OPENCV_WINDOW 
+
+//#define HAVE_OPENCV_CUDA_SUPPORT
 
 /**
  * rgb gain and offset limits

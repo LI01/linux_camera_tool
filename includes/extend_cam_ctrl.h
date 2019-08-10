@@ -12,13 +12,13 @@
   You should have received a copy of the GNU General Public License along
   with this program; if not, write to the Free Software Foundation, Inc., 
 
-  This is the sample code for Leopard USB3.0 camera use v4l2 and opencv for 
+  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for 
   camera streaming and display.
 
   Common implementation of a v4l2 application
   1. Open a descriptor to the device.
   2. Retrieve and analyse the device's capabilities.
-  3. Set the capture format(YUYV etc).
+  3. Set the capture format(YUV422 etc).
   4. Prepare the device for buffering handling. 
      when capturing a frame, you have to submit a buffer to the device(queue)
      and retrieve it once it's been filled with data(dequeue)
@@ -77,6 +77,8 @@ typedef enum
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
+void resize_window_enable(int enable);
+
 void video_capture_save_raw();
 inline void set_save_raw_flag(int flag);
 int v4l2_core_save_data_to_file(const void *data, int size);
@@ -94,6 +96,7 @@ void add_gamma_val(float gamma_val_from_gui);
 void add_black_level_correction(int blc_val_from_gui);
 
 void awb_enable(int enable);
+void clahe_enable(int enable);
 void abc_enable(int enable);
 
 int open_v4l2_device(char *device_name, struct device *dev);
@@ -141,9 +144,8 @@ void canny_filter_enable(int enable);
 void rgb_ir_correction_enable(int enable);
 void apply_color_correction_rgb_ir(struct device *dev, const void *p);
 void rgb_ir_ir_display_enable(int enable);
-void apply_color_correction_rgb_ir_test(struct device *dev, 
-   const void *p);
-void seperate_dual_display_enable(int enable);
+void display_rgbir_ir_channel(struct device *dev, const void *p);
+void separate_dual_display_enable(int enable);
 void display_mat_info_enable(int enable);
 void add_alpha_val(int alpha_val_from_gui);
 void add_beta_val(int beta_val_from_gui);

@@ -111,7 +111,7 @@ typedef enum
     HEADER_EEPROM_PAGE_PROG  = 0x00FA,      // program one page
     HEADER_EEPROM_BULK_ERASE = 0x00FB,      // send bulk erase command
     HEADER_EEPROM_UPDATE_BUF = 0x00FC,      // update EEPROM page buffer, 256 bytes
-    HEADER_EEPROM_UPATE_ADDR = 0x00FD,      // update EEPROM page address, 3 bytes
+    HEADER_EEPROM_UPDATE_ADDR = 0x00FD,      // update EEPROM page address, 3 bytes
     HEADER_EEPROM_RDSR       = 0x00FE,      // EEPROM read status
 } fx3_eeprom_func;
 
@@ -146,7 +146,7 @@ typedef enum
     // TODO: this is from AP010X HCI command, check for AP020X compatibility
     CMD_GET_LOCK                = 0x8500, // Request flash manager access lock
     CMD_LOCK_STATUS             = 0x8501, // Retrive status of access lock request
-    CMD_RELEASE_LOCK            = 0x8502, // Release flash maanger access lock
+    CMD_RELEASE_LOCK            = 0x8502, // Release flash manager access lock
     CMD_FLASHMGR_CONFIG         = 0x8503, // configure flash manager and underlying SPI NVM subsystem
     CMD_FLASHMGR_READ           = 0x8504, // Read data from the SPI NVM
     CMD_WRITE                   = 0x8505, // Write data to the SPI NVM

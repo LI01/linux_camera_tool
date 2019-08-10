@@ -9,6 +9,8 @@ find_library(V4l2Libs v4l2 REQUIRED)
 find_library(udevLibs udev REQUIRED)
 find_library(jsoncLibs json-c REQUIRED)
 
+
+
 # check c++ compiler flag
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
@@ -47,6 +49,16 @@ target_link_libraries(${PROJECT_NAME}
 	${GTK3_LIBRARY_DIRS}
 )
 
+# default set USE_OPENCV_CUDA off
+# use cmake -DUSE_OPENCV_CUDA=ON .. to turn on
+option(USE_OPENCV_CUDA "Set to switch to build use OpenCV CUDA" OFF)
+if (USE_OPENCV_CUDA)
+	add_definitions(-DHAVE_OPENCV_CUDA_SUPPORT)
+	message(STATUS "Build with OPENCV_CUDA")
+else()
+	message(STATUS "Build without OpenCV_CUDA")
+endif()
+
 if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
 
 	find_package (PkgConfig REQUIRED)
@@ -69,5 +81,6 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
 		${OpenCV_LIBS}
 		${GTK3_LIBRARIES}
 	)
+
 
 endif(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})

@@ -12,7 +12,7 @@
   You should have received a copy of the GNU General Public License along
   with this program; if not, write to the Free Software Foundation, Inc., 
 
-  This is the sample code for Leopard USB3.0 camera use v4l2 and opencv for 
+  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for 
   camera streaming and display.
 
   Common implementation of a v4l2 application
@@ -67,7 +67,8 @@ static int *save_raw;				/// flag for saving raw
 static int *bayer_flag;				/// flag for choosing bayer pattern
 static int *bpp;					/// flag for datatype bits per pixel
 static int *awb_flag;				/// flag for enable awb
-static int *abc_flag;				/// flag for enable brightness& contrast
+static int *clahe_flag;				/// flag for enable CLAHE
+static int *abc_flag;				/// flag for enable auto brightness&contrast
 static float *gamma_val;			/// gamma correction value from gui
 static int *black_level_correction; /// black level correction value from gui
 static int *loop;					/// while (*loop)
@@ -86,8 +87,9 @@ static int *soft_ae_flag; 			/// flag for software AE
 static int *flip_flag, *mirror_flag;
 static int *show_edge_flag;
 static int *rgb_ir_color, *rgb_ir_ir;
-static int *seperate_dual_display;
+static int *separate_dual_display;
 static int *display_mat_info_ena;
+static int *resize_window_ena;
 
 static int *alpha, *beta, *sharpness;
 static int *edge_low_thres;
@@ -110,6 +112,29 @@ extern int get_current_height(int fd);
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
+
+/**
+ * resize opencv image
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void resize_window_enable(int enable)
+{
+	switch (enable)
+	{
+	case 1:
+		*resize_window_ena = TRUE;
+		break;
+	case 0:
+		*resize_window_ena= FALSE;
+		break;
+	default:
+		*resize_window_ena = TRUE;
+		break;
+	}
+}
+
+
 /**
  * callback for save raw image from gui
  */
@@ -194,14 +219,14 @@ inline void set_save_bmp_flag(int flag)
 }
 
 /**
- * save data to bitmap using opencv
+ * save data to bitmap using OpenCV
  * args:
  *	 opencv mat image to be captured
  *
  * asserts:
  *   none
  */
-static int save_frame_image_bmp(cv::InputOutputArray opencvImage)
+static int save_frame_image_bmp(cv::InputOutputArray& opencvImage)
 {
 
 	printf("save one capture bmp\n");
@@ -335,7 +360,7 @@ void add_gamma_val(float gamma_val_from_gui)
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
  */
-static void apply_gamma_correction(const cv::InputOutputArray opencvImage)
+static void apply_gamma_correction(cv::InputOutputArray& opencvImage)
 {
 	cv::Mat look_up_table(1, 256, CV_8U);
 	uchar *p = look_up_table.ptr();
@@ -383,7 +408,7 @@ void awb_enable(int enable)
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
  */
-static void apply_white_balance(cv::InputOutputArray opencvImage)
+static void apply_white_balance(cv::InputOutputArray& opencvImage)
 {
 	/// if it is grey image, do nothing
 	if (opencvImage.type() == CV_8UC1)
@@ -452,7 +477,6 @@ static void apply_white_balance(cv::InputOutputArray opencvImage)
 	}
 #endif
 }
-
 /**
  * set abc flag 
  * args:
@@ -474,48 +498,56 @@ void abc_enable(int enable)
 	}
 }
 
+/**
+ * set CLAHE flag 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void clahe_enable(int enable)
+{
+	switch (enable)
+	{
+	case 1:
+		*clahe_flag = TRUE;
+		break;
+	case 0:
+		*clahe_flag = FALSE;
+		break;
+	default:
+		*clahe_flag = FALSE;
+		break;
+	}
+}
+
 /** 
- * In-place camera stream apply auto adjusting brightness and contrast 
- * using historgram 
+ * In-place automatic brightness and contrast optimization with 
+ * optional histogram clipping. Looking at histogram, alpha operates 
+ * as color range amplifier, beta operates as range shift.
+ * O(x,y) = alpha * I(x,y) + beta
+ * Automatic brightness and contrast optimization calculates
+ * alpha and beta so that the output range is 0..255.
+ * Ref: http://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
  * args:
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
- * 		float clipHistPercent 			- clip histogram percentage
+ * 		float clipHistPercent 			 - cut wings of histogram at given percent
+ * 			typical=>1, 0=>Disabled
  */
-#ifndef USING_CLAHE
-static void apply_auto_brightness_and_contrast(
-	cv::InputOutputArray opencvImage,
-	float clipHistPercent = 0)
-#else
-static void apply_auto_brightness_and_contrast(
-	cv::InputOutputArray opencvImage)
-#endif
-{
-	/// if it is grey image, do nothing
-	if (opencvImage.type() == CV_8UC1)
-		return;
 
-#ifndef USING_CLAHE
-	/** Method 1:
-		 * Automatic brightness and contrast optimization with 
-		 * optional histogram clipping. Looking at histogram, 
-		 * alpha operates as color range amplifier, beta operates
-		 * as range shift.
-		 * O(x,y) = alpha * I(x,y) + beta
-		 * Automatic brightness and contrast optimization calculates
-		 * alpha and beta so that the output range is 0..255.
-		 * Ref: http://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
-		 * args:
-		 * 	 clipHistPercent - cut wings of histogram at given percent
-		 * 		typical=>1, 0=>Disabled
-		 */
+static void apply_auto_brightness_and_contrast(
+	cv::InputOutputArray& opencvImage,
+	float clipHistPercent = 0)
+{
 	int hist_size = 256;
 	float alpha, beta;
 	double min_gray = 0, max_gray = 0;
 
 	/// to calculate grayscale histogram
 	cv::Mat gray;
-	cv::cvtColor(opencvImage, gray, CV_BGR2GRAY);
+	if (opencvImage.type() != CV_8UC1)
+		cv::cvtColor(opencvImage, gray, cv::COLOR_BGR2GRAY);
+	else 
+		gray = opencvImage.getMat();
 
 	if (clipHistPercent == 0)
 	{
@@ -568,58 +600,83 @@ static void apply_auto_brightness_and_contrast(
 	beta = -min_gray * alpha;
 
 	/**
-		* Apply brightness and contrast normalization
-		* convertTo operates with saturate_cast
-		*/
+	 * Apply brightness and contrast normalization
+	 * convertTo operates with saturate_cast
+	 */
 	cv::Mat _opencvImage = opencvImage.getMat();
 	_opencvImage.convertTo(opencvImage, -1, alpha, beta);
 
-#else
-/** Method 2:
-		 * Contrast Limited Adaptive Histogram Equalization) algorithm
-		 * ref: https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
-		 */
+}
+
+/** 
+ * Contrast Limited Adaptive Histogram Equalization) algorithm
+ * ref: https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
+ */
+static void apply_clahe(
+	cv::InputOutputArray& opencvImage)
+{
+
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
-	cv::cuda::GpuMat lab_image;
-	cv::cuda::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
-	/// Extract the L channel
-	std::vector<cv::cuda::GpuMat> lab_planes(3);
-	cv::cuda::split(lab_image, lab_planes); // now we have the L image in lab_planes[0]
+	
+	if (opencvImage.type() != CV_8UC1)
+	{
+		cv::cuda::GpuMat lab_image;
+		cv::cuda::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
+		/// Extract the L channel
+		std::vector<cv::cuda::GpuMat> lab_planes(3);
+		cv::cuda::split(lab_image, lab_planes); // now we have the L image in lab_planes[0]
 
-	/// apply the CLAHE algorithm to the L channel
-	cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
-	clahe->setClipLimit(4);
-	cv::cuda::GpuMat dst;
-	clahe->apply(lab_planes[0], dst);
+		/// apply the CLAHE algorithm to the L channel
+		cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
+		clahe->setClipLimit(4);
+		cv::cuda::GpuMat dst;
+		clahe->apply(lab_planes[0], dst);
 
-	/// Merge the the color planes back into an Lab image
-	dst.copyTo(lab_planes[0]);
-	cv::cuda::merge(lab_planes, lab_image);
+		/// Merge the the color planes back into an Lab image
+		dst.copyTo(lab_planes[0]);
+		cv::cuda::merge(lab_planes, lab_image);
 
-	/// convert back to RGB
-	cv::cuda::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
+		/// convert back to RGB
+		cv::cuda::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
+	}
+	else
+	{
+		cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
+		clahe->setClipLimit(4);
+		clahe->apply(opencvImage, opencvImage);		
+	}
+	
 #else
-	cv::Mat lab_image;
-	cv::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
-	/// Extract the L channel
-	std::vector<cv::Mat> lab_planes(3);
-	/// now we have the L image in lab_planes[0]
-	cv::split(lab_image, lab_planes);
+	if (opencvImage.type() != CV_8UC1)
+	{
+		cv::Mat lab_image;
+		cv::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
+		/// Extract the L channel
+		std::vector<cv::Mat> lab_planes(3);
+		/// now we have the L image in lab_planes[0]
+		cv::split(lab_image, lab_planes);
 
-	/// apply the CLAHE algorithm to the L channel
-	cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
-	clahe->setClipLimit(4);
-	cv::Mat dst;
-	clahe->apply(lab_planes[0], dst);
+		/// apply the CLAHE algorithm to the L channel
+		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+		clahe->setClipLimit(4);
+		cv::Mat dst;
+		clahe->apply(lab_planes[0], dst);
 
-	/// Merge the the color planes back into an Lab image
-	dst.copyTo(lab_planes[0]);
-	cv::merge(lab_planes, lab_image);
+		/// Merge the the color planes back into an Lab image
+		dst.copyTo(lab_planes[0]);
+		cv::merge(lab_planes, lab_image);
 
-	/// convert back to RGB
-	cv::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
+		/// convert back to RGB
+		cv::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
+	}
+	else 
+	{
+		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+		clahe->setClipLimit(4);
+		clahe->apply(opencvImage, opencvImage);
+	}
 #endif
-#endif
+
 }
 
 
@@ -663,7 +720,6 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	dev->fd = v4l2_dev;
 
 	mmap_variables();
-
 	initialize_shared_memory_var();
 	return v4l2_dev;
 }
@@ -719,6 +775,8 @@ void mmap_variables()
 	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
 							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	awb_flag = (int *)mmap(NULL, sizeof *awb_flag, PROT_READ | PROT_WRITE,
+						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	clahe_flag = (int *)mmap(NULL, sizeof *clahe_flag, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	abc_flag = (int *)mmap(NULL, sizeof *abc_flag, PROT_READ | PROT_WRITE,
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -786,7 +844,7 @@ void mmap_variables()
 	rgb_ir_ir = (int *)mmap(NULL, sizeof *rgb_ir_ir,
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
-	seperate_dual_display = (int *)mmap(NULL, sizeof *seperate_dual_display,
+	separate_dual_display = (int *)mmap(NULL, sizeof *separate_dual_display,
 		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
 	display_mat_info_ena = (int *)mmap(NULL, sizeof *display_mat_info_ena,
@@ -800,6 +858,10 @@ void mmap_variables()
 						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	edge_low_thres = (int *)mmap(NULL, sizeof *edge_low_thres, 
 	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+	resize_window_ena = (int *)mmap(NULL, sizeof *resize_window_ena,
+		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
 }
 /** initialize share memory variables after declaration */
 void initialize_shared_memory_var()
@@ -821,6 +883,7 @@ void unmap_variables()
 	munmap(bpp, sizeof *bpp);
 	munmap(bayer_flag, sizeof *bayer_flag);
 	munmap(awb_flag, sizeof *awb_flag);
+	munmap(clahe_flag, sizeof *clahe_flag);
 	munmap(abc_flag, sizeof *abc_flag);
 	munmap(gamma_val, sizeof *gamma_val);
 	munmap(black_level_correction, sizeof *black_level_correction);
@@ -855,13 +918,16 @@ void unmap_variables()
 
 	munmap(rgb_ir_color, sizeof *rgb_ir_color);
 	munmap(rgb_ir_ir, sizeof *rgb_ir_ir);
-	munmap(seperate_dual_display, sizeof *seperate_dual_display);
+	munmap(separate_dual_display, sizeof *separate_dual_display);
 	munmap(display_mat_info_ena, sizeof *display_mat_info_ena);
 
 	munmap(alpha, sizeof *alpha);
 	munmap(beta, sizeof *beta);
 	munmap(sharpness, sizeof *sharpness);
 	munmap(edge_low_thres, sizeof *edge_low_thres);
+	
+	munmap(resize_window_ena, sizeof *resize_window_ena);
+
 }
 
 /**
@@ -1144,7 +1210,12 @@ void apply_soft_ae(struct device *dev, const void *p)
 	float image_mean = calc_mean(dev, p);
 	int ae_done = FALSE;
 
-	if (((image_mean > target_mean * 0.8) && (image_mean < target_mean * 1.2)) || ((cur_gain_x_exp >= max_exp_time * max_gain) && (image_mean < target_mean * 0.8)) || ((cur_gain_x_exp <= max_exp_time * min_gain) && (image_mean > target_mean * 1.2)))
+	if (((image_mean > target_mean * 0.8) 
+	&& (image_mean < target_mean * 1.2)) 
+	|| ((cur_gain_x_exp >= max_exp_time * max_gain) 
+	&& (image_mean < target_mean * 0.8)) 
+	|| ((cur_gain_x_exp <= max_exp_time * min_gain) 
+	&& (image_mean > target_mean * 1.2)))
 	{
 		ae_done = TRUE;
 		return;
@@ -1190,7 +1261,7 @@ void perform_shift(struct device *dev, const void *p, int shift)
 	unsigned char *dst = (unsigned char *)p;
 	unsigned short ts;
 
-/** 
+	/** 
 	 * use OpenMP loop parallelism to accelerate shifting 
 	 * If there is no speed up, that is because this operation is heavily 
 	 * memory bound. All the cores share one memory bus, so using more threads 
@@ -1476,7 +1547,7 @@ void disable_rgb_matrix()
 // bgr_planes[0];//blue channel
 // bgr_planes[1];//green channel
 // bgr_planes[2];//red channel
-static void apply_rgb_matrix_post_debayer(cv::InputOutputArray _opencvImage)
+static void apply_rgb_matrix_post_debayer(cv::InputOutputArray& _opencvImage)
 {
 
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
@@ -1561,6 +1632,338 @@ void canny_filter_enable(int enable)
 		break;
 	default:
 		*show_edge_flag = FALSE;
+		break;
+	}
+}
+
+/**
+ * set separate dual display enable flag 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void separate_dual_display_enable(int enable)
+{
+	switch (enable)
+	{
+	case 1:
+		*separate_dual_display = TRUE;
+		break;
+	case 0:
+		*separate_dual_display = FALSE;
+		break;
+	default:
+		*separate_dual_display = FALSE;
+		break;
+	}
+}
+/** separate display right and left mat image from a dual stereo vision camera */
+static void display_dual_stereo_separately(cv::InputOutputArray& _opencvImage)
+{
+
+	cv::Mat opencvImage = _opencvImage.getMat();
+	/// define region of interest for cropped Mat for dual stereo
+	cv::Rect roi_left(0, 0, opencvImage.cols/2, opencvImage.rows);
+	cv::Mat cropped_ref_left(opencvImage, roi_left);
+	cv::Mat cropped_left;
+	cropped_ref_left.copyTo(cropped_left);
+	cv::imshow("cam_left", cropped_left);
+	cv::Rect roi_right(opencvImage.cols/2, 0, 
+		opencvImage.cols/2, opencvImage.rows);
+	cv::Mat cropped_ref_right(opencvImage, roi_right);
+	cv::Mat cropped_right;
+	cropped_ref_right.copyTo(cropped_right);
+	cv::imshow("cam_right", cropped_right);
+}
+/**
+ * set display mat info flag 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void display_mat_info_enable(int enable)
+{
+	switch (enable)
+	{
+	case 1:
+		*display_mat_info_ena = TRUE;
+		break;
+	case 0:
+		*display_mat_info_ena = FALSE;
+		break;
+	default:
+		*display_mat_info_ena = TRUE;
+		break;
+	}
+}
+/**
+ * unify putting text in opencv image
+ * a wrapper for put_text()
+ */
+static void streaming_put_text(cv::Mat opencvImage,
+							   const char *str, int cordinate_y)
+{
+	int scale = opencvImage.cols / 1000;
+	cv::putText(opencvImage,
+				str,
+				cv::Point(scale * TEXT_SCALE_BASE, cordinate_y), // Coordinates
+				cv::FONT_HERSHEY_SIMPLEX,						 // Font
+				(float)scale,									 // Scale. 2.0 = 2x bigger
+				cv::Scalar(255, 255, 255),						 // BGR Color - white
+				2												 // Line Thickness (Optional)
+	);															 // Anti-alias (Optional)
+}
+/** put mat info text in: res, fps, ESC*/
+static void display_current_mat_stream_info(cv::InputOutputArray& _opencvImage)
+{
+	cv::Mat opencvImage = _opencvImage.getMat();
+	int height_scale = (opencvImage.cols / 1000);
+	streaming_put_text(opencvImage, "ESC: close application",
+					   height_scale * TEXT_SCALE_BASE);
+
+	char resolution[25];
+	sprintf(resolution, "Current Res:%dx%d", opencvImage.rows, opencvImage.cols);
+	streaming_put_text(opencvImage, resolution,
+					   height_scale * TEXT_SCALE_BASE * 2);
+
+	/** 
+  	 * getTickcount: return number of ticks from OS
+	 * getTickFrequency: returns the number of ticks per second
+	 * t = ((double)getTickCount() - t)/getTickFrequency();
+	 * fps is t's reciprocal
+	 */
+	cur_time = ((double)cv::getTickCount() - cur_time) /
+			   cv::getTickFrequency();
+	double fps = 1.0 / cur_time;			 // frame rate
+	char string_frame_rate[10];				 // string to save fps
+	sprintf(string_frame_rate, "%.2f", fps); // to 2 decimal places
+	char fpsString[20];
+	strcpy(fpsString, "Current Fps:");
+	strcat(fpsString, string_frame_rate);
+	streaming_put_text(opencvImage, fpsString,
+					   height_scale * TEXT_SCALE_BASE * 3);
+}
+/** callback for set alpha for contrast correction from gui */
+void add_alpha_val(int alpha_val_from_gui)
+{
+	*alpha = alpha_val_from_gui;
+}
+/** callback for set beta for brightness correction from gui */
+void add_beta_val(int beta_val_from_gui)
+{
+	*beta = beta_val_from_gui;
+}
+static void apply_brightness_and_contrast(cv::InputOutputArray& _opencvImage)
+{
+	cv::Mat opencvImage = _opencvImage.getMat();
+ 	if (opencvImage.type() == CV_8UC3) {
+	 	for( int y = 0; y < opencvImage.rows; y++) {
+        	for( int x = 0; x < opencvImage.cols; x++) {
+            	for( int c = 0; c < 3; c++ ) {
+                	opencvImage.at<cv::Vec3b>(y,x)[c] = cv::saturate_cast<uchar>
+					((*alpha)*(opencvImage.at<cv::Vec3b>(y,x)[c] ) + (*beta));
+				}
+			}
+		}	 
+	}
+	else { //mono
+		for( int y = 0; y < opencvImage.rows; y++) {
+        	for( int x = 0; x < opencvImage.cols; x++) {
+                opencvImage.at<uchar>(y,x) = cv::saturate_cast<uchar>
+					((*alpha)*(opencvImage.at<uchar>(y,x) ) + (*beta));
+			}
+		}
+	}
+}
+/** callback for set sharpness for sharpness correction from gui */
+void add_sharpness_val(int sharpness_val_from_gui)
+{
+	*sharpness = sharpness_val_from_gui;
+}
+
+static void sharpness_control(cv::InputOutputArray& _opencvImage)
+{
+	cv::Mat opencvImage = _opencvImage.getMat();
+	cv::Mat blurred;
+	cv::GaussianBlur(opencvImage, blurred, cv::Size(0, 0), *sharpness);
+	cv::addWeighted(opencvImage, 1.5, blurred, -0.5, 0, blurred);
+	blurred.copyTo(opencvImage);
+}
+
+void add_edge_thres_val(int edge_low_thres_val_from_gui)
+{
+	*edge_low_thres = edge_low_thres_val_from_gui;
+}
+
+static cv::Mat canny_filter_control(cv::InputOutputArray& _opencvImage)
+{
+	cv::Mat opencvImage = _opencvImage.getMat();
+	const int ratio = 3;
+	const int kernel_size = 3;
+	cv::Mat edges;
+	cv::blur(opencvImage, edges, cv::Size(5,5));
+	cv::cvtColor(edges, edges, cv::COLOR_BGR2GRAY);
+	cv::Canny(edges, opencvImage, (*edge_low_thres), 
+		(*edge_low_thres)*ratio, kernel_size);
+	return opencvImage;
+}
+
+/**
+ * group 3a ctrl flags for bayer cameras
+ * auto exposure, auto white balance, auto brightness and contrast ctrl
+ */
+static void group_3a_ctrl_flags_for_raw_camera(
+	cv::InputOutputArray& opencvImage)
+{
+	/** color output */
+	if (add_bayer_forcv(bayer_flag) != 4)
+	{
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+		// cv::cuda::cvtColor(opencvImage, opencvImage,
+		// cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+		cv::cuda::demosaicing(opencvImage, opencvImage,
+			cv::cuda::COLOR_BayerBG2BGR_MHT + add_bayer_forcv(bayer_flag));
+#else
+		cv::cvtColor(opencvImage, opencvImage,
+			cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
+
+#endif
+		if (*rgb_matrix_flag == TRUE)
+			apply_rgb_matrix_post_debayer(opencvImage);
+	}
+	/** mono output */
+	if (add_bayer_forcv(bayer_flag) == 4)
+	{
+		CV_Assert((opencvImage.type() == CV_8UC1) || (opencvImage.type() == CV_8UC3));
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
+		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
+#else
+		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
+		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
+#endif
+	}
+
+	/** check awb flag, awb functionality, only available for bayer camera */
+	if (*(awb_flag) == TRUE)
+		apply_white_balance(opencvImage);
+	if (*(clahe_flag) == TRUE)
+		apply_clahe(opencvImage);
+	
+}
+
+
+/** 
+ * opencv only support debayering 8 and 16 bits 
+ * 
+ * decode the frame, move each pixel by certain bits,
+ * and mask it for 8 bits, render a frame using opencv
+ * args: 
+ * 		struct device *dev - every infomation for camera
+ * 		const void *p - pointer for the buffer
+ * 		int shift - values to shift(RAW10 - 2, RAW12 - 4, YUV422 - 0) 
+ * 
+ */
+void decode_a_frame(struct device *dev, const void *p, int shift)
+{
+	int height = dev->height;
+	int width = dev->width;
+
+	cv::Mat share_img;
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+	cv::cuda::GpuMat gpu_img;
+#endif
+
+	if (*(soft_ae_flag) == TRUE)
+		apply_soft_ae(dev, p);
+
+	/** --- for raw8, raw10, raw12 bayer camera ---*/
+	if (shift != 0)
+	{
+		if (*rgb_gain_offset_flag == 1)
+			apply_rgb_gain_offset_pre_debayer(dev, p);
+		if (*rgb_ir_color == 1)
+			apply_color_correction_rgb_ir(dev, p);
+		if (*rgb_ir_ir == 1)
+			display_rgbir_ir_channel(dev, p);
+		/** 
+		 * --- for raw10, raw12 camera ---
+		 * tried with CV_16UC1 and then cast back, it doesn't really improve fps
+		 * I guess use openmp is already efficient enough 
+		 */
+		if (shift > 0) 
+			perform_shift(dev, p, shift);
+			
+		/**
+		 *  --- for raw8 camera ---
+		 * each pixel is 8-bit instead of 16-bit now
+		 * need to adjust read width
+		 */
+		else 
+			width = width * 2;
+		
+		//swap_two_bytes(dev, p);
+		cv::Mat img(height, width, CV_8UC1, (void *)p);
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+		gpu_img.upload(img);
+		group_3a_ctrl_flags_for_raw_camera(gpu_img);
+		gpu_img.download(img);
+#else
+		group_3a_ctrl_flags_for_raw_camera(img);	
+#endif
+		share_img = img;
+	}
+
+	/** --- for yuv camera ---*/
+	else if (shift == 0)
+	{
+		cv::Mat img(height, width, CV_8UC2, (void *)p);
+		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
+		if (add_bayer_forcv(bayer_flag) == 4)
+			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
+		share_img = img;
+	}
+
+	if (*(gamma_val) != (float)1)
+		apply_gamma_correction(share_img);
+	// if (*(clahe_flag) == TRUE)
+	// 	apply_clahe(share_img);
+	if (*(alpha) != (float)1 || (*beta) != (float)0)
+		apply_brightness_and_contrast(share_img);
+	if (*flip_flag)
+		cv::flip(share_img, share_img, 0);
+	if (*mirror_flag)
+		cv::flip(share_img, share_img, 1);
+	if (*sharpness != (float)1)
+		sharpness_control(share_img);
+	if (*(abc_flag) == TRUE)
+		apply_auto_brightness_and_contrast(share_img, 1);
+	if (*show_edge_flag) 
+		share_img = canny_filter_control(share_img);
+	if (*(save_bmp))
+		save_frame_image_bmp(share_img);
+	if (*separate_dual_display) 
+		display_dual_stereo_separately(share_img);
+	if (*display_mat_info_ena)
+		display_current_mat_stream_info(share_img);
+
+
+	/** if image larger than 720p by any dimension, resize the window */
+	if (*resize_window_ena) {
+		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
+			cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
+	}	
+
+	cv::imshow("cam", share_img);
+	
+	char key = (char)cv::waitKey(_1MS);
+	switch (key) {
+	case 'q':
+	case 'Q':
+	case _ESC_KEY_ASCII:
+		cv::destroyWindow("cam");
+		set_loop(0);
+
+		break;
+	default:
 		break;
 	}
 }
@@ -1681,18 +2084,12 @@ void rgb_ir_ir_display_enable(int enable)
 		break;
 	}
 }
-void apply_color_correction_rgb_ir_test(struct device *dev, const void *p)
+void display_rgbir_ir_channel(struct device *dev, const void *p)
 {
 	int pixel_max_val = BIT(*bpp) - 1;
 	int height = dev->height;
 	int width = dev->width;
-	float ir_r = 1.3;
-	float ir_g = 0.35;
-	float ir_b = 0.3;
-	uint16_t b_orig, b_proc;
-	uint16_t g1_orig, g1_proc;
-	uint16_t g2_orig, g2_proc;
-	uint16_t r_orig, r_proc;
+
 	uint16_t ir_orig1, ir_orig2, ir_orig3, ir_orig4;
 	uint16_t *src_short = (uint16_t *)p;
 	uint16_t *dst = (uint16_t *)p;
@@ -1701,370 +2098,46 @@ void apply_color_correction_rgb_ir_test(struct device *dev, const void *p)
 			// IR1
 			ir_orig1 = src_short[BOTTOM_RIGHT(j,i,width)];
 			ir_orig1 = set_limit(ir_orig1, pixel_max_val, 0);
-			dst[PIX(j/2, i/2, width/2)] = ir_orig1;
+			//dst[PIX(j/2, i/2, width/2)] = ir_orig1;
+			dst[PIX(j, i, width)] = ir_orig1;
+			dst[RIGHT(j, i, width)] = ir_orig1;
+			dst[BOTTOM(j, i, width)] = ir_orig1;
 			// IR2
 			ir_orig2 = src_short[BOTTOM_RIGHT(j,i+2,width)];
 			ir_orig2 = set_limit(ir_orig2, pixel_max_val, 0);
-			dst[PIX(j/2, i/2+1, width/2)] = ir_orig2;
+			dst[PIX(j, i+2, width)] = ir_orig2;
+			dst[RIGHT(j, i+2, width)] = ir_orig2;
+			dst[BOTTOM(j, i+2, width)] = ir_orig2;
+			//dst[PIX(j/2, i/2+1, width/2)] = ir_orig2;
 			// IR3
 			ir_orig3 = src_short[BOTTOM_RIGHT(j+2,i,width)];
 			ir_orig3 = set_limit(ir_orig3, pixel_max_val, 0);
-			dst[PIX(j/2+1, i/2, width/2)] = ir_orig3;
+			//dst[PIX(j/2+1, i/2, width/2)] = ir_orig3;
+			dst[PIX(j+2, i, width)] = ir_orig3;
+			dst[RIGHT(j+2, i, width)] = ir_orig3;
+			dst[BOTTOM(j+2, i, width)] = ir_orig3;
 			// IR4
 			ir_orig4 = src_short[BOTTOM_RIGHT(j+2,i+2,width)];
 			ir_orig4 = set_limit(ir_orig4, pixel_max_val, 0);
-			dst[PIX(j/2+1, i/2+1, width/2)] = ir_orig4;		
+			//dst[PIX(j/2+1, i/2+1, width/2)] = ir_orig4;		
+			dst[PIX(j+2, i+2, width)] = ir_orig4;	
+			dst[RIGHT(j+2, i+2, width)] = ir_orig4;
+			dst[BOTTOM(j+2, i+2, width)] = ir_orig4;
 		}
 	}
 	perform_shift(dev, dst,  set_shift(bpp));
-	cv::Mat rgbir_ir(height/2, width/2, CV_8UC1, dst);
+	//cv::Mat rgbir_ir(height/2, width/2, CV_8UC1, dst);
+	cv::Mat rgbir_ir(height, width, CV_8UC1, dst);
 	cv::cvtColor(rgbir_ir, rgbir_ir, cv::COLOR_BayerBG2BGR);
 	cv::cvtColor(rgbir_ir, rgbir_ir, cv::COLOR_BGR2GRAY);
-
+	//cv::pyrUp(rgbir_ir, rgbir_ir,cv::Size(rgbir_ir.cols*2, rgbir_ir.rows*2));
 	*gamma_val = 0.45;
-	*black_level_correction = 64;
+	//*black_level_correction = 64;
+	*sharpness = 10;
 	apply_gamma_correction(rgbir_ir);
-
-	cv::imshow("test", rgbir_ir);
+	sharpness_control(rgbir_ir);
+	cv::imshow("RGB-IR IR Channel", rgbir_ir);
 }
-/**
- * set seperate dual display enable flag 
- * args:
- * 		flag - set/reset the flag when get check button toggle
- */
-void seperate_dual_display_enable(int enable)
-{
-	switch (enable)
-	{
-	case 1:
-		*seperate_dual_display = TRUE;
-		break;
-	case 0:
-		*seperate_dual_display = FALSE;
-		break;
-	default:
-		*seperate_dual_display = FALSE;
-		break;
-	}
-}
-/** separate display right and left mat image from a dual stereo vision camera */
-static void display_dual_stereo_separately(cv::InputOutputArray _opencvImage)
-{
-
-	cv::Mat opencvImage = _opencvImage.getMat();
-	/// define region of interest for cropped Mat for dual stereo
-	cv::Rect roi_left(0, 0, opencvImage.cols/2, opencvImage.rows);
-	cv::Mat cropped_ref_left(opencvImage, roi_left);
-	cv::Mat cropped_left;
-	cropped_ref_left.copyTo(cropped_left);
-	cv::imshow("cam_left", cropped_left);
-	cv::Rect roi_right(opencvImage.cols/2, 0, 
-		opencvImage.cols/2, opencvImage.rows);
-	cv::Mat cropped_ref_right(opencvImage, roi_right);
-	cv::Mat cropped_right;
-	cropped_ref_right.copyTo(cropped_right);
-	cv::imshow("cam_right", cropped_right);
-}
-/**
- * set display mat info flag 
- * args:
- * 		flag - set/reset the flag when get check button toggle
- */
-void display_mat_info_enable(int enable)
-{
-	switch (enable)
-	{
-	case 1:
-		*display_mat_info_ena = TRUE;
-		break;
-	case 0:
-		*display_mat_info_ena = FALSE;
-		break;
-	default:
-		*display_mat_info_ena = TRUE;
-		break;
-	}
-}
-/**
- * unify putting text in opencv image
- * a wrapper for put_text()
- */
-static void streaming_put_text(cv::Mat opencvImage,
-							   const char *str, int cordinate_y)
-{
-	int scale = opencvImage.cols / 1000;
-	cv::putText(opencvImage,
-				str,
-				cv::Point(scale * TEXT_SCALE_BASE, cordinate_y), // Coordinates
-				cv::FONT_HERSHEY_SIMPLEX,						 // Font
-				(float)scale,									 // Scale. 2.0 = 2x bigger
-				cv::Scalar(255, 255, 255),						 // BGR Color - white
-				2												 // Line Thickness (Optional)
-	);															 // Anti-alias (Optional)
-}
-/** put mat info text in: res, fps, ESC*/
-static void display_current_mat_stream_info(cv::InputOutputArray _opencvImage)
-{
-	cv::Mat opencvImage = _opencvImage.getMat();
-	int height_scale = (opencvImage.cols / 1000);
-	streaming_put_text(opencvImage, "ESC: close application",
-					   height_scale * TEXT_SCALE_BASE);
-
-	char resolution[25];
-	sprintf(resolution, "Current Res:%dx%d", opencvImage.rows, opencvImage.cols);
-	streaming_put_text(opencvImage, resolution,
-					   height_scale * TEXT_SCALE_BASE * 2);
-
-	/** 
-  	 * getTickcount: return number of ticks from OS
-	 * getTickFrequency: returns the number of ticks per second
-	 * t = ((double)getTickCount() - t)/getTickFrequency();
-	 * fps is t's reciprocal
-	 */
-	cur_time = ((double)cv::getTickCount() - cur_time) /
-			   cv::getTickFrequency();
-	double fps = 1.0 / cur_time;			 // frame rate
-	char string_frame_rate[10];				 // string to save fps
-	sprintf(string_frame_rate, "%.2f", fps); // to 2 decimal places
-	char fpsString[20];
-	strcpy(fpsString, "Current Fps:");
-	strcat(fpsString, string_frame_rate);
-	streaming_put_text(opencvImage, fpsString,
-					   height_scale * TEXT_SCALE_BASE * 3);
-}
-/** callback for set alpha for contrast correction from gui */
-void add_alpha_val(int alpha_val_from_gui)
-{
-	*alpha = alpha_val_from_gui;
-}
-/** callback for set beta for brightness correction from gui */
-void add_beta_val(int beta_val_from_gui)
-{
-	*beta = beta_val_from_gui;
-}
-static void apply_brightness_and_contrast(const cv::InputOutputArray _opencvImage)
-{
-	cv::Mat opencvImage = _opencvImage.getMat();
- 	if (opencvImage.type() == CV_8UC3) {
-	 	for( int y = 0; y < opencvImage.rows; y++) {
-        	for( int x = 0; x < opencvImage.cols; x++) {
-            	for( int c = 0; c < 3; c++ ) {
-                	opencvImage.at<cv::Vec3b>(y,x)[c] = cv::saturate_cast<uchar>
-					((*alpha)*(opencvImage.at<cv::Vec3b>(y,x)[c] ) + (*beta));
-				}
-			}
-		}	 
-	}
-	else { //mono
-		for( int y = 0; y < opencvImage.rows; y++) {
-        	for( int x = 0; x < opencvImage.cols; x++) {
-                opencvImage.at<uchar>(y,x) = cv::saturate_cast<uchar>
-					((*alpha)*(opencvImage.at<uchar>(y,x) ) + (*beta));
-			}
-		}
-	}
-}
-/** callback for set sharpness for sharpness correction from gui */
-void add_sharpness_val(int sharpness_val_from_gui)
-{
-	*sharpness = sharpness_val_from_gui;
-}
-static void sharpness_control(cv::InputArray _opencvImage)
-{
-	cv::Mat opencvImage = _opencvImage.getMat();
-	cv::Mat blurred;
-	cv::GaussianBlur(opencvImage, blurred, cv::Size(0, 0), *sharpness);
-	cv::addWeighted(opencvImage, 1.5, blurred, -0.5, 0, blurred);
-	blurred.copyTo(opencvImage);
-}
-
-void add_edge_thres_val(int edge_low_thres_val_from_gui)
-{
-	*edge_low_thres = edge_low_thres_val_from_gui;
-}
-
-static cv::Mat canny_filter_control(cv::InputOutputArray _opencvImage)
-{
-	cv::Mat opencvImage = _opencvImage.getMat();
-	const int ratio = 3;
-	const int kernel_size = 3;
-	cv::Mat edges;
-	cv::blur(opencvImage, edges, cv::Size(5,5));
-	cv::cvtColor(edges, edges, cv::COLOR_BGR2GRAY);
-	cv::Canny(edges, opencvImage, (*edge_low_thres), 
-		(*edge_low_thres)*ratio, kernel_size);
-	return opencvImage;
-
-}
-
-/**
- * group 3a ctrl flags for bayer cameras
- * auto exposure, auto white balance, auto brightness and contrast ctrl
- */
-static void group_3a_ctrl_flags_for_raw_camera(cv::InputOutputArray opencvImage)
-{
-	/** color output */
-	if (add_bayer_forcv(bayer_flag) != 4)
-	{
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-		// cv::cuda::cvtColor(opencvImage, opencvImage,
-		// cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-		cv::cuda::demosaicing(opencvImage, opencvImage,
-							  cv::cuda::COLOR_BayerBG2BGR_MHT + add_bayer_forcv(bayer_flag));
-#else
-		cv::cvtColor(opencvImage, opencvImage,
-					 cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-
-#endif
-		if (*rgb_matrix_flag == TRUE)
-			apply_rgb_matrix_post_debayer(opencvImage);
-	}
-	/** mono output */
-	if (add_bayer_forcv(bayer_flag) == 4)
-	{
-		CV_Assert((opencvImage.type() == CV_8UC1) || (opencvImage.type() == CV_8UC3));
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
-#else
-		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
-#endif
-	}
-
-	/** check awb flag, awb functionality, only available for bayer camera */
-	if (*(awb_flag) == TRUE)
-		apply_white_balance(opencvImage);
-
-	/** check abc flag, abc functionality, only available for bayer camera */
-	if (*(abc_flag) == TRUE)
-	{
-#ifndef USING_CLAHE
-		apply_auto_brightness_and_contrast(opencvImage, 1);
-#else
-		apply_auto_brightness_and_contrast(opencvImage);
-#endif
-	}
-}
-
-
-/** 
- * opencv only support debayering 8 and 16 bits 
- * 
- * decode the frame, move each pixel by certain bits,
- * and mask it for 8 bits, render a frame using opencv
- * args: 
- * 		struct device *dev - every infomation for camera
- * 		const void *p - pointer for the buffer
- * 		int shift - values to shift(RAW10 - 2, RAW12 - 4, YUV422 - 0) 
- * 
- */
-void decode_a_frame(struct device *dev, const void *p, int shift)
-{
-	int height = dev->height;
-	int width = dev->width;
-
-	cv::Mat share_img;
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-	cv::cuda::GpuMat gpu_img;
-#endif
-
-	if (*(soft_ae_flag) == TRUE)
-		apply_soft_ae(dev, p);
-
-	/** --- for raw8, raw10, raw12 bayer camera ---*/
-	if (shift != 0)
-	{
-		if (*rgb_gain_offset_flag == 1)
-			apply_rgb_gain_offset_pre_debayer(dev, p);
-		if (*rgb_ir_color == 1)
-			apply_color_correction_rgb_ir(dev, p);
-		if (*rgb_ir_ir == 1)
-			apply_color_correction_rgb_ir_test(dev, p);
-		/** 
-		 * --- for raw10, raw12 camera ---
-		 * tried with CV_16UC1 and then cast back, it doesn't really improve fps
-		 * I guess use openmp is already efficient enough 
-		 */
-		if (shift > 0) 
-			perform_shift(dev, p, shift);
-			
-		/**
-		 *  --- for raw8 camera ---
-		 * each pixel is 8-bit instead of 16-bit now
-		 * need to adjust read width
-		 */
-		else 
-			width = width * 2;
-		
-		//swap_two_bytes(dev, p);
-		cv::Mat img(height, width, CV_8UC1, (void *)p);
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-		gpu_img.upload(img);
-		group_3a_ctrl_flags_for_raw_camera(gpu_img);
-		gpu_img.download(img);
-#else
-		group_3a_ctrl_flags_for_raw_camera(img);	
-#endif
-		share_img = img;
-		// if (*rgb_ir_color == 1) {
-		// 	//cv::pyrDown(share_img, share_img, cv::Size(share_img.cols/2, share_img.rows/2));
-		// 	cv::pyrUp(share_img, share_img, cv::Size(share_img.cols*2, share_img.rows*2));
-		// }
-	}
-
-	/** --- for yuv camera ---*/
-	else if (shift == 0)
-	{
-		cv::Mat img(height, width, CV_8UC2, (void *)p);
-		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
-		if (add_bayer_forcv(bayer_flag) == 4)
-			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
-		share_img = img;
-	}
-
-	if (*(gamma_val) != (float)1)
-		apply_gamma_correction(share_img);
-	if (*(alpha) != (float)1 || (*beta) != (float)0)
-		apply_brightness_and_contrast(share_img);
-	if (*flip_flag)
-		cv::flip(share_img, share_img, 0);
-	if (*mirror_flag)
-		cv::flip(share_img, share_img, 1);
-	if (*sharpness != (float)1)
-		sharpness_control(share_img);
-	if (*show_edge_flag) 
-		share_img = canny_filter_control(share_img);
-	if (*(save_bmp))
-		save_frame_image_bmp(share_img);
-	if (*seperate_dual_display) 
-		display_dual_stereo_separately(share_img);
-	if (*display_mat_info_ena)
-		display_current_mat_stream_info(share_img);
-
-
-#ifdef RESIZE_OPENCV_WINDOW
-	/** if image larger than 720p by any dimension, resize the window */
-	if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
-		cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
-#endif
-
-	cv::imshow("cam", share_img);
-	
-	char key = (char)cv::waitKey(_1MS);
-	switch (key) {
-	case 'q':
-	case 'Q':
-	case _ESC_KEY_ASCII:
-		cv::destroyWindow("cam");
-		set_loop(0);
-
-		break;
-	default:
-		break;
-	}
-}
-
 /**
  * request, allocate and map buffers
  * 

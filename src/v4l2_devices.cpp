@@ -110,7 +110,6 @@ char *enum_v4l2_device(char *dev_name)
 		 * itself in /dev. */
         printf("Device Node Path: %s\n", udev_device_get_devnode(dev));
         strcpy(dev_name_tmp, udev_device_get_devnode(dev));
-        printf("%s\n", dev_name_tmp);
 
         /** The device pointed to by dev contains information about
 		 * the hidraw device. In order to get information about the
@@ -134,6 +133,7 @@ char *enum_v4l2_device(char *dev_name)
         if ((strcmp("2a0b", udev_device_get_sysattr_value(dev, "idVendor"))) == 0)
         {
             strcpy(dev_name, dev_name_tmp);
+            printf("Find leopard USB3 camera at %s\n", dev_name_tmp);
             /** From here, we can call get_sysattr_value() for each file
 		     * in the device's /sys entry. The strings passed into these
 		     * functions (idProduct, idVendor, serial, etc.) correspond
@@ -168,3 +168,4 @@ char *enum_v4l2_device(char *dev_name)
     udev_unref(udev);
     return dev_name;
 }
+

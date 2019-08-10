@@ -13,7 +13,7 @@
   with this program; if not, write to the Free Software Foundation, Inc., 
   
   This is the sample code for Leopard USB3.0 camera, mainly for the camera tool
-  control GUI using Gtk3. Gtk3 asnd Gtk2 don't live together paceful. If you 
+  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you 
   have problem running Gtk3 with your current compiled openCV, please refer to
   README.md guide to rebuild your opencv for supporting Gtk3.
   
@@ -87,7 +87,7 @@ typedef enum
 /**-------------------------menu bar callbacks------------------------------*/
 void open_config_dialog(GtkWidget *widget, gpointer window);
 void fw_update_clicked (GtkWidget *item);
-void about_info(GtkWidget *widget, gpointer window);
+void about_info(GtkWidget *widget);
 void exit_from_help(GtkWidget *widget);
 /**-------------------------grid1 callbacks---------------------------------*/
 void radio_datatype(GtkWidget *widget, gpointer data);
@@ -98,7 +98,7 @@ void hscale_gain_up(GtkRange *widget);
 
 void enable_ae(GtkToggleButton *toggle_button);
 void enable_awb(GtkToggleButton *toggle_button);
-void enable_abc(GtkToggleButton *toggle_button);
+void enable_clahe(GtkToggleButton *toggle_button);
 
 void toggled_addr_length(GtkWidget *widget, gpointer data);
 void toggled_val_length(GtkWidget *widget, gpointer data);
@@ -125,14 +125,16 @@ void enable_rgb_ir_color(GtkToggleButton *toggle_button);
 void enable_rgb_ir_ir(GtkToggleButton *toggle_button);
 void enable_display_dual_stereo(GtkToggleButton *toggle_button);
 void enable_display_mat_info(GtkToggleButton *toggle_button);
-
+void enable_abc(GtkToggleButton *toggle_button);
 void hscale_alpha_up(GtkRange *widget);
 void hscale_beta_up(GtkRange *widget);
 void hscale_sharpness_up(GtkRange *widget);
 void hscale_edge_thres_up(GtkRange *widget);
 /**-------------------------micellanous callbacks---------------------------*/
 void exit_loop(GtkWidget *widget);
-gboolean check_escape(GtkWidget *widget, GdkEventKey *event);
+  gboolean check_escape(
+  GtkWidget *widget, 
+  GdkEventKey *event);
 /*****************************************************************************
 **                      	Helper functions
 *****************************************************************************/
@@ -147,25 +149,30 @@ void init_grid1_widgets();
 void init_grid2_widgets();
 
 void iterate_def_elements(
-    def_element *definitions, size_t members);
+  def_element *definitions, 
+  size_t members);
 
 void init_grid1_def_elements();
 void init_grid2_def_elements();
 
-void iterate_grid1_elements(
-    grid_elements *elements, size_t members);
-void iterate_grid2_elements(
-    grid_elements *elements, size_t members);
-void list_all_grid1_elements();
-void list_all_grid2_elements();
+void iterate_grid_elements(
+  GtkWidget *grid,
+  grid_elements *elements, 
+  size_t members);
 
-void iterate_element_cb(element_callback *callbacks,
-                        size_t members);
+void list_all_grid1_elements(GtkWidget *grid);
+void list_all_grid2_elements(GtkWidget *grid);
+
+void iterate_element_cb(
+  element_callback *callbacks,
+  size_t members);
 void list_all_grid1_element_callbacks();
 void list_all_grid2_element_callbacks();
 
-void iterate_window_signals(GtkWidget *widget,
-                            window_signal *signals, size_t members);
+void iterate_window_signals(
+  GtkWidget *widget,
+  window_signal *signals, 
+  size_t members);
 void list_all_window_signals(GtkWidget *window);
 
 
@@ -173,8 +180,12 @@ void list_all_window_signals(GtkWidget *window);
 **                      	Main GUI
 *****************************************************************************/
 int gui_init();
-void grid1_setup();
-void notebook_setup();
-void menu_bar_setup();
+void grid_layout_setup(GtkWidget *grid);
+void grid1_setup(GtkWidget *grid);
+void grid2_setup(GtkWidget *grid);
+void grid3_setup(GtkWidget *grid);
+
+void notebook_setup(GtkWidget *maintable);
+void menu_bar_setup(GtkWidget *maintable, GtkWidget *window);
 void gui_run();
 void ctrl_gui_main();

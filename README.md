@@ -65,7 +65,6 @@ To build __OpenCV CUDA__ support, please refer to ```INSTALL_OPENCV_CUDA.md``` i
 ### Build Camera Tool
 * Use __make or cmake__ when you don't need __OpenCV CUDA__ support
 * Use __cmake__ when you need __OpenCV CUDA__ support
-* To build Linux Camera Tool with __OpenCV CUDA__ support, open the macro ```HAVE_OPENCV_CUDA_SUPPORT``` in ```hardware.h```
 
 1. Make
 ```sh
@@ -76,7 +75,8 @@ make
 ```sh
 mkdir build
 cd build
-cmake ../
+cmake ..            # USE_OPENCV_CUDA is turned off by default
+cmake -DUSE_OPENCV_CUDA=ON .. # turn on USE_OPENCV_CUDA for OpenCV CUDA support
 make
 
 # Add to your project

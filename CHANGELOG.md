@@ -3,13 +3,13 @@ All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
 
-## v0.0.0 - 2019-07-26  
+## v0.3.4 - 2019-07-26  
 **Added:**
 - add missing batchCmd and json
 
 **Changed:**
 - clean up ae code
-## v0.0.0 - 2019-07-25  
+## v0.3.3 - 2019-07-25  
 **Added:**
 - add rgb gain and offset, rgb2rgb matrix, software ae support 
 ## v0.3.2 - 2019-07-15  
@@ -35,7 +35,7 @@ All notable changes to Linux Camera Tool will be documented in this file.
 ## v0.2.7 - 2019-07-02  
 **Added:**
 - add lif firmware update support
-- add elaspe time count in main
+- add elapse time count in main
 ## v0.2.6 - 2019-07-02 
 **Changed:**
 - Merge pull request #6 from xiao6768/set_compiler_c11
@@ -96,7 +96,7 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - clean up the code
 ## v0.1.2 - 2019-04-17
 **Changed:**  
-- correct udev for laptop with webcam, TODO: batchtxt etc
+- correct udev for laptop with webcam, TODO: batch.txt etc
 - add doc
 ## v0.1.1 - 2019-04-12
 **Changed:**  
@@ -121,7 +121,7 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - return error for trigger
 - add usage of cmake for this project
 - 1. add cmake support. 
-- 2. compile test tool when buiding current project. if not, only build the library. 
+- 2. compile test tool when building current project. if not, only build the library. 
 - 3. move ui_control to test/ cause it seems a test tool
 ## v0.0.6 - 2019-04-10  
 **Added:**

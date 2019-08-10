@@ -37,6 +37,7 @@ static struct option opts[] = {
 	{"nbufs", 1, 0, 'n'},
 	{"size", 1, 0, 's'},
 	{"time-per-frame", 1, 0, 't'},
+	{"device", 1, 0, 'd'},
 	{0, 0, 0, 0}};
 
 /******************************************************************************
@@ -80,29 +81,11 @@ int main(int argc, char **argv)
 	struct v4l2_fract time_per_frame = {1, 15};
 	// record start time
 	auto start = std::chrono::high_resolution_clock::now();
-
 	char *ret_dev_name = enum_v4l2_device(dev_name);
-	std::string _dev_name(ret_dev_name);
-	v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
-
-	if (v4l2_dev < 0)
-	{
-		printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
-		return -1;
-	}
-
-	printf("********************List Available Resolutions***************\n");
-	/** 
-	 * list all the resolutions 
-	 * run a v4l2-ctl --list-formats-ext 
-	 * to see the resolution and available frame rate 
-	 */
-	std::cout << get_stdout_from_cmd(
-		"v4l2-ctl --device=" + _dev_name +
-		" --list-formats-ext | grep Size | awk '{print $1 $3}'| sed 's/Size/Resolution/g'");
+	char* dev_number;
 
 	printf("********************Camera Tool Usages***********************\n");
-	while ((c = getopt_long(argc, argv, "n:s:t:", opts, NULL)) != -1)
+	while ((c = getopt_long(argc, argv, "n:s:t:d:", opts, NULL)) != -1)
 	{
 		switch (c)
 		{
@@ -132,6 +115,15 @@ int main(int argc, char **argv)
 			do_set_time_per_frame = 1;
 			time_per_frame.denominator = atoi(optarg);
 			break;
+		case 'd':
+			dev_number = optarg;
+			if (dev_number[0] >= '0' && dev_number[0] <= '9' && strlen(dev_number) <=3)
+			{
+				sprintf(ret_dev_name, "/dev/video%s", dev_number);
+				printf("ret dev name = %s\r\n", ret_dev_name);
+			}
+			
+			break;
 		default:
 			printf("Invalid option -%c\n", c);
 			printf("Run %s -h for help.\n", argv[0]);
@@ -143,6 +135,25 @@ int main(int argc, char **argv)
 	{
 		usage(argv[0]);
 	}
+	
+	std::string _dev_name(ret_dev_name);
+	v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
+
+	if (v4l2_dev < 0)
+	{
+		printf("open camera %s failed,err code:%d\n\r", ret_dev_name, v4l2_dev);
+		return -1;
+	}
+
+	printf("********************List Available Resolutions***************\n");
+	/** 
+	 * list all the resolutions 
+	 * run a v4l2-ctl --list-formats-ext 
+	 * to see the resolution and available frame rate 
+	 */
+	std::cout << get_stdout_from_cmd(
+		"v4l2-ctl --device=" + _dev_name +
+		" --list-formats-ext | grep Size | awk '{print $1 $3}'| sed 's/Size/Resolution/g'");
 
 	/** Set the video format. */
 	if (do_set_format)

@@ -55,7 +55,8 @@ void split(const std::string &s, char delim, Out result)
  *   split the string by a delimiter
  *   this function return a new vector
  */
-std::vector<std::string> split(const std::string &s, char delim)
+std::vector<std::string> 
+split(const std::string &s, char delim)
 {
     std::vector<std::string> elems;
     split(s, delim, std::back_inserter(elems));
@@ -66,7 +67,8 @@ std::vector<std::string> split(const std::string &s, char delim)
  * Use this helper function to switch over the result of a hash function that
  * uses the string as input, so that the code looks much cleaner 
  * */
-option_string_code hashit(std::string const &inString)
+option_string_code 
+hashit(std::string const &inString)
 {
     if (inString == "SubAddress")
         return eSubAddress;
