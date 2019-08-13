@@ -40,7 +40,7 @@ GtkWidget *label_datatype, *hbox_datatype;
 GtkWidget *radio_raw10, *radio_raw12, *radio_yuyv, *radio_raw8;
 GtkWidget *label_bayer, *hbox_bayer;
 GtkWidget *radio_bg, *radio_gb, *radio_rg, *radio_gr, *radio_mono;
-GtkWidget *check_button_auto_exp, *check_button_awb, *check_button_auto_gain;
+GtkWidget *check_button_auto_exp, *check_button_awb, *check_button_clahe;
 GtkWidget *label_exposure, *label_gain;
 GtkWidget *hscale_exposure, *hscale_gain;
 GtkWidget *label_i2c_addr, *entry_i2c_addr;
@@ -200,7 +200,6 @@ void radio_datatype(GtkWidget *widget, gpointer data)
         gtk_widget_set_sensitive(radio_gb,0);
         gtk_widget_set_sensitive(radio_bg,0);
         gtk_widget_set_sensitive(check_button_awb,0);
-        gtk_widget_set_sensitive(check_button_auto_gain,0);
         gtk_widget_set_sensitive(check_button_rgb_gain,0);
         gtk_widget_set_sensitive(check_button_rgb_matrix,0);
         gtk_widget_set_sensitive(check_button_rgb_ir_color,0);
@@ -214,7 +213,6 @@ void radio_datatype(GtkWidget *widget, gpointer data)
         gtk_widget_set_sensitive(radio_gb,1);
         gtk_widget_set_sensitive(radio_bg,1);
         gtk_widget_set_sensitive(check_button_awb,1);
-        gtk_widget_set_sensitive(check_button_auto_gain,1);
         gtk_widget_set_sensitive(check_button_rgb_gain,1);
         gtk_widget_set_sensitive(check_button_rgb_matrix,1);
         gtk_widget_set_sensitive(check_button_rgb_ir_color,1);
@@ -848,7 +846,7 @@ void init_grid1_widgets()
 
     check_button_auto_exp  = gtk_check_button_new();
     check_button_awb            = gtk_check_button_new();
-    check_button_auto_gain      = gtk_check_button_new();    
+    check_button_clahe      = gtk_check_button_new();    
     check_button_trig_en        = gtk_check_button_new();
     check_button_just_sensor    = gtk_check_button_new();
 
@@ -1118,7 +1116,7 @@ void init_grid1_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
          .label_str = "Enable auto white balance"},
-        {.widget = check_button_auto_gain ,    
+        {.widget = check_button_clahe ,    
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
          .label_str = "Enable CLAHE"},        
@@ -1433,7 +1431,7 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = hbox_bayer,               .col =++col, .row =row++, .width =2},
         {.widget = check_button_auto_exp,    .col =col=0, .row =row,   .width =1},
         {.widget = check_button_awb,         .col =++col, .row =row,   .width =1},
-        {.widget = check_button_auto_gain,   .col =++col, .row =row++, .width =1},
+        {.widget = check_button_clahe,   .col =++col, .row =row++, .width =1},
         {.widget = label_exposure,           .col =col=0, .row =row,   .width =1},
         {.widget = hscale_exposure,          .col =++col, .row =row++, .width =3},
         {.widget = label_gain,               .col =col=0, .row =row,   .width =1},
@@ -1594,7 +1592,7 @@ void list_all_grid1_element_callbacks()
          .signal = "toggled", 
          .handler = G_CALLBACK(enable_awb), 
          .data = NULL},
-        {.widget = check_button_auto_gain,     
+        {.widget = check_button_clahe,     
          .signal = "toggled", 
          .handler = G_CALLBACK(enable_clahe), 
          .data = NULL},

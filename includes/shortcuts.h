@@ -48,7 +48,7 @@ typedef enum { FALSE, TRUE } BOOL;
 
 #define LOWBYTE(x)          ((unsigned char) (x))
 #define HIGHBYTE(x)         ((unsigned char) (((unsigned int) (x)) >> 8))
-
+#define BYTES_PER_BPP(bpp)  ((bpp -1)/8 + 1)
 /** ------------------------------Arrays------------------------------------*/
 #define CLEAR(a)            memset(&(a), 0, sizeof(a))
 /** Get number of elements in an array */

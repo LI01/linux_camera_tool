@@ -50,6 +50,7 @@
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 #include <opencv4/opencv2/cudaobjdetect.hpp>
 #include <opencv4/opencv2/cudaimgproc.hpp>
+#include <opencv4/opencv2/cudafilters.hpp>
 #include <opencv4/opencv2/cudaarithm.hpp>
 #endif
 
@@ -100,7 +101,7 @@ int *cur_gain;	 					/// update current gain for AE
 static int image_count;				/// image count number add to capture name
 double cur_time = 0;				/// time measured in OpenCV for fps
 struct v4l2_buffer queuebuffer; 	/// queuebuffer for enqueue, dequeue buffer
-
+static constexpr const char* window_name = "Camera View"; 
 /*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
@@ -304,17 +305,17 @@ inline int add_bayer_forcv(int *bayer_flag)
 	switch (cmp)
 	{
 	case CV_BayerBG2BGR_FLG:
-		return 0;
+		return CV_BayerBG2BGR_FLG-1;
 	case CV_BayerGB2BGR_FLG:
-		return 1;
+		return CV_BayerGB2BGR_FLG-1;
 	case CV_BayerRG2BGR_FLG:
-		return 2;
+		return CV_BayerRG2BGR_FLG-1;
 	case CV_BayerGR2BGR_FLG:
-		return 3;
+		return CV_BayerGR2BGR_FLG-1;
 	case CV_MONO_FLG:
-		return 4;
+		return CV_MONO_FLG-1;
 	default:
-		return 0;
+		return CV_BayerBG2BGR_FLG-1;
 	}
 }
 
@@ -868,8 +869,8 @@ void initialize_shared_memory_var()
 {
 	*gamma_val = 1.0;
 	*black_level_correction = 0;
-	*bpp = 10;
-	*bayer_flag = 0;
+	*bpp = RAW10_FLG;
+	*bayer_flag = CV_BayerBG2BGR_FLG;
 	*display_mat_info_ena = TRUE;
 	*alpha = 1;
 	*beta = 0;
@@ -962,7 +963,7 @@ void stop_Camera(struct device *dev)
 	ret = ioctl(dev->fd, VIDIOC_STREAMOFF, &type);
 	if (ret < 0)
 	{
-		printf("Couldn't stop camera streaming\n");
+		perror("Couldn't stop camera streaming\n");
 		return;
 	}
 	return;
@@ -1070,15 +1071,13 @@ void video_get_format(struct device *dev)
 */
 void streaming_loop(struct device *dev)
 {
-	cv::namedWindow("cam", cv::WINDOW_NORMAL);
+	cv::namedWindow(window_name, cv::WINDOW_NORMAL);
 
 	image_count = 0;
 	*loop = 1;
 	while (*loop)
 		get_a_frame(dev);
-
-	if (*loop == 0)	
-		unmap_variables();
+	unmap_variables();
 }
 
 /** 
@@ -1108,7 +1107,7 @@ void get_a_frame(struct device *dev)
 		if (*(save_raw))
 			v4l2_core_save_data_to_file(dev->buffers[i].start, dev->imagesize);
 
-		decode_a_frame(dev, dev->buffers[i].start, set_shift(bpp));
+		decode_process_a_frame(dev, dev->buffers[i].start);
 
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
 		{
@@ -1155,9 +1154,7 @@ double calc_mean(struct device *dev, const void *p)
 	int height = dev->height;
 	int start_x = (width - size) / 2;
 	int start_y = (height - size) / 2;
-	/// convert bits per pixel to bytes per pixel
-	int bytes_per_pixel = (*bpp - 1) / 8 + 1;
-
+	int bytes_per_pixel = BYTES_PER_BPP(*bpp);
 	int start_pos = PIX(start_x, start_y, width) * bytes_per_pixel;
 	double total = 0, mean = 0;
 	unsigned char *src_char = (unsigned char *)p;
@@ -1308,6 +1305,30 @@ void swap_two_bytes(struct device *dev, const void *p)
 	}
 }
 
+/** 
+ * Easier way to debug if it is FPGA byte swap problem
+ * ---------------------------INTERNAL USE ONLY------------------------
+ * Swap higher and lower 8-bit to see if there is still artifact exists
+ * args: 
+ * 		struct device *dev - every infomation for camera
+ * 		const void *p 		- camera streaming buffer pointer
+ */
+void swap_four_bytes(struct device *dev, const void *p)
+{
+	uint32_t *dst = (uint32_t *)p;
+	uint32_t *src = (uint32_t *)p;
+	uint32_t tmp;
+
+	for (unsigned int i = 0; i < dev->height/2; i++)
+	{
+		for (unsigned int j = 0; j < dev->width/2; j++)
+		{
+			tmp = src[PIX(j, i, dev->width)];
+			dst[PIX(j, i, dev->width)] = ((uint16_t)tmp << 16) |
+			 ((uint16_t) (tmp >> 16));
+		}
+	}
+}
 
 /**
  * set the limit for rgb color correction input value
@@ -1741,6 +1762,7 @@ static void display_current_mat_stream_info(cv::InputOutputArray& _opencvImage)
 	streaming_put_text(opencvImage, fpsString,
 					   height_scale * TEXT_SCALE_BASE * 3);
 }
+
 /** callback for set alpha for contrast correction from gui */
 void add_alpha_val(int alpha_val_from_gui)
 {
@@ -1778,23 +1800,42 @@ void add_sharpness_val(int sharpness_val_from_gui)
 {
 	*sharpness = sharpness_val_from_gui;
 }
-
+/**
+ * apply sharpness filter to a given image
+ * if OpenCV CUDA is enabled, use createGaussianFilter, 
+ */
 static void sharpness_control(cv::InputOutputArray& _opencvImage)
 {
+#ifndef HAVE_OPENCV_CUDA_SUPPORT
 	cv::Mat opencvImage = _opencvImage.getMat();
 	cv::Mat blurred;
 	cv::GaussianBlur(opencvImage, blurred, cv::Size(0, 0), *sharpness);
 	cv::addWeighted(opencvImage, 1.5, blurred, -0.5, 0, blurred);
 	blurred.copyTo(opencvImage);
+#else
+	if (*sharpness > 16) *sharpness = 16;
+	int ksize = 2*(*sharpness)-1;
+	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
+	cv::cuda::GpuMat blurred;
+	cv::Ptr<cv::cuda::Filter> filter = 
+		cv::cuda::createGaussianFilter(opencvImage.type(),blurred.type(), 
+		cv::Size(ksize, ksize),1);
+	filter->apply(opencvImage, blurred);
+	cv::cuda::addWeighted(opencvImage, 1.5, blurred, -0.5, 0, blurred);
+	blurred.copyTo(opencvImage);
+#endif
 }
 
 void add_edge_thres_val(int edge_low_thres_val_from_gui)
 {
 	*edge_low_thres = edge_low_thres_val_from_gui;
 }
-
+/**
+ * Reason not to use OpenCV CUDA acceleration is it doesn't make the process faster
+ */
 static cv::Mat canny_filter_control(cv::InputOutputArray& _opencvImage)
 {
+
 	cv::Mat opencvImage = _opencvImage.getMat();
 	const int ratio = 3;
 	const int kernel_size = 3;
@@ -1804,17 +1845,18 @@ static cv::Mat canny_filter_control(cv::InputOutputArray& _opencvImage)
 	cv::Canny(edges, opencvImage, (*edge_low_thres), 
 		(*edge_low_thres)*ratio, kernel_size);
 	return opencvImage;
+
 }
 
 /**
  * group 3a ctrl flags for bayer cameras
- * auto exposure, auto white balance, auto brightness and contrast ctrl
+ * auto exposure, auto white balance, CLAHE ctrl
  */
 static void group_3a_ctrl_flags_for_raw_camera(
 	cv::InputOutputArray& opencvImage)
 {
 	/** color output */
-	if (add_bayer_forcv(bayer_flag) != 4)
+	if (*bayer_flag != CV_MONO_FLG)
 	{
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 		// cv::cuda::cvtColor(opencvImage, opencvImage,
@@ -1830,59 +1872,73 @@ static void group_3a_ctrl_flags_for_raw_camera(
 			apply_rgb_matrix_post_debayer(opencvImage);
 	}
 	/** mono output */
-	if (add_bayer_forcv(bayer_flag) == 4)
+	if (*bayer_flag == CV_MONO_FLG && opencvImage.type() == CV_8UC3)
 	{
-		CV_Assert((opencvImage.type() == CV_8UC1) || (opencvImage.type() == CV_8UC3));
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
-		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-		cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
+			cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
+			cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
 #else
-		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-		cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
+			cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
+			cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);	
 #endif
 	}
 
 	/** check awb flag, awb functionality, only available for bayer camera */
 	if (*(awb_flag) == TRUE)
 		apply_white_balance(opencvImage);
-	if (*(clahe_flag) == TRUE)
-		apply_clahe(opencvImage);
-	
+
 }
 
+void switch_on_keys()
+{
+	char key = (char)cv::waitKey(_1MS);
+	switch (key) {
+	case 'q':
+	case 'Q':
+	case _ESC_KEY_ASCII:
+		cv::destroyWindow(window_name);
+		set_loop(0);
+
+		break;
+	default:
+		break;
+	}
+
+}
 
 /** 
- * opencv only support debayering 8 and 16 bits 
+ * OpenCV only support debayering 8 and 16 bits 
  * 
  * decode the frame, move each pixel by certain bits,
- * and mask it for 8 bits, render a frame using opencv
+ * and mask it for 8 bits, render a frame using OpenCV
+ * perform all flagged image processing tasks here 
  * args: 
  * 		struct device *dev - every infomation for camera
  * 		const void *p - pointer for the buffer
- * 		int shift - values to shift(RAW10 - 2, RAW12 - 4, YUV422 - 0) 
+
  * 
  */
-void decode_a_frame(struct device *dev, const void *p, int shift)
+void decode_process_a_frame(struct device *dev, const void *p)
 {
 	int height = dev->height;
 	int width = dev->width;
-
+	int shift = set_shift(bpp);
 	cv::Mat share_img;
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	cv::cuda::GpuMat gpu_img;
 #endif
 
-	if (*(soft_ae_flag) == TRUE)
+	if (*soft_ae_flag)
 		apply_soft_ae(dev, p);
 
 	/** --- for raw8, raw10, raw12 bayer camera ---*/
 	if (shift != 0)
 	{
-		if (*rgb_gain_offset_flag == 1)
+		if (*rgb_gain_offset_flag)
 			apply_rgb_gain_offset_pre_debayer(dev, p);
-		if (*rgb_ir_color == 1)
+		if (*rgb_ir_color)
 			apply_color_correction_rgb_ir(dev, p);
-		if (*rgb_ir_ir == 1)
+		if (*rgb_ir_ir)
 			display_rgbir_ir_channel(dev, p);
 		/** 
 		 * --- for raw10, raw12 camera ---
@@ -1914,31 +1970,47 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 
 	/** --- for yuv camera ---*/
 	else if (shift == 0)
-	{
+	{	
+		//swap_four_bytes(dev, p);
 		cv::Mat img(height, width, CV_8UC2, (void *)p);
 		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
-		if (add_bayer_forcv(bayer_flag) == 4)
+		if (*bayer_flag == CV_MONO_FLG && img.type() != CV_8UC1)
 			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
 		share_img = img;
 	}
+#ifdef HAVE_OPENCV_CUDA_SUPPORT
+	gpu_img.upload(share_img);
+	if (*(gamma_val) != (float)1)
+		apply_gamma_correction(gpu_img);
+	
+	if (*sharpness != (float)1)
+		sharpness_control(gpu_img);
 
+	if (*clahe_flag)
+		apply_clahe(gpu_img);
+	gpu_img.download(share_img);
+#else
 	if (*(gamma_val) != (float)1)
 		apply_gamma_correction(share_img);
-	// if (*(clahe_flag) == TRUE)
-	// 	apply_clahe(share_img);
+	
+	if (*sharpness != (float)1)
+		sharpness_control(share_img);
+
+	if (*clahe_flag)
+		apply_clahe(share_img);
+#endif 
 	if (*(alpha) != (float)1 || (*beta) != (float)0)
 		apply_brightness_and_contrast(share_img);
 	if (*flip_flag)
 		cv::flip(share_img, share_img, 0);
 	if (*mirror_flag)
 		cv::flip(share_img, share_img, 1);
-	if (*sharpness != (float)1)
-		sharpness_control(share_img);
-	if (*(abc_flag) == TRUE)
+
+	if (*abc_flag)
 		apply_auto_brightness_and_contrast(share_img, 1);
 	if (*show_edge_flag) 
 		share_img = canny_filter_control(share_img);
-	if (*(save_bmp))
+	if (*save_bmp)
 		save_frame_image_bmp(share_img);
 	if (*separate_dual_display) 
 		display_dual_stereo_separately(share_img);
@@ -1949,24 +2021,15 @@ void decode_a_frame(struct device *dev, const void *p, int shift)
 	/** if image larger than 720p by any dimension, resize the window */
 	if (*resize_window_ena) {
 		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
-			cv::resizeWindow("cam", CROPPED_WIDTH, CROPPED_HEIGHT);
+			cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
 	}	
 
-	cv::imshow("cam", share_img);
-	
-	char key = (char)cv::waitKey(_1MS);
-	switch (key) {
-	case 'q':
-	case 'Q':
-	case _ESC_KEY_ASCII:
-		cv::destroyWindow("cam");
-		set_loop(0);
+	cv::imshow(window_name, share_img);
+	switch_on_keys();
 
-		break;
-	default:
-		break;
-	}
 }
+
+
 /**
  * set rgb ir color correction flag 
  * args:
@@ -2137,6 +2200,8 @@ void display_rgbir_ir_channel(struct device *dev, const void *p)
 	apply_gamma_correction(rgbir_ir);
 	sharpness_control(rgbir_ir);
 	cv::imshow("RGB-IR IR Channel", rgbir_ir);
+
+	
 }
 /**
  * request, allocate and map buffers
@@ -2265,6 +2330,7 @@ int video_free_buffers(struct device *dev)
 	if (ret < 0)
 	{
 		printf("Unable to release buffers: %d.\n", errno);
+		fflush(stdout);
 		return ret;
 	}
 

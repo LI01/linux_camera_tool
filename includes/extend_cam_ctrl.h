@@ -151,8 +151,9 @@ void add_alpha_val(int alpha_val_from_gui);
 void add_beta_val(int beta_val_from_gui);
 void add_sharpness_val(int sharpness_val_from_gui);
 void add_edge_thres_val(int edge_low_thres_val_from_gui);
+void switch_on_keys();
 
-void decode_a_frame(struct device *dev, const void *p, int shift);
+void decode_process_a_frame(struct device *dev, const void *p);
 
 int video_alloc_buffers(struct device *dev, int nbufs);
 int video_free_buffers(struct device *dev);

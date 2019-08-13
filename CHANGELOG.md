@@ -2,7 +2,15 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
-
+## v0.3.6 - 2019-08-09
+**Added:**  
+- add OpenCV CUDA build in cmake, 
+- add open camera from device number(used to stream multiple different LI USB3 cameras)
+  
+## v0.3.5 - 2019-08-01  
+**Added:**
+- add grid2
+  
 ## v0.3.4 - 2019-07-26  
 **Added:**
 - add missing batchCmd and json
@@ -14,7 +22,8 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - add rgb gain and offset, rgb2rgb matrix, software ae support 
 ## v0.3.2 - 2019-07-15  
 **Added:**
-- add OpenCV CUDA support, put gain,exp max query in cam_property to avoid device mismatch
+- add OpenCV CUDA support
+- put gain,exp max query in cam_property to avoid device mismatch
 
 **Changed:**
 - Makefile build with C++11 so it won't fail at build 
@@ -31,7 +40,7 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - correct the bug of read sensor val buffer being too small
 ## v0.2.8 - 2019-07-03
 **Changed:**  
-- add exposure and gain maximum value in GUI that read from v4l2 so the range doesn't confuse people
+- add exposure and gain maximum value in GUI that read from v4l2 so the range doesn't confuses people
 ## v0.2.7 - 2019-07-02  
 **Added:**
 - add lif firmware update support
@@ -47,13 +56,16 @@ All notable changes to Linux Camera Tool will be documented in this file.
 ## v0.2.4 - 2019-06-28  
 **Added:**
 - add error check for parsing  hex/dec input
-- add firmware update from shell script, TODO: need to integrate into GUI
+- add firmware update from shell script
+- TODO: need to integrate into GUI
 ## v0.2.3 - 2019-06-26
 **Added:**  
 - add batch cmd parser
 ## v0.2.2 - 2019-06-21
 **Added:**  
-- add AR0231 DUAL CAM DEMO code, byte swap debug function, TODO: ui click need to further debug
+- add AR0231 DUAL CAM DEMO code
+- add byte swap debug function
+- TODO: ui click need to further debug
 ## v0.2.1 - 2019-06-13
 **Added:**  
 - add firmware erase
@@ -76,13 +88,15 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - add icon for control window
 ## v0.1.6 - 2019-05-06
 **Changed:**  
-- reorg ui_ctrl, remove some warning messages
+- reorg ui_ctrl,
+- remove some warning messages
   
 **Added:**
 - add raw8 support
 ## v0.1.5 - 2019-05-01  
 **Added:**
-- integrate register write into json, TODO: capture images in while loop or before?
+- integrate register write into json
+- TODO: capture images in while loop or before?
 ## v0.1.4 - 2019-04-30
 **Changed:**  
 - put header files into includes
@@ -136,7 +150,8 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - add resolution and frame rate
 - add readme and .gigignore etc
 - add awb in ui control
-- add white balance,TODO: edit UI
+- add white balance
+- TODO: edit UI
 ## v0.0.3 - 2019-04-05  
 **Changed:**
 - remove unused libraries
