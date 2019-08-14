@@ -19,7 +19,7 @@
   driver support.
 
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/cam_property.h"
@@ -294,7 +294,7 @@ int get_frame_rate(int fd)
 /**------------------------------------------------------------------------ */
 /** Get current resolution height
  *  args:
- *      int fd - put buffers in
+ *      int fd - file descriptor for camera device
  * 		control id
  */
 int get_current_height(int fd)
@@ -312,6 +312,45 @@ int get_current_height(int fd)
 		return 0;
 	}
     return fmt.fmt.pix.height;
+}
+
+/** 
+ * retrive device's capabilities
+ * 
+ * args: 
+ * 		int fd - file descriptor for camera device
+ * returns: 
+ * 		error value
+ */
+int check_dev_cap(int fd)
+{
+	struct v4l2_capability cap;
+	CLEAR(cap);
+	int ret;
+	ret = (ioctl(fd, VIDIOC_QUERYCAP, &cap));
+	if (ret < 0)
+	{
+		printf("VIDIOC_QUERYCAP error:%s\n", strerror(errno));
+		return -1;
+	}
+
+	if ((cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
+	{
+		printf("Error opening device: video capture not supported.\n");
+		return -1;
+	}
+	if (!(cap.capabilities & V4L2_CAP_STREAMING))
+	{
+		printf("Does not support streaming\n");
+
+		return -1;
+	}
+	if (!(cap.capabilities & V4L2_CAP_READWRITE))
+	{
+		printf("Does not support read, try with mmap\n");
+		return -1;
+	}
+	return 0;
 }
 
 void usage( const char *argv0)

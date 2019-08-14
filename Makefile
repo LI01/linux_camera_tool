@@ -41,6 +41,7 @@ $(APP): $(OBJS)
 	$(CPP) -o $@ $(OBJS) $(CPPFLAGS) $(LDFLAGS)
 
 clean:
-	-rm -f *.o $(OBJS)
+	-rm -f *.o 
+	-rm -f $(OBJS)
 	-rm -f $(APP)
 

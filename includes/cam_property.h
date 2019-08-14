@@ -19,7 +19,7 @@
   driver support.
 
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 #pragma once
 /*****************************************************************************
@@ -67,5 +67,5 @@ void get_focus_absolute(int fd);
 int get_current_height(int fd);
 void set_frame_rate(int fd, int fps);
 int get_frame_rate(int fd);
-
+int check_dev_cap(int fd);
 void usage( const char *argv0);

@@ -37,7 +37,7 @@
  10. Close your descriptor to the device 
   
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/extend_cam_ctrl.h"
@@ -63,44 +63,43 @@
  * Since we use fork, variables btw two processes are not shared
  * use mmap for all variables you need to share between gui, videostreaming
  */
-static int *save_bmp;				/// flag for saving bmp
-static int *save_raw;				/// flag for saving raw
-static int *bayer_flag;				/// flag for choosing bayer pattern
-static int *bpp;					/// flag for datatype bits per pixel
-static int *awb_flag;				/// flag for enable awb
-static int *clahe_flag;				/// flag for enable CLAHE
-static int *abc_flag;				/// flag for enable auto brightness&contrast
-static float *gamma_val;			/// gamma correction value from gui
-static int *black_level_correction; /// black level correction value from gui
-static int *loop;					/// while (*loop)
-static int *rgb_gain_offset_flag;   /// flag for rgb gain and offset enable
-static int *r_gain;					/// values for rgb gain, offset correction
+static int *save_bmp;			  /// flag for saving bmp
+static int *save_raw;			  /// flag for saving raw
+static int *bayer_flag;			  /// flag for choosing bayer pattern
+static int *bpp;				  /// flag for datatype bits per pixel
+static int *awb_flag;			  /// flag for enable awb
+static int *clahe_flag;			  /// flag for enable CLAHE
+static int *abc_flag;			  /// flag for enable auto brightness&contrast
+static float *gamma_val;		  /// gamma correction value from gui
+static int *blc; 				  /// black level correction value from gui
+static int *loop;				  /// while (*loop)
+static int *rgb_gainoffset_flg;   /// flag for rgb gain and offset enable
+static int *r_gain;				  /// values for rgb gain, offset correction
 static int *b_gain;
 static int *g_gain;
 static int *r_offset;
 static int *b_offset;
 static int *g_offset;
-static int *rgb_matrix_flag; 		/// flag for rgb2rgb matrix enable
-static int *rr, *rg, *rb;			/// values for rgb2rgb matrix
+static int *rgb_matrix_flg; 	  /// flag for rgb2rgb matrix enable
+static int *rr, *rg, *rb;		  /// values for rgb2rgb matrix
 static int *gr, *gg, *gb;
 static int *br, *bg, *bb;
-static int *soft_ae_flag; 			/// flag for software AE
+static int *soft_ae_flag; 		  /// flag for software AE
 static int *flip_flag, *mirror_flag;
 static int *show_edge_flag;
 static int *rgb_ir_color, *rgb_ir_ir;
-static int *separate_dual_display;
-static int *display_mat_info_ena;
+static int *separate_dual;
+static int *display_info_ena;
 static int *resize_window_ena;
 
 static int *alpha, *beta, *sharpness;
 static int *edge_low_thres;
 
-int *cur_exposure; 					/// update current exposure for AE
-int *cur_gain;	 					/// update current gain for AE
-
-static int image_count;				/// image count number add to capture name
-double cur_time = 0;				/// time measured in OpenCV for fps
-struct v4l2_buffer queuebuffer; 	/// queuebuffer for enqueue, dequeue buffer
+int *cur_exposure; 				  /// update current exposure for AE
+int *cur_gain;	 				  /// update current gain for AE
+static int image_count;			  /// image count number add to capture name
+double cur_time = 0;			  /// time measured in OpenCV for fps
+struct v4l2_buffer queuebuffer;   /// queuebuffer for enqueue, dequeue buffer
 static constexpr const char* window_name = "Camera View"; 
 /*****************************************************************************
 **                      	External Callbacks
@@ -113,26 +112,33 @@ extern int get_current_height(int fd);
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
-
-/**
- * resize opencv image
- * args:
- * 		flag - set/reset the flag when get check button toggle
+/*
+ * flip the flag of one enable/disable switch
+ * use *flag for these global shared memory flag
  */
-void resize_window_enable(int enable)
+void enable_wrapper(int *flag, int enable)
 {
 	switch (enable)
 	{
-	case 1:
-		*resize_window_ena = TRUE;
+	case 1: 
+		*flag = TRUE; 
 		break;
-	case 0:
-		*resize_window_ena= FALSE;
+	case 0: 
+		*flag = FALSE; 
 		break;
-	default:
-		*resize_window_ena = TRUE;
+	default: 
+		*flag = FALSE; 
 		break;
 	}
+}
+/**
+ * resize opencv image
+ * args:
+ * 		enable - set/reset the flag when get check button toggle
+ */
+void resize_window_enable(int enable)
+{
+	enable_wrapper(resize_window_ena, enable);
 }
 
 
@@ -339,10 +345,10 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = CV_MONO_FLG;
 }
 
-/** callback for set black_level_correction from gui */
-void add_black_level_correction(int blc_val_from_gui)
+/** callback for set blc from gui */
+void add_blc(int blc_val_from_gui)
 {
-	*black_level_correction = blc_val_from_gui;
+	*blc = blc_val_from_gui;
 }
 
 /** callback for set gamma_val for gamma correction from gui */
@@ -361,7 +367,8 @@ void add_gamma_val(float gamma_val_from_gui)
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
  */
-static void apply_gamma_correction(cv::InputOutputArray& opencvImage)
+static void apply_gamma_correction(
+	cv::InputOutputArray& opencvImage)
 {
 	cv::Mat look_up_table(1, 256, CV_8U);
 	uchar *p = look_up_table.ptr();
@@ -385,18 +392,7 @@ static void apply_gamma_correction(cv::InputOutputArray& opencvImage)
  */
 void awb_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*awb_flag = TRUE;
-		break;
-	case 0:
-		*awb_flag = FALSE;
-		break;
-	default:
-		*awb_flag = FALSE;
-		break;
-	}
+	enable_wrapper(awb_flag, enable);
 }
 
 /** 
@@ -409,30 +405,34 @@ void awb_enable(int enable)
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
  */
-static void apply_white_balance(cv::InputOutputArray& opencvImage)
+static void apply_white_balance(
+	cv::InputOutputArray& _opencvImage)
 {
+	
 	/// if it is grey image, do nothing
-	if (opencvImage.type() == CV_8UC1)
+	if (_opencvImage.type() == CV_8UC1)
 		return;
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
-	cv::cuda::GpuMat _opencvImage = opencvImage.getGpuMat();
+	
+	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
 	std::vector<cv::cuda::GpuMat> bgr_planes;
-	cv::cuda::split(_opencvImage, bgr_planes);
+	cv::cuda::split(opencvImage, bgr_planes);
 	cv::cuda::equalizeHist(bgr_planes[0], bgr_planes[0]);
 	cv::cuda::equalizeHist(bgr_planes[1], bgr_planes[1]);
 	cv::cuda::equalizeHist(bgr_planes[2], bgr_planes[2]);
-	cv::cuda::merge(bgr_planes, _opencvImage);
+	cv::cuda::merge(bgr_planes, opencvImage);
+	
 #else
 	/// ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
-	cv::Mat _opencvImage = opencvImage.getMat();
+	cv::Mat opencvImage = _opencvImage.getMat();
 	double discard_ratio = 0.05;
 	int hists[3][256];
 	CLEAR(hists);
 
-	for (int y = 0; y < _opencvImage.rows; ++y)
+	for (int y = 0; y < opencvImage.rows; ++y)
 	{
-		uchar *ptr = _opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < _opencvImage.cols; ++x)
+		uchar *ptr = opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < opencvImage.cols; ++x)
 		{
 			for (int j = 0; j < 3; ++j)
 			{
@@ -442,7 +442,7 @@ static void apply_white_balance(cv::InputOutputArray& opencvImage)
 	}
 
 	/// cumulative hist
-	int total = _opencvImage.cols * _opencvImage.rows;
+	int total = opencvImage.cols * opencvImage.rows;
 	int vmin[3], vmax[3];
 	for (int i = 0; i < 3; ++i)
 	{
@@ -460,10 +460,10 @@ static void apply_white_balance(cv::InputOutputArray& opencvImage)
 			vmax[i] += 1;
 	}
 
-	for (int y = 0; y < _opencvImage.rows; ++y)
+	for (int y = 0; y < opencvImage.rows; ++y)
 	{
-		uchar *ptr = _opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < _opencvImage.cols; ++x)
+		uchar *ptr = opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < opencvImage.cols; ++x)
 		{
 			for (int j = 0; j < 3; ++j)
 			{
@@ -477,47 +477,26 @@ static void apply_white_balance(cv::InputOutputArray& opencvImage)
 		}
 	}
 #endif
+	
 }
 /**
  * set abc flag 
  * args:
- * 		flag - set/reset the flag when get check button toggle
+ * 		enable - set/reset the flag when get check button toggle
  */
 void abc_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*abc_flag = TRUE;
-		break;
-	case 0:
-		*abc_flag = FALSE;
-		break;
-	default:
-		*abc_flag = FALSE;
-		break;
-	}
+	enable_wrapper(abc_flag, enable);
 }
 
 /**
  * set CLAHE flag 
  * args:
- * 		flag - set/reset the flag when get check button toggle
+ * 		enable - set/reset the flag when get check button toggle
  */
 void clahe_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*clahe_flag = TRUE;
-		break;
-	case 0:
-		*clahe_flag = FALSE;
-		break;
-	default:
-		*clahe_flag = FALSE;
-		break;
-	}
+	enable_wrapper(clahe_flag, enable);
 }
 
 /** 
@@ -530,7 +509,7 @@ void clahe_enable(int enable)
  * Ref: http://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
  * args:
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
+ * 			that can be modified inside the functions
  * 		float clipHistPercent 			 - cut wings of histogram at given percent
  * 			typical=>1, 0=>Disabled
  */
@@ -539,6 +518,7 @@ static void apply_auto_brightness_and_contrast(
 	cv::InputOutputArray& opencvImage,
 	float clipHistPercent = 0)
 {
+	
 	int hist_size = 256;
 	float alpha, beta;
 	double min_gray = 0, max_gray = 0;
@@ -564,9 +544,9 @@ static void apply_auto_brightness_and_contrast(
 		const float *histRange = {range};
 		bool uniform = true;
 		bool accumulate = false;
-		// void calcHist(img_orig, n_images, channels(gray=0), mask(for ROi),
-		//               mat hist, dimemsion, histSize=bins=256,
-		//               ranges_for_pixel, bool uniform, bool accumulate);
+		/// void calcHist(img_orig, n_images, channels(gray=0), mask(for ROi),
+		///               mat hist, dimemsion, histSize=bins=256,
+		///               ranges_for_pixel, bool uniform, bool accumulate);
 		calcHist(&gray, 1, 0, cv::Mat(), hist, 1,
 				 &hist_size, &histRange, uniform, accumulate);
 
@@ -577,6 +557,7 @@ static void apply_auto_brightness_and_contrast(
 		{
 			accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
 		}
+		
 
 		/// locate points that cuts at required value
 		float max = accumulator.back();
@@ -606,17 +587,27 @@ static void apply_auto_brightness_and_contrast(
 	 */
 	cv::Mat _opencvImage = opencvImage.getMat();
 	_opencvImage.convertTo(opencvImage, -1, alpha, beta);
-
+	
 }
 
 /** 
  * Contrast Limited Adaptive Histogram Equalization) algorithm
+ * The algorithm used for OpenCV CUDA and normal is the same
+ * Steps: 
+ * 1. if it is RGB image, convert image to lab color-space, jump to step 2
+ * 2. separate and get L channel of lab planes, jump tp step 4
+ * 3. if it is monochrome image, jump to step 4
+ * 4. apply adaptive historgram equalization(cv::createCLAHE etc)
+ * 5. convert the resulting Lab back to RGB, if it is mono, do nothing
  * ref: https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
+ * args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 			that can be modified inside the functions
  */
 static void apply_clahe(
 	cv::InputOutputArray& opencvImage)
 {
-
+	
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	
 	if (opencvImage.type() != CV_8UC1)
@@ -625,7 +616,8 @@ static void apply_clahe(
 		cv::cuda::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
 		/// Extract the L channel
 		std::vector<cv::cuda::GpuMat> lab_planes(3);
-		cv::cuda::split(lab_image, lab_planes); // now we have the L image in lab_planes[0]
+		/// now we have the L image in lab_planes[0]
+		cv::cuda::split(lab_image, lab_planes); 
 
 		/// apply the CLAHE algorithm to the L channel
 		cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
@@ -676,8 +668,9 @@ static void apply_clahe(
 		clahe->setClipLimit(4);
 		clahe->apply(opencvImage, opencvImage);
 	}
+	
 #endif
-
+	
 }
 
 
@@ -725,209 +718,120 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	return v4l2_dev;
 }
 
-/** 
- * retrive device's capabilities
- * 
- * args: 
- * 		struct device *dev - device infomation
- * returns: 
- * 		error value
- */
-int check_dev_cap(struct device *dev)
-{
-	struct v4l2_capability cap;
-	CLEAR(cap);
-	int ret;
-	ret = (ioctl(dev->fd, VIDIOC_QUERYCAP, &cap));
-	if (ret < 0)
-	{
-		printf("VIDIOC_QUERYCAP error:%s\n", strerror(errno));
-		return -1;
-	}
-
-	if ((cap.capabilities & V4L2_CAP_VIDEO_CAPTURE) == 0)
-	{
-		printf("Error opening device: video capture not supported.\n");
-		return -1;
-	}
-	if (!(cap.capabilities & V4L2_CAP_STREAMING))
-	{
-		printf("Does not support streaming\n");
-
-		return -1;
-	}
-	if (!(cap.capabilities & V4L2_CAP_READWRITE))
-	{
-		printf("Does not support read, try with mmap\n");
-		return -1;
-	}
-	return 0;
-}
-
 /** mmap the variables for processes share */
 void mmap_variables()
 {
-	save_bmp = (int *)mmap(NULL, sizeof *save_bmp, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	save_raw = (int *)mmap(NULL, sizeof *save_raw, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	bpp = (int *)mmap(NULL, sizeof *bpp, PROT_READ | PROT_WRITE,
-					  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	bayer_flag = (int *)mmap(NULL, sizeof *bayer_flag, PROT_READ | PROT_WRITE,
-							 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	awb_flag = (int *)mmap(NULL, sizeof *awb_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	clahe_flag = (int *)mmap(NULL, sizeof *clahe_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	abc_flag = (int *)mmap(NULL, sizeof *abc_flag, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	gamma_val = (float *)mmap(NULL, sizeof *gamma_val, PROT_READ | PROT_WRITE,
-							  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	black_level_correction = (int *)mmap(NULL, sizeof *black_level_correction,
-										 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	loop = (int *)mmap(NULL, sizeof *loop, PROT_READ | PROT_WRITE,
-					   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	rgb_gain_offset_flag = (int *)mmap(NULL, sizeof *rgb_gain_offset_flag,
-									   PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	rgb_matrix_flag = (int *)mmap(NULL, sizeof *rgb_matrix_flag,
-								  PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	r_gain = (int *)mmap(NULL, sizeof *r_gain, PROT_READ | PROT_WRITE,
-						 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	g_gain = (int *)mmap(NULL, sizeof *g_gain, PROT_READ | PROT_WRITE,
-						 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	b_gain = (int *)mmap(NULL, sizeof *b_gain, PROT_READ | PROT_WRITE,
-						 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	r_offset = (int *)mmap(NULL, sizeof *r_offset, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	g_offset = (int *)mmap(NULL, sizeof *g_offset, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	b_offset = (int *)mmap(NULL, sizeof *b_offset, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	rr = (int *)mmap(NULL, sizeof *rr, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	rg = (int *)mmap(NULL, sizeof *rg, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	rb = (int *)mmap(NULL, sizeof *rb, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	gr = (int *)mmap(NULL, sizeof *gr, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	gg = (int *)mmap(NULL, sizeof *gg, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	gb = (int *)mmap(NULL, sizeof *gb, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	br = (int *)mmap(NULL, sizeof *br, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	bg = (int *)mmap(NULL, sizeof *bg, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	bb = (int *)mmap(NULL, sizeof *bb, PROT_READ | PROT_WRITE,
-					 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	cur_exposure = (int *)mmap(NULL, sizeof *cur_exposure, PROT_READ | PROT_WRITE,
-							   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	cur_gain = (int *)mmap(NULL, sizeof *cur_gain, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-
-	soft_ae_flag = (int *)mmap(NULL, sizeof *soft_ae_flag, PROT_READ | PROT_WRITE,
-							   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	flip_flag = (int *)mmap(NULL, sizeof *flip_flag, PROT_READ | PROT_WRITE,
-		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	mirror_flag = (int *)mmap(NULL, sizeof *mirror_flag, PROT_READ | PROT_WRITE,
-		 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	show_edge_flag = (int *)mmap(NULL, sizeof *show_edge_flag, 
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);	
-	
-	rgb_ir_color = (int *)mmap(NULL, sizeof *rgb_ir_color,
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	rgb_ir_ir = (int *)mmap(NULL, sizeof *rgb_ir_ir,
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	separate_dual_display = (int *)mmap(NULL, sizeof *separate_dual_display,
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	display_mat_info_ena = (int *)mmap(NULL, sizeof *display_mat_info_ena,
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	alpha = (int *)mmap(NULL, sizeof *alpha, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	beta = (int *)mmap(NULL, sizeof *beta, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	sharpness = (int *)mmap(NULL, sizeof *sharpness, PROT_READ | PROT_WRITE,
-						   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-	edge_low_thres = (int *)mmap(NULL, sizeof *edge_low_thres, 
-	PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-	resize_window_ena = (int *)mmap(NULL, sizeof *resize_window_ena,
-		PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
+	gamma_val 		 = (float *)mmap(NULL, sizeof(float), RW, SHAREA, -1, 0);
+	save_bmp 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	save_raw 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	bpp 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	bayer_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	awb_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	clahe_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	abc_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	blc 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	loop 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	rgb_gainoffset_flg   = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	rgb_matrix_flg 	     = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	r_gain 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	g_gain 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	b_gain 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	r_offset 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	g_offset 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	b_offset 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	rr 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	rg 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	rb 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	gr 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	gg 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	gb 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	br 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	bg 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	bb 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	cur_exposure 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	cur_gain 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	soft_ae_flag 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	flip_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	mirror_flag 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	show_edge_flag 	     = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	rgb_ir_color 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	rgb_ir_ir 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	separate_dual 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	display_info_ena 	 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	alpha 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	beta 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	sharpness 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	edge_low_thres 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	resize_window_ena 	 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
 }
+
 /** initialize share memory variables after declaration */
 void initialize_shared_memory_var()
 {
 	*gamma_val = 1.0;
-	*black_level_correction = 0;
+	*blc = 0;
 	*bpp = RAW10_FLG;
 	*bayer_flag = CV_BayerBG2BGR_FLG;
-	*display_mat_info_ena = TRUE;
+	*display_info_ena = TRUE;
 	*alpha = 1;
 	*beta = 0;
 	*sharpness = 1;
 }
+
+/** wrapper for unmap shared memory */
+template<class T>
+void unmap_wrapper(T *data)
+{
+	int ret = munmap(data, sizeof(T));
+	if (ret < 0)
+		printf("Unable to unmap shared memory (%d)\n", errno);	
+}
+
 /** unmap all the variables after stream ends */
 void unmap_variables()
 {
-	munmap(save_bmp, sizeof *save_bmp);
-	munmap(save_raw, sizeof *save_raw);
-	munmap(bpp, sizeof *bpp);
-	munmap(bayer_flag, sizeof *bayer_flag);
-	munmap(awb_flag, sizeof *awb_flag);
-	munmap(clahe_flag, sizeof *clahe_flag);
-	munmap(abc_flag, sizeof *abc_flag);
-	munmap(gamma_val, sizeof *gamma_val);
-	munmap(black_level_correction, sizeof *black_level_correction);
-	munmap(loop, sizeof *loop);
-
-	munmap(rgb_gain_offset_flag, sizeof *rgb_gain_offset_flag);
-	munmap(r_gain, sizeof *r_gain);
-	munmap(g_gain, sizeof *g_gain);
-	munmap(b_gain, sizeof *b_gain);
-	munmap(r_offset, sizeof *r_offset);
-	munmap(g_offset, sizeof *g_offset);
-	munmap(b_offset, sizeof *b_offset);
-
-	munmap(rgb_matrix_flag, sizeof *rgb_matrix_flag);
-	munmap(rr, sizeof *rr);
-	munmap(rg, sizeof *rg);
-	munmap(rb, sizeof *rb);
-	munmap(gr, sizeof *gr);
-	munmap(gg, sizeof *gg);
-	munmap(gb, sizeof *gb);
-	munmap(br, sizeof *br);
-	munmap(bg, sizeof *bg);
-	munmap(bb, sizeof *bb);
-
-	munmap(cur_exposure, sizeof *cur_exposure);
-	munmap(cur_gain, sizeof *cur_gain);
-
-	munmap(soft_ae_flag, sizeof *soft_ae_flag);
-	munmap(flip_flag, sizeof *flip_flag);
-	munmap(mirror_flag, sizeof *mirror_flag);
-	munmap(show_edge_flag, sizeof *show_edge_flag);
-
-	munmap(rgb_ir_color, sizeof *rgb_ir_color);
-	munmap(rgb_ir_ir, sizeof *rgb_ir_ir);
-	munmap(separate_dual_display, sizeof *separate_dual_display);
-	munmap(display_mat_info_ena, sizeof *display_mat_info_ena);
-
-	munmap(alpha, sizeof *alpha);
-	munmap(beta, sizeof *beta);
-	munmap(sharpness, sizeof *sharpness);
-	munmap(edge_low_thres, sizeof *edge_low_thres);
-	
-	munmap(resize_window_ena, sizeof *resize_window_ena);
+	unmap_wrapper(save_bmp);
+	unmap_wrapper(save_raw);
+	unmap_wrapper(bpp);
+	unmap_wrapper(bayer_flag);
+	unmap_wrapper(awb_flag);
+	unmap_wrapper(clahe_flag);
+	unmap_wrapper(abc_flag);
+	unmap_wrapper(gamma_val);
+	unmap_wrapper(blc);
+	unmap_wrapper(loop);
+	unmap_wrapper(rgb_gainoffset_flg);
+	unmap_wrapper(r_gain);
+	unmap_wrapper(g_gain);
+	unmap_wrapper(b_gain);
+	unmap_wrapper(r_offset);
+	unmap_wrapper(g_offset);
+	unmap_wrapper(b_offset);
+	unmap_wrapper(rgb_matrix_flg);
+	unmap_wrapper(rr);
+	unmap_wrapper(rg);
+	unmap_wrapper(rb);
+	unmap_wrapper(gr);
+	unmap_wrapper(gg);
+	unmap_wrapper(gb);
+	unmap_wrapper(br);
+	unmap_wrapper(bg);
+	unmap_wrapper(bb);
+	unmap_wrapper(cur_exposure);
+	unmap_wrapper(cur_gain);
+	unmap_wrapper(soft_ae_flag);
+	unmap_wrapper(flip_flag);
+	unmap_wrapper(mirror_flag);
+	unmap_wrapper(show_edge_flag);
+	unmap_wrapper(rgb_ir_color);
+	unmap_wrapper(rgb_ir_ir);
+	unmap_wrapper(separate_dual);
+	unmap_wrapper(display_info_ena);
+	unmap_wrapper(alpha);
+	unmap_wrapper(beta);
+	unmap_wrapper(sharpness);
+	unmap_wrapper(edge_low_thres);
+	unmap_wrapper(resize_window_ena);
 
 }
 
@@ -973,14 +877,17 @@ void stop_Camera(struct device *dev)
  * video set format - Leopard camera format is YUYV
  * need to do a v4l2-ctl --list-formats-ext to see the resolution
  * args: 
- * 		struct device *dev - device infomation
- * 	  	width - resolution width
- * 		height - resolution height
- * 		pixelformat - V4L2_PIX_FMT_YUYV
+ * 		struct device *dev 	- device infomation
+ * 	  	width 				- resolution width
+ * 		height 				- resolution height
+ * 		pixelformat 		- V4L2_PIX_FMT_YUYV
  * 
  */
-void video_set_format(struct device *dev, int width,
-					  int height, int pixelformat)
+void video_set_format(
+	struct device *dev, 
+	int width,
+	int height, 
+	int pixelformat)
 {
 	struct v4l2_format fmt;
 	int ret;
@@ -1091,7 +998,7 @@ void streaming_loop(struct device *dev)
  */
 void get_a_frame(struct device *dev)
 {
-	for (unsigned int i = 0; i < dev->nbufs; i++)
+	for (size_t i = 0; i < dev->nbufs; i++)
 	{
 		cur_time = (double)cv::getTickCount();
 		queuebuffer.index = i;
@@ -1102,10 +1009,6 @@ void get_a_frame(struct device *dev)
 			perror("VIDIOC_DQBUF");
 			return;
 		}
-
-		/// check the capture raw image flag, do this before decode a frame
-		if (*(save_raw))
-			v4l2_core_save_data_to_file(dev->buffers[i].start, dev->imagesize);
 
 		decode_process_a_frame(dev, dev->buffers[i].start);
 
@@ -1119,6 +1022,7 @@ void get_a_frame(struct device *dev)
 	return;
 }
 
+
 /**
  * set software ae 
  * args:
@@ -1126,18 +1030,7 @@ void get_a_frame(struct device *dev)
  */
 void soft_ae_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*soft_ae_flag = TRUE;
-		break;
-	case 0:
-		*soft_ae_flag = FALSE;
-		break;
-	default:
-		*soft_ae_flag = FALSE;
-		break;
-	}
+	enable_wrapper(soft_ae_flag, enable);
 }
 /**
  * calculate the mean value of a given unprocessed image for a defined ROI
@@ -1146,7 +1039,8 @@ void soft_ae_enable(int enable)
  * 		struct device *dev - every infomation for camera
  * 		const void *p 		- camera streaming buffer pointer
  */
-double calc_mean(struct device *dev, const void *p)
+double calc_mean(
+	struct device *dev, const void *p)
 {
 	/// define ROI: 256x256 square pixels in the middle of image
 	int size = ROI_SIZE;
@@ -1194,7 +1088,8 @@ double calc_mean(struct device *dev, const void *p)
  * 		struct device *dev - every infomation for camera
  * 		const void *p 		- camera streaming buffer pointer
  */
-void apply_soft_ae(struct device *dev, const void *p)
+void apply_soft_ae(
+	struct device *dev, const void *p)
 {
 	int local_gain = *cur_gain;
 	int local_exposure = *cur_exposure;
@@ -1247,12 +1142,14 @@ void apply_soft_ae(struct device *dev, const void *p)
  * Shift bits for 16-bit stream and get lower 8-bit for OpenCV debayering.
  * Info of Leopard USB3 RAW data stream is explained in /pic/datatypeExp.jpg 
  * args: 
- * 		struct device *dev - every infomation for camera
+ * 		struct device *dev  - every infomation for camera
  * 		const void *p 		- camera streaming buffer pointer
  * 		int shift 			- shift bits
  * */
-void perform_shift(struct device *dev, const void *p, int shift)
+void perform_shift(
+	struct device *dev, const void *p, int shift)
 {
+	
 	unsigned char tmp;
 	unsigned short *src_short = (unsigned short *)p;
 	unsigned char *dst = (unsigned char *)p;
@@ -1266,19 +1163,20 @@ void perform_shift(struct device *dev, const void *p, int shift)
 	 * This will change if the resolution is smaller so buffer size is smaller. 
 	 */
 #pragma omp for nowait
-	for (unsigned int i = 0; i < dev->height; i++)
+	for (size_t i = 0; i < dev->height; i++)
 	{
-		for (unsigned int j = 0; j < dev->width; j++)
+		for (size_t j = 0; j < dev->width; j++)
 		{
 			ts = *(src_short++);
-			if (ts > *black_level_correction)
-				tmp = (ts - *black_level_correction) >> shift;
+			if (ts > *blc)
+				tmp = (ts - *blc) >> shift;
 			else
 				tmp = 0;
 
 			*(dst++) = (unsigned char)tmp;
 		}
 	}
+	
 }
 
 /** 
@@ -1295,9 +1193,9 @@ void swap_two_bytes(struct device *dev, const void *p)
 	uint16_t *src = (uint16_t *)p;
 	uint16_t tmp;
 
-	for (unsigned int i = 0; i < dev->height; i++)
+	for (size_t i = 0; i < dev->height; i++)
 	{
-		for (unsigned int j = 0; j < dev->width; j++)
+		for (size_t j = 0; j < dev->width; j++)
 		{
 			tmp = src[PIX(j, i, dev->width)];
 			dst[PIX(j, i, dev->width)] = LOWBYTE(tmp) << 8 | HIGHBYTE(tmp);
@@ -1319,9 +1217,9 @@ void swap_four_bytes(struct device *dev, const void *p)
 	uint32_t *src = (uint32_t *)p;
 	uint32_t tmp;
 
-	for (unsigned int i = 0; i < dev->height/2; i++)
+	for (size_t i = 0; i < dev->height/2; i++)
 	{
-		for (unsigned int j = 0; j < dev->width/2; j++)
+		for (size_t j = 0; j < dev->width/2; j++)
 		{
 			tmp = src[PIX(j, i, dev->width)];
 			dst[PIX(j, i, dev->width)] = ((uint16_t)tmp << 16) |
@@ -1337,20 +1235,22 @@ int set_limit(int val, int max, int min)
 {
 	return val = val < min ? min : val > max ? max : val;
 }
+
 /** pass the variable from GUI to camera streaming thread
  * and print out these values
  * set the flag on enable rgb_gain_offset
  */
-void enable_rgb_gain_offset(int red_gain, int green_gain, int blue_gain,
-							int red_offset, int green_offset, int blue_offset)
+void enable_rgb_gain_offset(
+	int red_gain, 	int green_gain,   int blue_gain,
+	int red_offset, int green_offset, int blue_offset)
 {
-	*r_gain = red_gain;
-	*g_gain = green_gain;
-	*b_gain = blue_gain;
-	*r_offset = red_offset;
-	*g_offset = green_offset;
-	*b_offset = blue_offset;
-	*rgb_gain_offset_flag = 1;
+	*r_gain 	= red_gain;
+	*g_gain 	= green_gain;
+	*b_gain 	= blue_gain;
+	*r_offset 	= red_offset;
+	*g_offset 	= green_offset;
+	*b_offset 	= blue_offset;
+	*rgb_gainoffset_flg = 1;
 
 	printf("r gain = %d\tg gain = %d\tb gain = %d\r\n"
 		   "r offset = %d\tg offset = %d\tb offset = %d\r\n ",
@@ -1362,13 +1262,18 @@ void enable_rgb_gain_offset(int red_gain, int green_gain, int blue_gain,
  */
 void disable_rgb_gain_offset()
 {
-	*rgb_gain_offset_flag = 0;
+	*rgb_gainoffset_flg = 0;
 }
+
 /**
  * apply rgb gain and offset color correction before debayering
  * only support four bayer patterns now: GRBG, GBRG, RGGB, BGGR
+ * args: 
+ * 		struct device *dev 	- every infomation for camera
+ * 		const void *p 		- camera streaming buffer pointer
  */
-void apply_rgb_gain_offset_pre_debayer(struct device *dev, const void *p)
+void apply_rgb_gain_offset_pre_debayer(
+	struct device *dev, const void *p)
 {
 	int pixel_max_val = BIT(*bpp) - 1;
 	int height = dev->height;
@@ -1537,9 +1442,10 @@ void apply_rgb_gain_offset_pre_debayer(struct device *dev, const void *p)
  * and print out these values
  * set the flag on enable rgb to rgb matrix
  */
-void enable_rgb_matrix(int red_red, int red_green, int red_blue,
-					   int green_red, int green_green, int green_blue,
-					   int blue_red, int blue_green, int blue_blue)
+void enable_rgb_matrix(
+	int red_red, 	int red_green, 		int red_blue,
+	int green_red, 	int green_green, 	int green_blue,
+	int blue_red, 	int blue_green, 	int blue_blue)
 {
 	*rr = red_red;
 	*rg = red_green;
@@ -1550,51 +1456,50 @@ void enable_rgb_matrix(int red_red, int red_green, int red_blue,
 	*br = blue_red;
 	*bg = blue_green;
 	*bb = blue_blue;
-	*rgb_matrix_flag = 1;
+	*rgb_matrix_flg = 1;
 	printf("rgb matrix enabled\r\n");
 	printf("rr = %d\trg = %d\trb = %d\r\n"
 		   "gr = %d\tgg = %d\tgb = %d\r\n"
 		   "br = %d\tbg = %d\tbb = %d\r\n",
 		   *rr, *rg, *rb, *gr, *gg, *gb, *br, *bg, *bb);
 }
+
 /**
  * disable the flag on rgb to rgb matrix
  */
 void disable_rgb_matrix()
 {
-	*rgb_matrix_flag = 0;
+	*rgb_matrix_flg = 0;
 }
 
-// bgr_planes[0];//blue channel
-// bgr_planes[1];//green channel
-// bgr_planes[2];//red channel
-static void apply_rgb_matrix_post_debayer(cv::InputOutputArray& _opencvImage)
+/**
+ * in-place apply rgb color correction matrix for a given mat
+ * since this requires to access individual pixel of a given mat, OpenCV CUDA
+ * acceleration is not used
+ * For color correction matrix, please request from Leopard support
+ * Refs: http://www.imatest.com/docs/colormatrix/
+ * args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
+ */
+static void apply_rgb_matrix_post_debayer(
+	cv::InputOutputArray& _opencvImage)
 {
-
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
-	cv::cuda::GpuMat bgr_planes[3];
-	cv::cuda::GpuMat output[3];
-	cv::cuda::split(opencvImage, bgr_planes);
-	//TODO: multiply the matrix etc
-	//cv::cuda::merge(output, 3, opencvImage);
-	cv::cuda::merge(bgr_planes, 3, opencvImage);
-
-#else
 	cv::Mat opencvImage = _opencvImage.getMat();
-	cv::Mat bgr_planes[3];
-	cv::Mat output[3];
-	cv::split(opencvImage, bgr_planes);
+	uchar r,g,b;
 
-	output[0] = ((*bb) * bgr_planes[0] + (*bg) * bgr_planes[1] + (*br) * bgr_planes[2]) / 256; //blue
-	// FIXME: why every time adding bgr_planes[2] multiple 0 can even make color wrong? - remove all green
-	// so red-green and green-red don't work now because I couldn't add in
-	//output[1] = ((*gb) * bgr_planes[0] + (*gg) * bgr_planes[1] + (*gr) * bgr_planes[2])/256; // green
-	output[1] = ((*gb) * bgr_planes[0] + (*gg) * bgr_planes[1]) / 256;						   // green
-	output[2] = ((*rb) * bgr_planes[0] + (*rg) * bgr_planes[1] + (*rr) * bgr_planes[2]) / 256; // red
-
-	cv::merge(output, 3, opencvImage);
-#endif
+	for (int i=0; i < opencvImage.rows;++i) {
+		/// point to first pixel in row
+		cv::Vec3b* pixel = opencvImage.ptr<cv::Vec3b>(i); 
+		for (int j=0; j < opencvImage.cols;++j) {
+			r = pixel[j][2];
+			g = pixel[j][1];
+			b = pixel[j][0];
+			pixel[j][2] = ((*rb) * b + (*rg) * g + (*rr) * r)/256;
+			pixel[j][1] = ((*gb) * b + (*gg) * g + (*gr) * r)/256;
+			pixel[j][0] = ((*bb) * b + (*bg) * g + (*br) * r)/256;
+		}
+	}
 }
 /**
  * set flip flag 
@@ -1603,19 +1508,9 @@ static void apply_rgb_matrix_post_debayer(cv::InputOutputArray& _opencvImage)
  */
 void flip_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*flip_flag = TRUE;
-		break;
-	case 0:
-		*flip_flag = FALSE;
-		break;
-	default:
-		*flip_flag = FALSE;
-		break;
-	}
+	enable_wrapper(flip_flag, enable);
 }
+
 /**
  * set mirror flag 
  * args:
@@ -1623,18 +1518,7 @@ void flip_enable(int enable)
  */
 void mirror_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*mirror_flag = TRUE;
-		break;
-	case 0:
-		*mirror_flag = FALSE;
-		break;
-	default:
-		*mirror_flag = FALSE;
-		break;
-	}
+	enable_wrapper(mirror_flag, enable);
 }
 /**
  * set canny filter flag 
@@ -1643,18 +1527,7 @@ void mirror_enable(int enable)
  */
 void canny_filter_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*show_edge_flag = TRUE;
-		break;
-	case 0:
-		*show_edge_flag = FALSE;
-		break;
-	default:
-		*show_edge_flag = FALSE;
-		break;
-	}
+	enable_wrapper(show_edge_flag, enable);
 }
 
 /**
@@ -1662,25 +1535,21 @@ void canny_filter_enable(int enable)
  * args:
  * 		flag - set/reset the flag when get check button toggle
  */
-void separate_dual_display_enable(int enable)
+void separate_dual_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*separate_dual_display = TRUE;
-		break;
-	case 0:
-		*separate_dual_display = FALSE;
-		break;
-	default:
-		*separate_dual_display = FALSE;
-		break;
-	}
+	enable_wrapper(separate_dual, enable);
 }
-/** separate display right and left mat image from a dual stereo vision camera */
-static void display_dual_stereo_separately(cv::InputOutputArray& _opencvImage)
-{
 
+/** 
+ * separate display right and left mat image from a dual stereo vision camera
+ * args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
+ */
+static void display_dual_stereo_separately(
+	cv::InputOutputArray& _opencvImage)
+{
+	
 	cv::Mat opencvImage = _opencvImage.getMat();
 	/// define region of interest for cropped Mat for dual stereo
 	cv::Rect roi_left(0, 0, opencvImage.cols/2, opencvImage.rows);
@@ -1694,46 +1563,53 @@ static void display_dual_stereo_separately(cv::InputOutputArray& _opencvImage)
 	cv::Mat cropped_right;
 	cropped_ref_right.copyTo(cropped_right);
 	cv::imshow("cam_right", cropped_right);
+
 }
 /**
  * set display mat info flag 
  * args:
  * 		flag - set/reset the flag when get check button toggle
  */
-void display_mat_info_enable(int enable)
+void display_info_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*display_mat_info_ena = TRUE;
-		break;
-	case 0:
-		*display_mat_info_ena = FALSE;
-		break;
-	default:
-		*display_mat_info_ena = TRUE;
-		break;
-	}
+	enable_wrapper(display_info_ena, enable);
 }
 /**
  * unify putting text in opencv image
  * a wrapper for put_text()
+ * args:
+ * 		cv::Mat opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
+ * 		str 				- text you will put in
+ * 		cordinate_y 		- vertical location that will put this line  
  */
-static void streaming_put_text(cv::Mat opencvImage,
-							   const char *str, int cordinate_y)
+static void streaming_put_text(
+	cv::Mat &opencvImage,
+	const char *str, 
+	int cordinate_y)
 {
 	int scale = opencvImage.cols / 1000;
-	cv::putText(opencvImage,
-				str,
-				cv::Point(scale * TEXT_SCALE_BASE, cordinate_y), // Coordinates
-				cv::FONT_HERSHEY_SIMPLEX,						 // Font
-				(float)scale,									 // Scale. 2.0 = 2x bigger
-				cv::Scalar(255, 255, 255),						 // BGR Color - white
-				2												 // Line Thickness (Optional)
-	);															 // Anti-alias (Optional)
+	cv::putText(
+		opencvImage,
+		str,
+		cv::Point(scale * TEXT_SCALE_BASE, cordinate_y), // Coordinates
+		cv::FONT_HERSHEY_SIMPLEX,						 // Font
+		(float)scale,									 // Scale. 2.0 = 2x bigger
+		cv::Scalar(255, 255, 255),						 // BGR Color - white
+		2												 // Line Thickness
+	);													 // Anti-alias (Optional)
 }
-/** put mat info text in: res, fps, ESC*/
-static void display_current_mat_stream_info(cv::InputOutputArray& _opencvImage)
+
+/** 
+ * put a given stream's info text in: 
+ * res, fps, ESC, 
+ * automatically adjust text size with different camera resolutions
+ *  args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
+*/
+static void display_current_mat_stream_info(
+	cv::InputOutputArray& _opencvImage)
 {
 	cv::Mat opencvImage = _opencvImage.getMat();
 	int height_scale = (opencvImage.cols / 1000);
@@ -1741,7 +1617,8 @@ static void display_current_mat_stream_info(cv::InputOutputArray& _opencvImage)
 					   height_scale * TEXT_SCALE_BASE);
 
 	char resolution[25];
-	sprintf(resolution, "Current Res:%dx%d", opencvImage.rows, opencvImage.cols);
+	sprintf(resolution, "Current Res:%dx%d", 
+		opencvImage.rows, opencvImage.cols);
 	streaming_put_text(opencvImage, resolution,
 					   height_scale * TEXT_SCALE_BASE * 2);
 
@@ -1773,7 +1650,16 @@ void add_beta_val(int beta_val_from_gui)
 {
 	*beta = beta_val_from_gui;
 }
-static void apply_brightness_and_contrast(cv::InputOutputArray& _opencvImage)
+
+/**
+ * apply brightness(alpha) and contrast(beta) control from slider val
+ * for both color and mono camera stream
+ * args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
+ */
+static void apply_brightness_and_contrast(
+	cv::InputOutputArray& _opencvImage)
 {
 	cv::Mat opencvImage = _opencvImage.getMat();
  	if (opencvImage.type() == CV_8UC3) {
@@ -1794,17 +1680,32 @@ static void apply_brightness_and_contrast(cv::InputOutputArray& _opencvImage)
 			}
 		}
 	}
+	
 }
 /** callback for set sharpness for sharpness correction from gui */
 void add_sharpness_val(int sharpness_val_from_gui)
 {
 	*sharpness = sharpness_val_from_gui;
 }
+
 /**
  * apply sharpness filter to a given image
- * if OpenCV CUDA is enabled, use createGaussianFilter, 
+ *
+ * if OpenCV CUDA is enabled, use createGaussianFilter directly,
+ *  sharpness slide will work as the kernel size(3,5,7 etc up to 31)
+ *
+ * if OpenCV CUDA is disabled, use the algorithm of un-sharp mask: 
+ * 1. apply a Gaussian smoothing filter
+ * 2. subtract the smoothed version from the original image
+ * (in a weighted way so the values of a constant area remain constant)
+ * sharpness slide will work as the Gaussian blur parameter sigma
+ *
+ * args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
  */
-static void sharpness_control(cv::InputOutputArray& _opencvImage)
+static void sharpness_control(
+	cv::InputOutputArray& _opencvImage)
 {
 #ifndef HAVE_OPENCV_CUDA_SUPPORT
 	cv::Mat opencvImage = _opencvImage.getMat();
@@ -1824,6 +1725,7 @@ static void sharpness_control(cv::InputOutputArray& _opencvImage)
 	cv::cuda::addWeighted(opencvImage, 1.5, blurred, -0.5, 0, blurred);
 	blurred.copyTo(opencvImage);
 #endif
+	
 }
 
 void add_edge_thres_val(int edge_low_thres_val_from_gui)
@@ -1831,7 +1733,11 @@ void add_edge_thres_val(int edge_low_thres_val_from_gui)
 	*edge_low_thres = edge_low_thres_val_from_gui;
 }
 /**
- * Reason not to use OpenCV CUDA acceleration is it doesn't make the process faster
+ * Reason not to use OpenCV CUDA acceleration:
+ * it doesn't make this process faster
+ * args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
  */
 static cv::Mat canny_filter_control(cv::InputOutputArray& _opencvImage)
 {
@@ -1849,10 +1755,12 @@ static cv::Mat canny_filter_control(cv::InputOutputArray& _opencvImage)
 }
 
 /**
- * group 3a ctrl flags for bayer cameras
- * auto exposure, auto white balance, CLAHE ctrl
+ * debayer and apply AWB for a given frame(support both OpenCV CUDA and not)
+ * args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
  */
-static void group_3a_ctrl_flags_for_raw_camera(
+static void debayer_awb_a_frame(
 	cv::InputOutputArray& opencvImage)
 {
 	/** color output */
@@ -1866,10 +1774,10 @@ static void group_3a_ctrl_flags_for_raw_camera(
 #else
 		cv::cvtColor(opencvImage, opencvImage,
 			cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-
+	
 #endif
-		if (*rgb_matrix_flag == TRUE)
-			apply_rgb_matrix_post_debayer(opencvImage);
+		if (*awb_flag)
+			apply_white_balance(opencvImage);
 	}
 	/** mono output */
 	if (*bayer_flag == CV_MONO_FLG && opencvImage.type() == CV_8UC3)
@@ -1883,9 +1791,7 @@ static void group_3a_ctrl_flags_for_raw_camera(
 #endif
 	}
 
-	/** check awb flag, awb functionality, only available for bayer camera */
-	if (*(awb_flag) == TRUE)
-		apply_white_balance(opencvImage);
+
 
 }
 
@@ -1898,14 +1804,24 @@ void switch_on_keys()
 	case _ESC_KEY_ASCII:
 		cv::destroyWindow(window_name);
 		set_loop(0);
-
 		break;
 	default:
 		break;
 	}
-
 }
 
+static void group_gpu_image_proc(
+	cv::InputOutputArray opencvImage)
+{
+	if (*(gamma_val) != (float)1)
+		apply_gamma_correction(opencvImage);
+	
+	if (*sharpness != (float)1)
+		sharpness_control(opencvImage);
+
+	if (*clahe_flag)
+		apply_clahe(opencvImage);
+}
 /** 
  * OpenCV only support debayering 8 and 16 bits 
  * 
@@ -1930,11 +1846,13 @@ void decode_process_a_frame(struct device *dev, const void *p)
 
 	if (*soft_ae_flag)
 		apply_soft_ae(dev, p);
-
+	if (*save_raw)
+		v4l2_core_save_data_to_file(p, dev->imagesize);
+	
 	/** --- for raw8, raw10, raw12 bayer camera ---*/
 	if (shift != 0)
 	{
-		if (*rgb_gain_offset_flag)
+		if (*rgb_gainoffset_flg)
 			apply_rgb_gain_offset_pre_debayer(dev, p);
 		if (*rgb_ir_color)
 			apply_color_correction_rgb_ir(dev, p);
@@ -1960,11 +1878,13 @@ void decode_process_a_frame(struct device *dev, const void *p)
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 		gpu_img.upload(img);
-		group_3a_ctrl_flags_for_raw_camera(gpu_img);
+		debayer_awb_a_frame(gpu_img);
 		gpu_img.download(img);
 #else
-		group_3a_ctrl_flags_for_raw_camera(img);	
+		debayer_awb_a_frame(img);	
 #endif
+		if (*rgb_matrix_flg)
+			apply_rgb_matrix_post_debayer(img);
 		share_img = img;
 	}
 
@@ -1978,51 +1898,36 @@ void decode_process_a_frame(struct device *dev, const void *p)
 			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
 		share_img = img;
 	}
+
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	gpu_img.upload(share_img);
-	if (*(gamma_val) != (float)1)
-		apply_gamma_correction(gpu_img);
-	
-	if (*sharpness != (float)1)
-		sharpness_control(gpu_img);
-
-	if (*clahe_flag)
-		apply_clahe(gpu_img);
+	group_gpu_image_proc(gpu_img);
 	gpu_img.download(share_img);
 #else
-	if (*(gamma_val) != (float)1)
-		apply_gamma_correction(share_img);
-	
-	if (*sharpness != (float)1)
-		sharpness_control(share_img);
-
-	if (*clahe_flag)
-		apply_clahe(share_img);
+	group_gpu_image_proc(share_img);
 #endif 
+
 	if (*(alpha) != (float)1 || (*beta) != (float)0)
 		apply_brightness_and_contrast(share_img);
 	if (*flip_flag)
 		cv::flip(share_img, share_img, 0);
 	if (*mirror_flag)
 		cv::flip(share_img, share_img, 1);
-
 	if (*abc_flag)
 		apply_auto_brightness_and_contrast(share_img, 1);
 	if (*show_edge_flag) 
 		share_img = canny_filter_control(share_img);
 	if (*save_bmp)
 		save_frame_image_bmp(share_img);
-	if (*separate_dual_display) 
+	if (*separate_dual) 
 		display_dual_stereo_separately(share_img);
-	if (*display_mat_info_ena)
-		display_current_mat_stream_info(share_img);
-
 
 	/** if image larger than 720p by any dimension, resize the window */
-	if (*resize_window_ena) {
+	if (*resize_window_ena) 
 		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
 			cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
-	}	
+	if (*display_info_ena)
+		display_current_mat_stream_info(share_img);
 
 	cv::imshow(window_name, share_img);
 	switch_on_keys();
@@ -2037,18 +1942,7 @@ void decode_process_a_frame(struct device *dev, const void *p)
  */
 void rgb_ir_correction_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*rgb_ir_color = TRUE;
-		break;
-	case 0:
-		*rgb_ir_color = FALSE;
-		break;
-	default:
-		*rgb_ir_color = FALSE;
-		break;
-	}
+	enable_wrapper(rgb_ir_color, enable);
 }
 /**
  *  Bayer color correction for RGB-IR sensor
@@ -2134,19 +2028,9 @@ void apply_color_correction_rgb_ir(struct device *dev, const void *p)
  */
 void rgb_ir_ir_display_enable(int enable)
 {
-	switch (enable)
-	{
-	case 1:
-		*rgb_ir_ir = TRUE;
-		break;
-	case 0:
-		*rgb_ir_ir = FALSE;
-		break;
-	default:
-		*rgb_ir_ir = FALSE;
-		break;
-	}
+	enable_wrapper(rgb_ir_ir, enable);
 }
+
 void display_rgbir_ir_channel(struct device *dev, const void *p)
 {
 	int pixel_max_val = BIT(*bpp) - 1;
@@ -2195,7 +2079,7 @@ void display_rgbir_ir_channel(struct device *dev, const void *p)
 	cv::cvtColor(rgbir_ir, rgbir_ir, cv::COLOR_BGR2GRAY);
 	//cv::pyrUp(rgbir_ir, rgbir_ir,cv::Size(rgbir_ir.cols*2, rgbir_ir.rows*2));
 	*gamma_val = 0.45;
-	//*black_level_correction = 64;
+	//*blc = 64;
 	*sharpness = 10;
 	apply_gamma_correction(rgbir_ir);
 	sharpness_control(rgbir_ir);
@@ -2245,7 +2129,7 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 		return -ENOMEM;
 
 	/** map the buffers */
-	for (unsigned int i = 0; i < dev->nbufs; i++)
+	for (size_t i = 0; i < dev->nbufs; i++)
 	{
 		CLEAR(querybuffer);
 		querybuffer.type = bufrequest.type;
@@ -2255,7 +2139,7 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 		ret = ioctl(dev->fd, VIDIOC_QUERYBUF, &querybuffer);
 		if (ret < 0)
 		{
-			printf("Unable to query buffer %u (%d).\n", i, errno);
+			printf("Unable to query buffer %zu (%d).\n", i, errno);
 			return ret;
 		}
 		printf("length: %u offset: %u\n", querybuffer.length,
@@ -2263,15 +2147,14 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 
 		buffers[i].length = querybuffer.length; /** remember for munmap() */
 
-		buffers[i].start = mmap(NULL, querybuffer.length,
-								PROT_READ | PROT_WRITE, MAP_SHARED, dev->fd,
+		buffers[i].start = mmap(NULL, querybuffer.length, RW, SHARE, dev->fd,
 								querybuffer.m.offset);
 
 		if (buffers[i].start == MAP_FAILED)
 		{
 			/** If you do not exit here you should unmap() and free()
            	the buffers mapped so far. */
-			printf("Unable to map buffer %u (%d)\n", i, errno);
+			printf("Unable to map buffer %zu (%d)\n", i, errno);
 			return ret;
 		}
 
@@ -2305,18 +2188,17 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 int video_free_buffers(struct device *dev)
 {
 	struct v4l2_requestbuffers requestbuf;
-	unsigned int i;
 	int ret;
 
 	if (dev->nbufs == 0)
 		return 0;
 
-	for (i = 0; i < dev->nbufs; ++i)
+	for (size_t i = 0; i < dev->nbufs; ++i)
 	{
 		ret = munmap(dev->buffers[i].start, dev->buffers[i].length);
 		if (ret < 0)
 		{
-			printf("Unable to unmap buffer %u (%d)\n", i, errno);
+			printf("Unable to unmap buffer %zu (%d)\n", i, errno);
 			return ret;
 		}
 	}

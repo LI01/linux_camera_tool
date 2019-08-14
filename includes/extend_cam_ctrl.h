@@ -37,7 +37,7 @@
  10. Close your descriptor to the device 
   
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 #pragma once
 /****************************************************************************
@@ -73,7 +73,13 @@ typedef enum
    CROPPED_HEIGHT = 720
 } cropped_resolution;
 
-
+/**
+ * make shared memory flags shorter 
+ * Ref: https://stackoverflow.com/questions/34042915/what-is-the-purpose-of-map-anonymous-flag-in-mmap-system-call
+ */
+#define RW     (PROT_READ | PROT_WRITE)  //permission:read, write
+#define SHAREA (MAP_SHARED | MAP_ANONYMOUS)
+#define SHARE  (MAP_SHARED)
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
@@ -93,17 +99,18 @@ inline int add_bayer_forcv(int *bayer_flag);
 void change_bayerpattern(void *bayer);
 
 void add_gamma_val(float gamma_val_from_gui);
-void add_black_level_correction(int blc_val_from_gui);
+void add_blc(int blc_val_from_gui);
 
 void awb_enable(int enable);
 void clahe_enable(int enable);
 void abc_enable(int enable);
 
 int open_v4l2_device(char *device_name, struct device *dev);
-int check_dev_cap(struct device *dev);
 
 void mmap_variables();
 void initialize_shared_memory_var();
+template<class T>
+void unmap_wrapper(T *data);
 void unmap_variables();
 
 void start_camera(struct device *dev);
@@ -125,17 +132,22 @@ void perform_shift(struct device *dev, const void *p, int shift);
 void swap_two_bytes(struct device *dev, const void *p);
 
 void rgb_ir_correction_enable(int enable);
-void apply_color_correction_rgb_ir(struct device *dev, const void *p);
+void apply_color_correction_rgb_ir(
+   struct device *dev, const void *p);
 
 int set_limit(int val, int max, int min);
-void enable_rgb_gain_offset(int red_gain, int green_gain, int blue_gain,
-                            int red_offset, int green_offset, int blue_offset);
+void enable_rgb_gain_offset(
+   int red_gain,   int green_gain,   int blue_gain,
+   int red_offset, int green_offset, int blue_offset);
 void disable_rgb_gain_offset();
-void apply_rgb_gain_offset_pre_debayer(struct device *dev, const void *p);
+void apply_rgb_gain_offset_pre_debayer(
+   struct device *dev, const void *p);
 
-void enable_rgb_matrix(int red_red, int red_green, int red_blue,
-                       int green_red, int green_green, int green_blue,
-                       int blue_red, int blue_green, int blue_blue);
+void enable_rgb_matrix(
+   int red_red,   int red_green,    int red_blue,
+   int green_red, int green_green,  int green_blue,
+   int blue_red,  int blue_green,   int blue_blue);
+
 void disable_rgb_matrix();
 
 void flip_enable(int enable);
@@ -145,8 +157,8 @@ void rgb_ir_correction_enable(int enable);
 void apply_color_correction_rgb_ir(struct device *dev, const void *p);
 void rgb_ir_ir_display_enable(int enable);
 void display_rgbir_ir_channel(struct device *dev, const void *p);
-void separate_dual_display_enable(int enable);
-void display_mat_info_enable(int enable);
+void separate_dual_enable(int enable);
+void display_info_enable(int enable);
 void add_alpha_val(int alpha_val_from_gui);
 void add_beta_val(int beta_val_from_gui);
 void add_sharpness_val(int sharpness_val_from_gui);

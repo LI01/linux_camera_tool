@@ -18,7 +18,7 @@
   README.md guide to rebuild your OpenCV for supporting Gtk3.
 
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 
 #include "../includes/shortcuts.h"
@@ -117,6 +117,7 @@ void open_config_dialog(GtkWidget *widget, gpointer window)
     ("_Cancel"),
     GTK_RESPONSE_CANCEL,
     NULL);
+    gtk_window_set_transient_for(GTK_WINDOW(file_dialog), GTK_WINDOW(window));
     gtk_widget_show(file_dialog);
     gint resp = gtk_dialog_run(GTK_DIALOG(file_dialog));
     //gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(file_dialog), "/");
@@ -179,7 +180,7 @@ void about_info(GtkWidget *widget)
         GTK_LICENSE_GPL_3_0);
     gtk_about_dialog_set_website(GTK_ABOUT_DIALOG(dialog_about), 
         "https://github.com/danyu9394/linux_camera_tool");
-
+    gtk_window_set_transient_for(GTK_WINDOW(dialog_about), GTK_WINDOW(window));
     gtk_widget_show_all(dialog_about);
 }
 /** callback for exit when click EXIT in help */
@@ -460,7 +461,7 @@ void black_level_correction(GtkWidget *widget)
     float_blc = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_blc)));
     if (floor(float_blc) == ceil(float_blc))
     {
-        add_black_level_correction((int)float_blc);
+        add_blc((int)float_blc);
         g_print("Apply black level correction = %d\n", (int)float_blc);
     }
     else
@@ -673,12 +674,12 @@ void enable_display_dual_stereo(GtkToggleButton *toggle_button)
     if (gtk_toggle_button_get_active(toggle_button))
     {
         g_print("Separate display dual stereo cam enable\n");
-        separate_dual_display_enable(1);
+        separate_dual_enable(1);
     }
     else
     {
         g_print("Separate display dual stereo cam disable\n");
-        separate_dual_display_enable(0);
+        separate_dual_enable(0);
     }
 }
 /** callback for enabling/disabling display camera info */
@@ -687,12 +688,12 @@ void enable_display_mat_info(GtkToggleButton *toggle_button)
     if (gtk_toggle_button_get_active(toggle_button))
     {
         g_print("stream info display enable\n");
-        display_mat_info_enable(1);
+        display_info_enable(1);
     }
     else
     {
         g_print("stream info display disable\n");
-        display_mat_info_enable(0);
+        display_info_enable(0);
     }
 }
 /** callback for enabling/disabling auto white balance */
@@ -1847,19 +1848,19 @@ void menu_bar_setup(GtkWidget *maintable)
 
     config_file_item = gtk_menu_item_new_with_label("Load json");
     gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
 
     config_file_item = gtk_menu_item_new_with_label("Load BatchCmd.txt");
     gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
 
     config_file_item = gtk_menu_item_new_with_label("Program Flash");
     gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
   
     config_file_item = gtk_menu_item_new_with_label("Program EEPROM");
     gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), NULL);
+    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
     
 
     /** firmware update items */

@@ -13,7 +13,7 @@
   support dynamically change resolutions etc because we use mmap for camera device.
 
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 
 #include "../includes/shortcuts.h"
@@ -44,6 +44,9 @@ static struct option opts[] = {
 **                           Function definition
 *****************************************************************************/
 
+/**
+ * timer used for benchmark ISP performance
+ */
 class Timer
 {
 public:
@@ -101,7 +104,6 @@ int main(int argc, char **argv)
 {
 	struct device dev;
 	char dev_name[64] = "/dev/video0";
-
 	int do_set_format = 0;
 	int do_set_time_per_frame = 0;
 	char *endptr;
@@ -109,10 +111,9 @@ int main(int argc, char **argv)
 	int c;
 	int sys_ret;
 	struct v4l2_fract time_per_frame = {1, 15};
-	// record start time
-	//auto start = std::chrono::high_resolution_clock::now();
 	char *ret_dev_name = enum_v4l2_device(dev_name);
 	char *dev_number;
+	
 	{
 		Timer timer;
 		printf("********************Camera Tool Usages***********************\n");
@@ -163,10 +164,8 @@ int main(int argc, char **argv)
 		}
 
 		if (optind >= argc)
-		{
 			usage(argv[0]);
-		}
-
+		
 		std::string _dev_name(ret_dev_name);
 		v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
 
@@ -188,79 +187,41 @@ int main(int argc, char **argv)
 
 		/** Set the video format. */
 		if (do_set_format)
-		{
 			video_set_format(&dev, dev.width, dev.height, V4L2_PIX_FMT_YUYV);
-		}
+		
 		/** Set the frame rate. */
 		if (do_set_time_per_frame)
-		{
 			set_frame_rate(v4l2_dev, time_per_frame.denominator);
-		}
+		
 
 		printf("********************Device Infomation************************\n");
 		/** try to get all the static camera info before fork */
 		read_cam_uuid_hwfw_rev(v4l2_dev);
 		get_gain(v4l2_dev);
 		get_exposure_absolute(v4l2_dev);
-		check_dev_cap(&dev);
+		check_dev_cap(v4l2_dev);
 		video_get_format(&dev);   /** list the current resolution etc */
 		get_frame_rate(v4l2_dev); /** list the current frame rate */
+
 		/** individual camera tests, detail info is in hardware.h */
 #ifdef AP0202_WRITE_REG_ON_THE_FLY
-		unsigned int i;
-		for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)
-			generic_I2C_write(v4l2_dev, 0x82, ChangConfig[i].reg_data_width,
-							  AP020X_I2C_ADDR, ChangConfig[i].reg_addr,
-							  (unsigned char *)&(ChangConfig[i].reg_val));
-
-		for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)
-		{
-			generic_I2C_read(v4l2_dev, 0x02, ChangConfig[i].reg_data_width,
-							 AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
-		}
-
-		generic_I2C_read(v4l2_dev, 0x02, 1, MAX9295_SER_I2C_ADDR, 0x0000);
-		generic_I2C_read(v4l2_dev, 0x02, 1, MAX9296_DESER_I2C_ADDR, 0x0000);
+		ap0202_write_reg_on_the_fly(v4l2_dev);
 #endif
 
 #ifdef AP0202_WRITE_REG_IN_FLASH
-		load_register_setting_from_configuration(v4l2_dev,
-												 SIZE(ChangConfigFromFlash), ChangConfigFromFlash);
-
-		sleep(1);
-		//generic_I2C_read(v4l2_dev, 0x02, 2, AP020X_I2C_ADDR, 0x0058);
-		sensor_reg_write(v4l2_dev, 0x5080, 0x00);
-		sensor_reg_read(v4l2_dev, 0x4308);
-		sensor_reg_read(v4l2_dev, 0x5080);
+		ap0202_write_reg_in_flash(v4l2_dev);
 #endif
 
 #ifdef OS05A20_PTS_QUERY
-		set_pts(v4l2_dev, 0);
-		get_pts(v4l2_dev);
+		os05a20_pts_query(v4l2_dev);
 #endif
 
 #ifdef AR0231_MIPI_TESTING
-		unsigned int i;
-		for (i = 0; i < sizeof(AR0231_MIPI_REG_TESTING) / sizeof(reg_seq); i++)
-		{
-			//choose either one of the function below for register read
-			generic_I2C_read(v4l2_dev, 0x02, AR0231_MIPI_REG_TESTING[i].reg_data_width,
-							 AR0231_I2C_ADDR, AR0231_MIPI_REG_TESTING[i].reg_addr);
-
-			sensor_reg_read(v4l2_dev, AR0231_MIPI_REG_TESTING[i].reg_addr);
-		}
+		ar0231_mipi_testing(v4l2_dev);
 #endif
 
 #ifdef IMX334_MONO_MIPI_TESTING
-		unsigned int i;
-		for (i = 0; i < sizeof(IMX334_MIPI_REG_TESTING) / sizeof(reg_seq); i++)
-		{
-			//TODO: choose either one of the function below for register read
-			generic_I2C_read(v4l2_dev, 0x02, IMX334_MIPI_REG_TESTING[i].reg_data_width,
-							 IMX334_I2C_ADDR, IMX334_MIPI_REG_TESTING[i].reg_addr);
-
-			sensor_reg_read(v4l2_dev, IMX334_MIPI_REG_TESTING[i].reg_addr);
-		}
+		imx334_mipi_testing(v4l2_dev);
 #endif
 
 		printf("********************Allocate Buffer for Capturing************\n");

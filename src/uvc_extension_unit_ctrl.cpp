@@ -17,7 +17,7 @@
   UVC extension unit features, firmware will need to get updated.
   
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 
 #include "../includes/shortcuts.h"
@@ -75,7 +75,7 @@ void error_handle_extension_unit()
 }
 
 /**
- * helper function to commnunicate with FX3 UVC defined extension unit
+ * helper function to communicate with FX3 UVC defined extension unit
  * args:
  * 		fd 			- file descriptor
  *  	property_id - defined Leopard Imaging USB3.0 Camera uvc extension id
@@ -1064,6 +1064,77 @@ void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
 			buf17[i] = 0xff;
 		buf17[0] = (unsigned char)addr;
 		memcpy(&buf17[1], buf + addr, len - addr);
+	}
+}
+#endif
+
+#ifdef AP0202_WRITE_REG_ON_THE_FLY
+void ap0202_write_reg_on_the_fly(int fd)
+{
+	printf("**********AP0202 write reg on the fly************************\n");
+	unsigned int i;
+	for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)
+		generic_I2C_write(fd, 0x82, ChangConfig[i].reg_data_width,
+						  AP020X_I2C_ADDR, ChangConfig[i].reg_addr,
+						  (unsigned char *)&(ChangConfig[i].reg_val));
+	for (i = 0; i < sizeof(ChangConfig) / sizeof(reg_seq); i++)
+	{
+		generic_I2C_read(fd, 0x02, ChangConfig[i].reg_data_width,
+						 AP020X_I2C_ADDR, ChangConfig[i].reg_addr);
+	}
+	generic_I2C_read(fd, 0x02, 1, MAX9295_SER_I2C_ADDR, 0x0000);
+	generic_I2C_read(fd, 0x02, 1, MAX9296_DESER_I2C_ADDR, 0x0000);
+}
+#endif
+
+#ifdef AP0202_WRITE_REG_IN_FLASH
+void ap0202_write_reg_in_flash(int fd)
+{
+	printf("**********AP0202 write reg in flash**************************\n");
+	load_register_setting_from_configuration(fd,
+		SIZE(ChangConfigFromFlash), ChangConfigFromFlash);
+
+	sleep(1);
+	//generic_I2C_read(v4l2_dev, 0x02, 2, AP020X_I2C_ADDR, 0x0058);
+	sensor_reg_write(fd, 0x5080, 0x00);
+	sensor_reg_read (fd, 0x4308);
+	sensor_reg_read (fd, 0x5080);
+}
+#endif
+#ifdef OS05A20_PTS_QUERY
+void os05a20_pts_query(int fd)
+{
+	printf("**********OS05A20 pts query**********************************\n");
+	set_pts(fd, 0);
+	get_pts(fd);
+}
+#endif 
+#ifdef AR0231_MIPI_TESTING
+void ar0231_mipi_testing(int fd)
+{
+	printf("**********AR0231 reg mipi testing****************************\n");
+	unsigned int i;
+	for (i = 0; i < sizeof(AR0231_MIPI_REG_TESTING) / sizeof(reg_seq); i++)
+	{
+		//choose either one of the function below for register read
+		generic_I2C_read(fd, 0x02, AR0231_MIPI_REG_TESTING[i].reg_data_width,
+						 AR0231_I2C_ADDR, AR0231_MIPI_REG_TESTING[i].reg_addr);
+		sensor_reg_read(fd, AR0231_MIPI_REG_TESTING[i].reg_addr);
+	}
+}
+#endif
+
+#ifdef IMX334_MONO_MIPI_TESTING
+void imx334_mipi_testing(int fd)
+{
+	printf("**********IMX334 reg mipi testing****************************\n");
+	unsigned int i;
+	for (i = 0; i < sizeof(IMX334_MIPI_REG_TESTING) / sizeof(reg_seq); i++)
+	{
+		//TODO: choose either one of the function below for register read
+		generic_I2C_read(fd, 0x02, IMX334_MIPI_REG_TESTING[i].reg_data_width,
+						 IMX334_I2C_ADDR, IMX334_MIPI_REG_TESTING[i].reg_addr);
+		sensor_reg_read(fd, IMX334_MIPI_REG_TESTING[i].reg_addr);
 	}
 }
 #endif

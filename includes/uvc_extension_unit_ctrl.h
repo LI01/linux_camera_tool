@@ -17,7 +17,7 @@
   UVC extension unit features, firmware will need to get updated.
   
   Author: Danyu L
-  Last edit: 2019/07
+  Last edit: 2019/08
 *****************************************************************************/
 #pragma once
 /*****************************************************************************
@@ -190,6 +190,7 @@ const reg_seq TrigDisable[] =
     {2, 0x098e, 0xc890},
     {1, 0xc890, 0x00}
 };
+void ap0202_write_reg_on_the_fly(int fd);
 #endif
 
 #ifdef AP0202_WRITE_REG_IN_FLASH
@@ -201,6 +202,11 @@ const reg_pair ChangConfigFromFlash[] =
 {
     {0x305e, 0x0222}, //customer_rev
 };
+void ap0202_write_reg_in_flash(int fd);
+#endif
+
+#ifdef OS05A20_PTS_QUERY
+void os05a20_pts_query(int fd);
 #endif
 
 #ifdef AR0231_MIPI_TESTING
@@ -213,6 +219,7 @@ const reg_seq AR0231_MIPI_REG_TESTING[] =
     {2, 0x305c, 0x0080}, //GREEN2_GAIN
     {2, 0x3138, 0x000B}  //OTPM_TCFG_OPT
 };
+void ar0231_mipi_testing(int fd);
 #endif
 
 #ifdef IMX334_MONO_MIPI_TESTING
@@ -222,6 +229,7 @@ const reg_seq IMX334_MIPI_REG_TESTING[] =
     {1, 0x3302, 0x32}, // BLKLEVEL[7:0]
     {1, 0x3303, 0x00}, // BLKLEVEL[1:0] range 0x0-0x3ff
 };
+void imx334_mipi_testing(int fd);
 #endif
 
 /*****************************************************************************
@@ -294,3 +302,4 @@ void ap020x_write_data(int fd, int buf_size, int pos, unsigned char *buf);
 void ap020x_program_flash_eeprom(int fd, const unsigned char *bin_buf, int bin_size);
 
 //void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len);
+
