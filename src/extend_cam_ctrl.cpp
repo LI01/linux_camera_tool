@@ -97,6 +97,7 @@ static int *edge_low_thres;
 
 int *cur_exposure; 				  /// update current exposure for AE
 int *cur_gain;	 				  /// update current gain for AE
+
 static int image_count;			  /// image count number add to capture name
 double cur_time = 0;			  /// time measured in OpenCV for fps
 struct v4l2_buffer queuebuffer;   /// queuebuffer for enqueue, dequeue buffer
@@ -105,10 +106,13 @@ static constexpr const char* window_name = "Camera View";
 **                      	External Callbacks
 *****************************************************************************/
 extern char *get_product(); 		/// put product name in captured image name
+extern int get_li_datatype();
 /// for software ae
 extern void set_gain(int fd, int analog_gain);
 extern void set_exposure_absolute(int fd, int exposure_absolute);
 extern int get_current_height(int fd);
+extern void free_device_vars();
+
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
@@ -176,7 +180,7 @@ int v4l2_core_save_data_to_file(const void *data, int size)
 {
 	FILE *fp;
 	int ret = 0;
-	char buf_name[30];
+	char buf_name[40];
 	snprintf(buf_name, sizeof(buf_name), "captures_%s_%d.raw",
 			 get_product(), image_count);
 
@@ -713,56 +717,81 @@ int open_v4l2_device(char *device_name, struct device *dev)
 	}
 	dev->fd = v4l2_dev;
 
-	mmap_variables();
-	initialize_shared_memory_var();
 	return v4l2_dev;
 }
-
+void *mmap_wrapper(int len)
+{
+	void *p = mmap(NULL, len, PROT_READ | PROT_WRITE, 
+		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	if (p == (void *) -1)
+		perror("mmap shared memory failed\n");
+	return p;
+}
 /** mmap the variables for processes share */
 void mmap_variables()
 {
-	gamma_val 		 = (float *)mmap(NULL, sizeof(float), RW, SHAREA, -1, 0);
-	save_bmp 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	save_raw 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	bpp 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	bayer_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	awb_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	clahe_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	abc_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	blc 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	loop 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	rgb_gainoffset_flg   = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	rgb_matrix_flg 	     = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	r_gain 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	g_gain 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	b_gain 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	r_offset 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	g_offset 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	b_offset 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	rr 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	rg 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	rb 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	gr 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	gg 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	gb 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	br 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	bg 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	bb 					 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	cur_exposure 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	cur_gain 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	soft_ae_flag 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	flip_flag 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	mirror_flag 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	show_edge_flag 	     = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	rgb_ir_color 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	rgb_ir_ir 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	separate_dual 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	display_info_ena 	 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	alpha 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	beta 				 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	sharpness 			 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	edge_low_thres 		 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
-	resize_window_ena 	 = (int *)mmap(NULL, sizeof(int), RW, SHAREA, -1, 0);
+	gamma_val 			= (float *)mmap_wrapper(sizeof(float));
+	save_bmp 			 = (int *)mmap_wrapper(sizeof(int));
+	save_raw 			 = (int *)mmap_wrapper(sizeof(int));
+	bpp 				 = (int *)mmap_wrapper(sizeof(int));
+	bayer_flag 			 = (int *)mmap_wrapper(sizeof(int));
+	awb_flag 			 = (int *)mmap_wrapper(sizeof(int));
+	clahe_flag 			 = (int *)mmap_wrapper(sizeof(int));
+	abc_flag 			 = (int *)mmap_wrapper(sizeof(int));
+	blc 				 = (int *)mmap_wrapper(sizeof(int));
+	loop 				 = (int *)mmap_wrapper(sizeof(int));
+	rgb_gainoffset_flg   = (int *)mmap_wrapper(sizeof(int));
+	rgb_matrix_flg 	     = (int *)mmap_wrapper(sizeof(int));
+	r_gain 				 = (int *)mmap_wrapper(sizeof(int));
+	g_gain 				 = (int *)mmap_wrapper(sizeof(int));
+	b_gain 				 = (int *)mmap_wrapper(sizeof(int));
+	r_offset 			 = (int *)mmap_wrapper(sizeof(int));
+	g_offset 			 = (int *)mmap_wrapper(sizeof(int));
+	b_offset 			 = (int *)mmap_wrapper(sizeof(int));
+	rr 					 = (int *)mmap_wrapper(sizeof(int));
+	rg 					 = (int *)mmap_wrapper(sizeof(int));
+	rb 					 = (int *)mmap_wrapper(sizeof(int));
+	gr 					 = (int *)mmap_wrapper(sizeof(int));
+	gg 					 = (int *)mmap_wrapper(sizeof(int));
+	gb 					 = (int *)mmap_wrapper(sizeof(int));
+	br 					 = (int *)mmap_wrapper(sizeof(int));
+	bg 					 = (int *)mmap_wrapper(sizeof(int));
+	bb 					 = (int *)mmap_wrapper(sizeof(int));
+	cur_exposure 		 = (int *)mmap_wrapper(sizeof(int));
+	cur_gain 			 = (int *)mmap_wrapper(sizeof(int));
+	soft_ae_flag 		 = (int *)mmap_wrapper(sizeof(int));
+	flip_flag 			 = (int *)mmap_wrapper(sizeof(int));
+	mirror_flag 		 = (int *)mmap_wrapper(sizeof(int));
+	show_edge_flag 	     = (int *)mmap_wrapper(sizeof(int));
+	rgb_ir_color 		 = (int *)mmap_wrapper(sizeof(int));
+	rgb_ir_ir 			 = (int *)mmap_wrapper(sizeof(int));
+	separate_dual 		 = (int *)mmap_wrapper(sizeof(int));
+	display_info_ena 	 = (int *)mmap_wrapper(sizeof(int));
+	alpha 				 = (int *)mmap_wrapper(sizeof(int));
+	beta 				 = (int *)mmap_wrapper(sizeof(int));
+	sharpness 			 = (int *)mmap_wrapper(sizeof(int));
+	edge_low_thres 		 = (int *)mmap_wrapper(sizeof(int));
+	resize_window_ena 	 = (int *)mmap_wrapper(sizeof(int));
+}
+
+int set_bpp(int datatype)
+{
+	switch(datatype)
+	{
+		case LI_RAW_10_MODE:
+			return RAW10_FLG;
+		case LI_RAW_12_MODE:
+			return RAW12_FLG;
+		case LI_RAW_8_MODE:
+		case LI_RAW_8_DUAL_MODE:
+			return RAW8_FLG;
+		case LI_YUY2_MODE:
+			return YUYV_FLG;
+		case LI_JPEG_MODE:
+			return YUYV_FLG;//haven't support yet	
+		default:
+			return RAW10_FLG;
+	}
 }
 
 /** initialize share memory variables after declaration */
@@ -770,7 +799,12 @@ void initialize_shared_memory_var()
 {
 	*gamma_val = 1.0;
 	*blc = 0;
-	*bpp = RAW10_FLG;
+	if (strcmp(get_product(), "USB Camera-OV580") == 0)
+		*bpp = RAW8_FLG;
+	else if (strcmp(get_product(), "OV580 STEREO") == 0)
+		*bpp = YUYV_FLG;
+	else
+		*bpp = set_bpp(get_li_datatype());
 	*bayer_flag = CV_BayerBG2BGR_FLG;
 	*display_info_ena = TRUE;
 	*alpha = 1;
@@ -832,7 +866,7 @@ void unmap_variables()
 	unmap_wrapper(sharpness);
 	unmap_wrapper(edge_low_thres);
 	unmap_wrapper(resize_window_ena);
-
+	free_device_vars();
 }
 
 /**
@@ -851,6 +885,8 @@ void start_camera(struct device *dev)
 		printf("Couldn't start camera streaming\n");
 		return;
 	}
+	mmap_variables();
+	initialize_shared_memory_var();
 	return;
 }
 
@@ -1618,7 +1654,7 @@ static void display_current_mat_stream_info(
 
 	char resolution[25];
 	sprintf(resolution, "Current Res:%dx%d", 
-		opencvImage.rows, opencvImage.cols);
+		opencvImage.cols, opencvImage.rows);
 	streaming_put_text(opencvImage, resolution,
 					   height_scale * TEXT_SCALE_BASE * 2);
 
@@ -1874,6 +1910,7 @@ void decode_process_a_frame(struct device *dev, const void *p)
 		else 
 			width = width * 2;
 		
+		
 		//swap_two_bytes(dev, p);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
@@ -1883,6 +1920,8 @@ void decode_process_a_frame(struct device *dev, const void *p)
 #else
 		debayer_awb_a_frame(img);	
 #endif
+
+
 		if (*rgb_matrix_flg)
 			apply_rgb_matrix_post_debayer(img);
 		share_img = img;
@@ -1891,7 +1930,6 @@ void decode_process_a_frame(struct device *dev, const void *p)
 	/** --- for yuv camera ---*/
 	else if (shift == 0)
 	{	
-		//swap_four_bytes(dev, p);
 		cv::Mat img(height, width, CV_8UC2, (void *)p);
 		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
 		if (*bayer_flag == CV_MONO_FLG && img.type() != CV_8UC1)
@@ -2147,8 +2185,8 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 
 		buffers[i].length = querybuffer.length; /** remember for munmap() */
 
-		buffers[i].start = mmap(NULL, querybuffer.length, RW, SHARE, dev->fd,
-								querybuffer.m.offset);
+		buffers[i].start = mmap(NULL, querybuffer.length, PROT_READ | PROT_WRITE,
+		 MAP_SHARED, dev->fd, querybuffer.m.offset);
 
 		if (buffers[i].start == MAP_FAILED)
 		{

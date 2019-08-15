@@ -1,0 +1,78 @@
+/*****************************************************************************
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc., 
+  
+  This is the a common used utility library 
+
+  Author: Danyu L
+  Last edit: 2019/08
+*****************************************************************************/
+#pragma once
+#include <chrono> //high resolution clock
+#include <iostream>
+
+/**
+ * timer used for benchmark ISP performance
+ */
+class Timer
+{
+public:
+	Timer()
+	{
+		m_start_time_point = std::chrono::high_resolution_clock::now();
+	}
+	~Timer()
+	{
+		Stop();
+	}
+	void Stop()
+	{
+		auto end_time_point = std::chrono::high_resolution_clock::now();
+		auto start = std::chrono::time_point_cast<std::chrono::microseconds>
+			(m_start_time_point).time_since_epoch().count();
+		auto end = std::chrono::time_point_cast<std::chrono::microseconds>
+			(end_time_point).time_since_epoch().count();
+		auto duration = end - start;
+		double ms = duration *0.001;
+		double second = ms * 0.001;
+		//std::cout << "Elapsed time："<< duration << "us (" << ms << "ms)\n";
+		std::cout << "Elapsed time："<< second << "s\n";
+	}
+
+private:
+	std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time_point;
+};
+
+/**
+ * return the output string for a linux shell command 
+ */
+std::string
+get_stdout_from_cmd(std::string cmd)
+{
+
+	std::string data;
+	FILE *stream;
+	const int max_buffer = 256;
+	char buffer[max_buffer];
+	cmd.append(" 2>&1");
+
+	stream = popen(cmd.c_str(), "r");
+	if (stream)
+	{
+		while (!feof(stream))
+			if (fgets(buffer, max_buffer, stream) != NULL)
+				data.append(buffer);
+		pclose(stream);
+	}
+	return data;
+}

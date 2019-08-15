@@ -2,6 +2,15 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.3.7 - 2019-08-13  
+**Added:**
+- add more OpenCV CUDA support functions for ISP
+- add benchmark performance matrix in README
+- add more OpenCV CUDA support functions in GUI
+
+**Changed:**
+- fix the bug of CCM, clean up the code
+
 ## v0.3.6 - 2019-08-09
 **Added:**  
 - add OpenCV CUDA build in cmake, 

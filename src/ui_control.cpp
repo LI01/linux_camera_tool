@@ -86,7 +86,7 @@ extern int v4l2_dev;/** global variable, file descriptor for camera device */
 
 char icon1path[30] = "./pic/leopard_cam_tool.jpg"; /** window icon for makefile */
 char icon2path[30] = "../pic/leopard_cam_tool.jpg"; /** window icon for cmake */
-char version_number[10] = "v0.4.3";
+char version_number[10] = "v0.3.8";
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
@@ -815,8 +815,25 @@ void init_grid1_widgets()
 	 *  try to increase 3 to 4, 5, 6 etc
 	 *  or ask for a firmware update, firmware exposure time mapping might be wrong
 	 */
-    int exposure_max = query_exposure_absolute_max(v4l2_dev);
-    int gain_max = query_gain_max(v4l2_dev);
+    int exposure_max;
+    int gain_max;
+    /* add these placeholder so you don't see invalid requests */
+    if (strcmp(get_product(), "USB Camera-OV580") == 0)
+    {
+        exposure_max = 1111;
+        gain_max = 11;  
+    }
+    else if (strcmp(get_product(), "OV580 STEREO") == 0)
+    {
+        exposure_max = 1111;
+        gain_max = query_gain_max(v4l2_dev);
+    }
+    else
+    {
+        exposure_max = query_exposure_absolute_max(v4l2_dev);
+        gain_max = query_gain_max(v4l2_dev);
+    }
+
     if (exposure_max == UNDEFINED_MAX_EXPOSURE_LINE)
         exposure_max = get_current_height(v4l2_dev) * 3;
 
@@ -896,6 +913,32 @@ void init_grid1_widgets()
     seperator_tab1_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     seperator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     seperator_tab1_3 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+
+    /** OV580 firmware doesn't have gain, exposure ctrl capabilities etc */
+    if (strcmp(get_product(), "USB Camera-OV580") == 0)
+    {
+        gtk_widget_set_sensitive(hscale_exposure, 0);
+        gtk_widget_set_sensitive(hscale_gain, 0);
+        gtk_widget_set_sensitive(button_read, 0);
+        gtk_widget_set_sensitive(button_write, 0);
+        gtk_widget_set_sensitive(radio_16bit_addr,0);
+        gtk_widget_set_sensitive(radio_16bit_val,0);
+        gtk_widget_set_sensitive(radio_8bit_addr,0);
+        gtk_widget_set_sensitive(radio_8bit_val,0);
+        gtk_widget_set_sensitive(check_button_just_sensor,0);
+
+    }
+    else if (strcmp(get_product(), "OV580 STEREO") == 0)
+    {
+        gtk_widget_set_sensitive(hscale_exposure, 0);
+        gtk_widget_set_sensitive(button_read, 0);
+        gtk_widget_set_sensitive(button_write, 0);
+        gtk_widget_set_sensitive(radio_16bit_addr,0);
+        gtk_widget_set_sensitive(radio_16bit_val,0);
+        gtk_widget_set_sensitive(radio_8bit_addr,0);
+        gtk_widget_set_sensitive(radio_8bit_val,0);
+        gtk_widget_set_sensitive(check_button_just_sensor,0);
+    }
 }
 /** 
  * init and declare all the grid2 widgets here
@@ -1007,12 +1050,22 @@ void iterate_def_elements (
 void init_grid1_def_elements ()
 {
     char device_buf[64];
-    snprintf(device_buf, sizeof(device_buf), "Device: %s - %s",
+    char fw_rev_buf[40];
+    if (is_ov580_stereo())
+    {
+        snprintf(device_buf, sizeof(device_buf), "Device: %s",
+                 get_manufacturer_name());
+        snprintf(fw_rev_buf, sizeof(fw_rev_buf), "Product: %s",
+                 get_product());
+    }
+    else
+    {
+        snprintf(device_buf, sizeof(device_buf), "Device: %s - %s",
              get_manufacturer_name(), get_product());
-
-    char fw_rev_buf[20];
-    snprintf(fw_rev_buf, sizeof(fw_rev_buf), "Firmware Rev: %d",
+        snprintf(fw_rev_buf, sizeof(fw_rev_buf), "Firmware Rev: %d",
              get_fw_rev());
+    }
+    
 
     static def_element definitions[] = {
         {.widget = label_device,      

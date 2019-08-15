@@ -33,6 +33,7 @@ static unsigned int m_bGain  = 0x1;
 
 int hw_rev; 
 int fw_rev;
+int li_datatype;
 char uuid[64];
 /******************************************************************************
 **                           Function definition
@@ -255,7 +256,7 @@ void set_sensor_gain_rgb(int fd, unsigned int rGain,
 
 /**
  * Getter for hardware revision
- * Most likely 0x0102, cut MSB 4-bit for datatype
+ * Most likely 0x0102
  */ 
 int get_hw_rev()
 {
@@ -271,6 +272,10 @@ int get_hw_rev()
 int get_fw_rev()
 {
 	return fw_rev;
+}
+int get_li_datatype()
+{
+	return li_datatype;
 }
 /**
  * Getter for uuid
@@ -291,8 +296,9 @@ void read_cam_uuid_hwfw_rev(int fd)
 	char uuidBuf[80];
 	read_from_UVC_extension(fd, LI_XU_SENSOR_UUID_HWFW_REV,
 							LI_XU_SENSOR_UUID_HWFW_REV_SIZE, buf7);
-	/** upper 4 bits are for camera datatype, clear that flags */
+	/** upper 4 bits are for camera li_datatype, clear that flags */
 	hw_rev = buf7[0] | (buf7[1] << 8);
+	li_datatype = hw_rev & 0xf000;
 	hw_rev &= ~(0xf000);
 	fw_rev = buf7[2] | (buf7[3] << 8);
 	for (int i = 0; i < (36 + 9); ++i)

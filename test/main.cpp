@@ -15,11 +15,9 @@
   Author: Danyu L
   Last edit: 2019/08
 *****************************************************************************/
-
-#include "../includes/shortcuts.h"
 #include <getopt.h>
-#include <chrono> //high resolution clock
-#include <iostream>
+#include "../includes/shortcuts.h"
+#include "../includes/utility.h"
 
 #include "../includes/uvc_extension_unit_ctrl.h"
 #include "../includes/extend_cam_ctrl.h"
@@ -44,62 +42,6 @@ static struct option opts[] = {
 **                           Function definition
 *****************************************************************************/
 
-/**
- * timer used for benchmark ISP performance
- */
-class Timer
-{
-public:
-	Timer()
-	{
-		m_start_time_point = std::chrono::high_resolution_clock::now();
-	}
-	~Timer()
-	{
-		Stop();
-	}
-	void Stop()
-	{
-		auto end_time_point = std::chrono::high_resolution_clock::now();
-		auto start = std::chrono::time_point_cast<std::chrono::microseconds>
-			(m_start_time_point).time_since_epoch().count();
-		auto end = std::chrono::time_point_cast<std::chrono::microseconds>
-			(end_time_point).time_since_epoch().count();
-		auto duration = end - start;
-		double second = duration * 0.001 * 0.001;
-		//std::cout << "Elapsed time："<< duration << "us (" << ms << "ms)\n";
-		std::cout << "Elapsed time："<< second << "s\n";
-	}
-
-private:
-	std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time_point;
-};
-
-/**
- * return the output string for a linux shell command 
- */
-std::string
-get_stdout_from_cmd(std::string cmd)
-{
-
-	std::string data;
-	FILE *stream;
-	const int max_buffer = 256;
-	char buffer[max_buffer];
-	cmd.append(" 2>&1");
-
-	stream = popen(cmd.c_str(), "r");
-	if (stream)
-	{
-		while (!feof(stream))
-			if (fgets(buffer, max_buffer, stream) != NULL)
-				data.append(buffer);
-		pclose(stream);
-	}
-	return data;
-}
-
-/** main function */
 int main(int argc, char **argv)
 {
 	struct device dev;
@@ -149,7 +91,9 @@ int main(int argc, char **argv)
 				break;
 			case 'd':
 				dev_number = optarg;
-				if (dev_number[0] >= '0' && dev_number[0] <= '9' && strlen(dev_number) <= 3)
+				if (dev_number[0] >= '0' 
+					&& dev_number[0] <= '9' 
+					&& strlen(dev_number) <= 3)
 				{
 					sprintf(ret_dev_name, "/dev/video%s", dev_number);
 					printf("ret dev name = %s\r\n", ret_dev_name);
@@ -183,7 +127,8 @@ int main(int argc, char **argv)
 	 	 */
 		std::cout << get_stdout_from_cmd(
 			"v4l2-ctl --device=" + _dev_name +
-			" --list-formats-ext | grep Size | awk '{print $1 $3}'| sed 's/Size/Resolution/g'");
+			" --list-formats-ext | grep Size | "
+			"awk '{print $1 $3}'| sed 's/Size/Resolution/g'");
 
 		/** Set the video format. */
 		if (do_set_format)
@@ -196,9 +141,10 @@ int main(int argc, char **argv)
 
 		printf("********************Device Infomation************************\n");
 		/** try to get all the static camera info before fork */
-		read_cam_uuid_hwfw_rev(v4l2_dev);
-		get_gain(v4l2_dev);
-		get_exposure_absolute(v4l2_dev);
+		
+		if (!is_ov580_stereo())
+			read_cam_uuid_hwfw_rev(v4l2_dev);
+
 		check_dev_cap(v4l2_dev);
 		video_get_format(&dev);   /** list the current resolution etc */
 		get_frame_rate(v4l2_dev); /** list the current frame rate */

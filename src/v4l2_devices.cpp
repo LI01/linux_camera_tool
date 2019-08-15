@@ -23,14 +23,21 @@
 #include "../includes/v4l2_devices.h"
 /*****************************************************************************
 **                      	Global data 
-*****************************************************************************/
-char manufacturer[20]; 
-char product[20];      
-char serial[64];       
-
+*****************************************************************************/   
+char *manufacturer;
+char *product;
+char *serial;
+int *is_ov580_st;
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
+void free_device_vars()
+{
+    free(manufacturer);
+    free(product);
+    free(serial);
+    free(is_ov580_st);
+}
 /**
  * Getter for manufacurer name: "Leopard Imaging"
  * These USB descriptor are read-only 
@@ -59,7 +66,36 @@ char *get_serial()
 {
     return serial;
 }
-
+/**
+ * if it is OV580 stereo, don't read hw, fw rev etc
+ */
+int is_ov580_stereo()
+{
+    return *is_ov580_st;
+}
+/**
+ * 2a0b is leopard manufacurer id
+ */
+int is_leopard_usb3(struct udev_device *dev)
+{
+    return !(strcmp("2a0b", udev_device_get_sysattr_value(dev, "idVendor")));
+}
+/**
+ * 05a9:0581 is LI-USB Camera-OV9282-OV580 
+ * 2b03:0580 is LI-USB Camera-OV4689-OV580
+ */
+int is_ov580_stereo(struct udev_device *dev)
+{
+   
+    int is_ov9272_ov580 = 
+        ((strcmp("05a9", udev_device_get_sysattr_value(dev, "idVendor"))) == 0) &&
+        ((strcmp("0581", udev_device_get_sysattr_value(dev, "idProduct"))) == 0);
+    int is_ov4689_ov580 = 
+        ((strcmp("2b03", udev_device_get_sysattr_value(dev, "idVendor"))) == 0) &&
+        ((strcmp("0580", udev_device_get_sysattr_value(dev, "idProduct"))) == 0);
+    *is_ov580_st = is_ov9272_ov580 || is_ov4689_ov580;
+    return *is_ov580_st;
+}
 /**
  * enumerate v4l2 device
  * input device set to default /dev/video0
@@ -75,7 +111,11 @@ char *enum_v4l2_device(char *dev_name)
     struct udev_list_entry *devices;
     struct udev_list_entry *dev_list_entry;
     struct udev_device *dev;
-
+    /** put these variables on heap so it doesn't get buffer overflow */
+    manufacturer    = (char *) malloc(20);
+    product         = (char *) malloc (20);
+    serial          = (char *) malloc (64);
+    is_ov580_st     = (int *) malloc(sizeof(int));
     printf("********************Udev Device Start************************\n");
     /** Create the udev object */
     udev = udev_new();
@@ -127,10 +167,8 @@ char *enum_v4l2_device(char *dev_name)
             exit(1);
         }
 
-        /**
-         * 2a0b is leopard manufacurer id, use udev to update video device id
-         */
-        if ((strcmp("2a0b", udev_device_get_sysattr_value(dev, "idVendor"))) == 0)
+
+        if (is_leopard_usb3(dev))
         {
             strcpy(dev_name, dev_name_tmp);
             printf("Find leopard USB3 camera at %s\n", dev_name_tmp);
@@ -148,6 +186,35 @@ char *enum_v4l2_device(char *dev_name)
             strcpy(manufacturer, udev_device_get_sysattr_value(dev, "manufacturer"));
             strcpy(product, udev_device_get_sysattr_value(dev, "product"));
             strcpy(serial, udev_device_get_sysattr_value(dev, "serial"));
+            printf("  %s\n  %s\n",
+                   manufacturer,
+                   product);
+            /** Add serial number in usb descriptor will need to request
+               a firmware updates, values will get from FX3 and sensor fuse id */
+            // printf("  serial: %s\n",
+            //        serial);
+
+            //TODO:delete this for other computer?
+            return dev_name;
+        }
+
+        else if (is_ov580_stereo(dev))
+        {
+            strcpy(dev_name, dev_name_tmp);
+            printf("Find Omnivision Stereo USB3 camera at %s\n", dev_name_tmp);
+            /** From here, we can call get_sysattr_value() for each file
+		     * in the device's /sys entry. The strings passed into these
+		     * functions (idProduct, idVendor, serial, etc.) correspond
+		     * directly to the files in the directory which represents
+		     * the USB device. Note that USB strings are Unicode, UCS2
+		     * encoded, but the strings returned from
+		     * udev_device_get_sysattr_value() are UTF-8 encoded. */
+            printf("  VID/PID: %s %s\n",
+                   udev_device_get_sysattr_value(dev, "idVendor"),
+                   udev_device_get_sysattr_value(dev, "idProduct"));
+
+            strcpy(manufacturer, udev_device_get_sysattr_value(dev, "manufacturer"));
+            strcpy(product, udev_device_get_sysattr_value(dev, "product"));
             printf("  %s\n  %s\n",
                    manufacturer,
                    product);

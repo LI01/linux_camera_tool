@@ -58,6 +58,17 @@ typedef enum
    RAW8_FLG = 8
 } bit_per_pixel_flag;
 
+/** --- for LI_XU_SENSOR_UUID_HWFW_REV --- */
+typedef enum
+{
+    LI_RAW_8_MODE          = 0x1000,
+    LI_RAW_10_MODE         = 0x2000,
+    LI_RAW_12_MODE         = 0x3000,
+    LI_YUY2_MODE           = 0x4000,
+    LI_RAW_8_DUAL_MODE     = 0x5000,
+    LI_JPEG_MODE           = 0x6000
+} li_datatype_fw_flag;
+
 typedef enum
 {
    CV_BayerBG2BGR_FLG = 1,
@@ -73,13 +84,6 @@ typedef enum
    CROPPED_HEIGHT = 720
 } cropped_resolution;
 
-/**
- * make shared memory flags shorter 
- * Ref: https://stackoverflow.com/questions/34042915/what-is-the-purpose-of-map-anonymous-flag-in-mmap-system-call
- */
-#define RW     (PROT_READ | PROT_WRITE)  //permission:read, write
-#define SHAREA (MAP_SHARED | MAP_ANONYMOUS)
-#define SHARE  (MAP_SHARED)
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
@@ -107,7 +111,9 @@ void abc_enable(int enable);
 
 int open_v4l2_device(char *device_name, struct device *dev);
 
+void *mmap_wrapper(int len);
 void mmap_variables();
+int set_bpp(int datatype);
 void initialize_shared_memory_var();
 template<class T>
 void unmap_wrapper(T *data);

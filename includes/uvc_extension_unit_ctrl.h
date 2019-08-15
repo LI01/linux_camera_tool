@@ -69,16 +69,7 @@ typedef enum
 #define LI_XU_GENERIC_I2C_RW_SIZE                   (262)
 #define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE        (33)
 
-/** --- for LI_XU_SENSOR_UUID_HWFW_REV --- */
-typedef enum
-{
-    RAW_8_MODE          = 0x1000,
-    RAW_10_MODE         = 0x2000,
-    RAW_12_MODE         = 0x3000,
-    YUY2_MODE           = 0x4000,
-    RAW_8_DUAL_MODE     = 0x5000,
-    JPEG_MODE           = 0x6000
-} datatype_fw_flag;
+
 #define SERIAL_NUMBER_WR_FLG (0xA5)
 
 /** --- for LI_XU_SENSOR_REG_RW  --- */
@@ -264,6 +255,7 @@ void set_sensor_gain_rgb(int fd, unsigned int rGain,
                          unsigned int bGain);
 
 int get_hw_rev();
+int get_li_datatype();
 int get_fw_rev();
 char *get_uuid();
 void read_cam_uuid_hwfw_rev(int fd);

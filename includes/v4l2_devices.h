@@ -22,7 +22,13 @@
 
 #pragma once
 #include <libudev.h>
+
+void free_device_vars();
 char* get_manufacturer_name(); 
 char* get_product();
 char *get_serial();
+int is_leopard_usb3(struct udev_device *dev);
+int is_ov580_stereo();
+int is_ov580_stereo(struct udev_device *dev);
+
 char *enum_v4l2_device(char *dev_name); 
