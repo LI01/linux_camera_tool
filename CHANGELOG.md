@@ -2,6 +2,15 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.3.9 - 2019-08-16  
+**Added:**
+- add more OpenCV CUDA support functions
+**Changed:**
+- fix the issue of can't open window when exposure and gain ctrl don't support in camera driver
+## v0.3.8 - 2019-08-15  
+**Added:**
+- add OV580-ST support
+  
 ## v0.3.7 - 2019-08-13  
 **Added:**
 - add more OpenCV CUDA support functions for ISP

@@ -41,6 +41,29 @@ static struct option opts[] = {
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
+/**
+ * return the output string for a linux shell command 
+ */
+std::string
+get_stdout_from_cmd(std::string cmd)
+{
+
+	std::string data;
+	FILE *stream;
+	const int max_buffer = 256;
+	char buffer[max_buffer];
+	cmd.append(" 2>&1");
+
+	stream = popen(cmd.c_str(), "r");
+	if (stream)
+	{
+		while (!feof(stream))
+			if (fgets(buffer, max_buffer, stream) != NULL)
+				data.append(buffer);
+		pclose(stream);
+	}
+	return data;
+}
 
 int main(int argc, char **argv)
 {
@@ -110,7 +133,7 @@ int main(int argc, char **argv)
 		if (optind >= argc)
 			usage(argv[0]);
 		
-		std::string _dev_name(ret_dev_name);
+		
 		v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
 
 		if (v4l2_dev < 0)
@@ -125,6 +148,7 @@ int main(int argc, char **argv)
 	 	 * run a v4l2-ctl --list-formats-ext 
 	 	 * to see the resolution and available frame rate 
 	 	 */
+		std::string _dev_name(ret_dev_name);
 		std::cout << get_stdout_from_cmd(
 			"v4l2-ctl --device=" + _dev_name +
 			" --list-formats-ext | grep Size | "

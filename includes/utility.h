@@ -53,26 +53,3 @@ private:
 	std::chrono::time_point<std::chrono::high_resolution_clock> m_start_time_point;
 };
 
-/**
- * return the output string for a linux shell command 
- */
-std::string
-get_stdout_from_cmd(std::string cmd)
-{
-
-	std::string data;
-	FILE *stream;
-	const int max_buffer = 256;
-	char buffer[max_buffer];
-	cmd.append(" 2>&1");
-
-	stream = popen(cmd.c_str(), "r");
-	if (stream)
-	{
-		while (!feof(stream))
-			if (fgets(buffer, max_buffer, stream) != NULL)
-				data.append(buffer);
-		pclose(stream);
-	}
-	return data;
-}

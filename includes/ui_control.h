@@ -87,7 +87,7 @@ typedef enum
 /**-------------------------menu bar callbacks------------------------------*/
 void open_config_dialog(GtkWidget *widget, gpointer window);
 void fw_update_clicked (GtkWidget *item);
-void about_info(GtkWidget *widget);
+void about_info();
 void exit_from_help(GtkWidget *widget);
 /**-------------------------grid1 callbacks---------------------------------*/
 void radio_datatype(GtkWidget *widget, gpointer data);
@@ -103,19 +103,20 @@ void enable_clahe(GtkToggleButton *toggle_button);
 void toggled_addr_length(GtkWidget *widget, gpointer data);
 void toggled_val_length(GtkWidget *widget, gpointer data);
 
-void register_write(GtkWidget *widget);
-void register_read(GtkWidget *widget);
+void register_write();
+void register_read();
 
-void capture_bmp(GtkWidget *widget);
-void capture_raw(GtkWidget *widget);
+void capture_bmp();
+void capture_raw();
 
-void gamma_correction(GtkWidget *widget);
-void send_trigger(GtkWidget *widget);
-void enable_trig(GtkWidget *widget);
-void black_level_correction(GtkWidget *widget);
+
+void gamma_correction();
+void send_trigger();
+void enable_trig();
+void black_level_correction();
 /**-------------------------grid2 callbacks-------------------------------*/
-void set_rgb_gain_offset(GtkWidget *widget);
-void set_rgb_matrix(GtkWidget *widget);
+void set_rgb_gain_offset();
+void set_rgb_matrix();
 
 void enable_soft_ae(GtkToggleButton *toggle_button);
 void enable_flip(GtkToggleButton *toggle_button);

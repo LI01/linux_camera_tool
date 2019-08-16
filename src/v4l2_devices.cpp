@@ -31,6 +31,9 @@ int *is_ov580_st;
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
+/**
+ * free the global variables on heap
+ */
 void free_device_vars()
 {
     free(manufacturer);
@@ -81,7 +84,7 @@ int is_leopard_usb3(struct udev_device *dev)
     return !(strcmp("2a0b", udev_device_get_sysattr_value(dev, "idVendor")));
 }
 /**
- * 05a9:0581 is LI-USB Camera-OV9282-OV580 
+ * 05a9:0581 is LI-USB Camera-OV9282-OV580, Camera-OV7251-OV580
  * 2b03:0580 is LI-USB Camera-OV4689-OV580
  */
 int is_ov580_stereo(struct udev_device *dev)

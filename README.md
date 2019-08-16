@@ -163,13 +163,13 @@ Benchmark test is performed on a _12M pixel RAW12 bayer_ camera (IMX477).
 | ```Auto White Balance```   | Yes                                | 300ms   | Yes                            | 3700us  |
 | ```CLAHE```                | Yes                                | 40ms    | Yes                            | 7700us  |
 | ```Gamma Correction```     | Yes                                | 2.7ms   | Yes                            | 1100us  |
-| ```Sharpness```            | Yes                                | 200ms   | Yes                            | 18ms    |
-| ```Show Edge```            | Yes                                | 50ms    | No                             | N/A     |
+| ```Sharpness```            | Yes                                | 200ms   | Yes                            | 20ms    |
+| ```Show Edge```            | Yes                                | 20ms    | Yes                            | 16ms    |
 | ```Perform Shift```        | No                                 | 28ms    | No                             | N/A     |
 | ```Seperate Display```     | Yes                                | 9000us  | No                             | N/A     |
-| ```Brightness```           | Yes                                | 300ms   | No                             | N/A     |
-| ```Contrast```             | Yes                                | 300ms   | No                             | N/A     |
-| ```Auto Bright&Contrast``` | Yes                                | 14ms    | No                             | N/A     |
+| ```Brightness```           | Yes                                | 300ms   | Yes                            | 400us   |
+| ```Contrast```             | Yes                                | 300ms   | Yes                            | 400us   |
+| ```Auto Bright&Contrast``` | Yes                                | 14ms    | Yes                            | 1180us  |
 
 ### Auto Exposure
 Auto exposure is usually implemented on sensor/ISP, which when enabled, won't further slow down the streaming. You need to check with camera driver for auto exposure support. If some sensor don't have AE support built-in, the check button in grid1 (```Enable auto exposure```)won't work. 

@@ -41,18 +41,8 @@
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/extend_cam_ctrl.h"
-
-/** Include files to use OpenCV API */
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-#include <opencv4/opencv2/cudaobjdetect.hpp>
-#include <opencv4/opencv2/cudaimgproc.hpp>
-#include <opencv4/opencv2/cudafilters.hpp>
-#include <opencv4/opencv2/cudaarithm.hpp>
-#endif
+#include "../includes/isp_lib.h"
+//#include "../includes/utility.h"
 
 #include <omp.h> /**for openmp */
 
@@ -258,10 +248,9 @@ static int save_frame_image_bmp(cv::InputOutputArray& opencvImage)
  * Crosslink doesn't support decode RAW14, RAW16 so far,
  * these two datatypes weren't used in USB3 camera
  */
-inline int set_shift(int *bpp)
+inline int set_shift(int bpp)
 {
-	int cmp = *bpp;
-	switch (cmp)
+	switch (bpp)
 	{
 	case RAW10_FLG:
 		return 2;
@@ -277,7 +266,7 @@ inline int set_shift(int *bpp)
 }
 
 /**
- * callback for change sensor datatype shift flag
+ * callback for change sensor datatype bit per pixel
  * args:
  * 		datatype - RAW10  -> set *bpp accordingly
  *  			   RAW12  
@@ -296,43 +285,17 @@ void change_datatype(void *datatype)
 		*bpp = RAW8_FLG;
 }
 
+
 /**
+ * callback for change sensor bayer pattern for debayering
  * determine the sensor bayer pattern to correctly debayer the image
  *   CV_BayerBG2BGR =46   -> bayer_flag_increment = 0
  *   CV_BayerGB2BGR =47   -> bayer_flag_increment = 1
  *   CV_BayerRG2BGR =48   -> bayer_flag_increment = 2
  *   CV_BayerGR2BGR =49	  -> bayer_flag_increment = 3
- * default bayer pattern: RGGB
  * args:
- * 		bayer_flag - flag for determining bayer pattern 
- * returns:
- * 		bayer pattern flag increment
- */
-inline int add_bayer_forcv(int *bayer_flag)
-{
-
-	int cmp = *bayer_flag;
-	switch (cmp)
-	{
-	case CV_BayerBG2BGR_FLG:
-		return CV_BayerBG2BGR_FLG-1;
-	case CV_BayerGB2BGR_FLG:
-		return CV_BayerGB2BGR_FLG-1;
-	case CV_BayerRG2BGR_FLG:
-		return CV_BayerRG2BGR_FLG-1;
-	case CV_BayerGR2BGR_FLG:
-		return CV_BayerGR2BGR_FLG-1;
-	case CV_MONO_FLG:
-		return CV_MONO_FLG-1;
-	default:
-		return CV_BayerBG2BGR_FLG-1;
-	}
-}
-
-/**
- * callback for change sensor bayer pattern for debayering
- * args:
- * 		bayer - for updating *bayer_flag
+ * 		bayer 		- for updating *bayer_flag
+ * 		*bayer_flag - flag for determining bayer pattern 
  *  			   
  */
 void change_bayerpattern(void *bayer)
@@ -361,33 +324,6 @@ void add_gamma_val(float gamma_val_from_gui)
 	*gamma_val = gamma_val_from_gui;
 }
 
-/** 
- *  Apply auto white balance in-place for a given image array
- *  When *gamma_val < 1, the original dark regions will be brighter 
- *  and the histogram will be shifted to the right 
- *  whereas it will be the opposite with *gamma_val > 1
- *  recommend *gamma_val: 0.45(1/2.2)
- *  args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static void apply_gamma_correction(
-	cv::InputOutputArray& opencvImage)
-{
-	cv::Mat look_up_table(1, 256, CV_8U);
-	uchar *p = look_up_table.ptr();
-	for (int i = 0; i < 256; i++)
-	{
-		p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, *gamma_val) * 255.0);
-	}
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-	cv::Ptr<cv::cuda::LookUpTable> lutAlg =
-		cv::cuda::createLookUpTable(look_up_table);
-	lutAlg->transform(opencvImage, opencvImage);
-#else
-	LUT(opencvImage, look_up_table, opencvImage);
-#endif
-}
 
 /**
  * set awb flag 
@@ -399,90 +335,7 @@ void awb_enable(int enable)
 	enable_wrapper(awb_flag, enable);
 }
 
-/** 
- *  Apply auto white balance in-place for a given image array
- *  the basic idea of Leopard AWB algorithm is to find the gray
- *  area of the image and apply Red, Green and Blue gains to make
- *  it gray, and then use the gray area to estimate the color 
- *  temperature.
- *  args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static void apply_white_balance(
-	cv::InputOutputArray& _opencvImage)
-{
-	
-	/// if it is grey image, do nothing
-	if (_opencvImage.type() == CV_8UC1)
-		return;
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-	
-	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
-	std::vector<cv::cuda::GpuMat> bgr_planes;
-	cv::cuda::split(opencvImage, bgr_planes);
-	cv::cuda::equalizeHist(bgr_planes[0], bgr_planes[0]);
-	cv::cuda::equalizeHist(bgr_planes[1], bgr_planes[1]);
-	cv::cuda::equalizeHist(bgr_planes[2], bgr_planes[2]);
-	cv::cuda::merge(bgr_planes, opencvImage);
-	
-#else
-	/// ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
-	cv::Mat opencvImage = _opencvImage.getMat();
-	double discard_ratio = 0.05;
-	int hists[3][256];
-	CLEAR(hists);
 
-	for (int y = 0; y < opencvImage.rows; ++y)
-	{
-		uchar *ptr = opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < opencvImage.cols; ++x)
-		{
-			for (int j = 0; j < 3; ++j)
-			{
-				hists[j][ptr[x * 3 + j]] += 1;
-			}
-		}
-	}
-
-	/// cumulative hist
-	int total = opencvImage.cols * opencvImage.rows;
-	int vmin[3], vmax[3];
-	for (int i = 0; i < 3; ++i)
-	{
-		for (int j = 0; j < 255; ++j)
-		{
-			hists[i][j + 1] += hists[i][j];
-		}
-		vmin[i] = 0;
-		vmax[i] = 255;
-		while (hists[i][vmin[i]] < discard_ratio * total)
-			vmin[i] += 1;
-		while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
-			vmax[i] -= 1;
-		if (vmax[i] < 255 - 1)
-			vmax[i] += 1;
-	}
-
-	for (int y = 0; y < opencvImage.rows; ++y)
-	{
-		uchar *ptr = opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < opencvImage.cols; ++x)
-		{
-			for (int j = 0; j < 3; ++j)
-			{
-				int val = ptr[x * 3 + j];
-				if (val < vmin[j])
-					val = vmin[j];
-				if (val > vmax[j])
-					val = vmax[j];
-				ptr[x * 3 + j] = static_cast<uchar>((val - vmin[j]) * 255.0 / (vmax[j] - vmin[j]));
-			}
-		}
-	}
-#endif
-	
-}
 /**
  * set abc flag 
  * args:
@@ -502,181 +355,6 @@ void clahe_enable(int enable)
 {
 	enable_wrapper(clahe_flag, enable);
 }
-
-/** 
- * In-place automatic brightness and contrast optimization with 
- * optional histogram clipping. Looking at histogram, alpha operates 
- * as color range amplifier, beta operates as range shift.
- * O(x,y) = alpha * I(x,y) + beta
- * Automatic brightness and contrast optimization calculates
- * alpha and beta so that the output range is 0..255.
- * Ref: http://answers.opencv.org/question/75510/how-to-make-auto-adjustmentsbrightness-and-contrast-for-image-android-opencv-image-correction/
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 			that can be modified inside the functions
- * 		float clipHistPercent 			 - cut wings of histogram at given percent
- * 			typical=>1, 0=>Disabled
- */
-
-static void apply_auto_brightness_and_contrast(
-	cv::InputOutputArray& opencvImage,
-	float clipHistPercent = 0)
-{
-	
-	int hist_size = 256;
-	float alpha, beta;
-	double min_gray = 0, max_gray = 0;
-
-	/// to calculate grayscale histogram
-	cv::Mat gray;
-	if (opencvImage.type() != CV_8UC1)
-		cv::cvtColor(opencvImage, gray, cv::COLOR_BGR2GRAY);
-	else 
-		gray = opencvImage.getMat();
-
-	if (clipHistPercent == 0)
-	{
-		/// keep full available range
-		cv::minMaxLoc(gray, &min_gray, &max_gray);
-	}
-	else
-	{
-		/// the grayscale histogram
-		cv::Mat hist;
-
-		float range[] = {0, 256};
-		const float *histRange = {range};
-		bool uniform = true;
-		bool accumulate = false;
-		/// void calcHist(img_orig, n_images, channels(gray=0), mask(for ROi),
-		///               mat hist, dimemsion, histSize=bins=256,
-		///               ranges_for_pixel, bool uniform, bool accumulate);
-		calcHist(&gray, 1, 0, cv::Mat(), hist, 1,
-				 &hist_size, &histRange, uniform, accumulate);
-
-		/// calculate cumulative distribution from the histogram
-		std::vector<float> accumulator(hist_size);
-		accumulator[0] = hist.at<float>(0);
-		for (int i = 1; i < hist_size; i++)
-		{
-			accumulator[i] = accumulator[i - 1] + hist.at<float>(i);
-		}
-		
-
-		/// locate points that cuts at required value
-		float max = accumulator.back();
-		clipHistPercent *= (max / 100.0); /// make percent as absolute
-		clipHistPercent /= 2.0;			  /// left and right wings
-		/// locate left cut
-		min_gray = 0;
-		while (accumulator[min_gray] < clipHistPercent)
-			min_gray++;
-
-		/// locate right cut
-		max_gray = hist_size - 1;
-		while (accumulator[max_gray] >= (max - clipHistPercent))
-			max_gray--;
-	}
-
-	/// current range
-	float input_range = max_gray - min_gray;
-	/// alpha expands current range to histsize range
-	alpha = (hist_size - 1) / input_range;
-	/// beta shifts current range so that minGray will go to 0
-	beta = -min_gray * alpha;
-
-	/**
-	 * Apply brightness and contrast normalization
-	 * convertTo operates with saturate_cast
-	 */
-	cv::Mat _opencvImage = opencvImage.getMat();
-	_opencvImage.convertTo(opencvImage, -1, alpha, beta);
-	
-}
-
-/** 
- * Contrast Limited Adaptive Histogram Equalization) algorithm
- * The algorithm used for OpenCV CUDA and normal is the same
- * Steps: 
- * 1. if it is RGB image, convert image to lab color-space, jump to step 2
- * 2. separate and get L channel of lab planes, jump tp step 4
- * 3. if it is monochrome image, jump to step 4
- * 4. apply adaptive historgram equalization(cv::createCLAHE etc)
- * 5. convert the resulting Lab back to RGB, if it is mono, do nothing
- * ref: https://stackoverflow.com/questions/24341114/simple-illumination-correction-in-images-opencv-c
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 			that can be modified inside the functions
- */
-static void apply_clahe(
-	cv::InputOutputArray& opencvImage)
-{
-	
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-	
-	if (opencvImage.type() != CV_8UC1)
-	{
-		cv::cuda::GpuMat lab_image;
-		cv::cuda::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
-		/// Extract the L channel
-		std::vector<cv::cuda::GpuMat> lab_planes(3);
-		/// now we have the L image in lab_planes[0]
-		cv::cuda::split(lab_image, lab_planes); 
-
-		/// apply the CLAHE algorithm to the L channel
-		cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
-		clahe->setClipLimit(4);
-		cv::cuda::GpuMat dst;
-		clahe->apply(lab_planes[0], dst);
-
-		/// Merge the the color planes back into an Lab image
-		dst.copyTo(lab_planes[0]);
-		cv::cuda::merge(lab_planes, lab_image);
-
-		/// convert back to RGB
-		cv::cuda::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
-	}
-	else
-	{
-		cv::Ptr<cv::cuda::CLAHE> clahe = cv::cuda::createCLAHE();
-		clahe->setClipLimit(4);
-		clahe->apply(opencvImage, opencvImage);		
-	}
-	
-#else
-	if (opencvImage.type() != CV_8UC1)
-	{
-		cv::Mat lab_image;
-		cv::cvtColor(opencvImage, lab_image, cv::COLOR_BGR2Lab);
-		/// Extract the L channel
-		std::vector<cv::Mat> lab_planes(3);
-		/// now we have the L image in lab_planes[0]
-		cv::split(lab_image, lab_planes);
-
-		/// apply the CLAHE algorithm to the L channel
-		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
-		clahe->setClipLimit(4);
-		cv::Mat dst;
-		clahe->apply(lab_planes[0], dst);
-
-		/// Merge the the color planes back into an Lab image
-		dst.copyTo(lab_planes[0]);
-		cv::merge(lab_planes, lab_image);
-
-		/// convert back to RGB
-		cv::cvtColor(lab_image, opencvImage, cv::COLOR_Lab2BGR);
-	}
-	else 
-	{
-		cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
-		clahe->setClipLimit(4);
-		clahe->apply(opencvImage, opencvImage);
-	}
-	
-#endif
-	
-}
-
 
 /** 
  * open the /dev/video* uvc camera device
@@ -1287,9 +965,9 @@ void enable_rgb_gain_offset(
 	*g_offset 	= green_offset;
 	*b_offset 	= blue_offset;
 	*rgb_gainoffset_flg = 1;
-
-	printf("r gain = %d\tg gain = %d\tb gain = %d\r\n"
-		   "r offset = %d\tg offset = %d\tb offset = %d\r\n ",
+	printf("----------rgb gain & offset enabled----------\r\n");
+	printf("r gain = %-4d\tg gain = %-4d\tb gain = %-4d\r\n"
+		   "r offset = %-3d\tg offset = %-3d\tb offset = %-3d\r\n ",
 		   *r_gain, *g_gain, *b_gain, *r_offset, *g_offset, *b_offset);
 }
 
@@ -1298,6 +976,7 @@ void enable_rgb_gain_offset(
  */
 void disable_rgb_gain_offset()
 {
+	printf("---------rgb gain & offset disabled---------\r\n");
 	*rgb_gainoffset_flg = 0;
 }
 
@@ -1493,10 +1172,10 @@ void enable_rgb_matrix(
 	*bg = blue_green;
 	*bb = blue_blue;
 	*rgb_matrix_flg = 1;
-	printf("rgb matrix enabled\r\n");
-	printf("rr = %d\trg = %d\trb = %d\r\n"
-		   "gr = %d\tgg = %d\tgb = %d\r\n"
-		   "br = %d\tbg = %d\tbb = %d\r\n",
+	printf("-----------rgb matrix enabled-----------\r\n");
+	printf("rr = %-4d\trg = %-4d\trb = %-4d\r\n"
+		   "gr = %-4d\tgg = %-4d\tgb = %-4d\r\n"
+		   "br = %-4d\tbg = %-4d\tbb = %-4d\r\n",
 		   *rr, *rg, *rb, *gr, *gg, *gb, *br, *bg, *bb);
 }
 
@@ -1505,38 +1184,11 @@ void enable_rgb_matrix(
  */
 void disable_rgb_matrix()
 {
+	printf("-----------rgb matrix disabled----------\r\n");
 	*rgb_matrix_flg = 0;
 }
 
-/**
- * in-place apply rgb color correction matrix for a given mat
- * since this requires to access individual pixel of a given mat, OpenCV CUDA
- * acceleration is not used
- * For color correction matrix, please request from Leopard support
- * Refs: http://www.imatest.com/docs/colormatrix/
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static void apply_rgb_matrix_post_debayer(
-	cv::InputOutputArray& _opencvImage)
-{
-	cv::Mat opencvImage = _opencvImage.getMat();
-	uchar r,g,b;
 
-	for (int i=0; i < opencvImage.rows;++i) {
-		/// point to first pixel in row
-		cv::Vec3b* pixel = opencvImage.ptr<cv::Vec3b>(i); 
-		for (int j=0; j < opencvImage.cols;++j) {
-			r = pixel[j][2];
-			g = pixel[j][1];
-			b = pixel[j][0];
-			pixel[j][2] = ((*rb) * b + (*rg) * g + (*rr) * r)/256;
-			pixel[j][1] = ((*gb) * b + (*gg) * g + (*gr) * r)/256;
-			pixel[j][0] = ((*bb) * b + (*bg) * g + (*br) * r)/256;
-		}
-	}
-}
 /**
  * set flip flag 
  * args:
@@ -1576,31 +1228,7 @@ void separate_dual_enable(int enable)
 	enable_wrapper(separate_dual, enable);
 }
 
-/** 
- * separate display right and left mat image from a dual stereo vision camera
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static void display_dual_stereo_separately(
-	cv::InputOutputArray& _opencvImage)
-{
-	
-	cv::Mat opencvImage = _opencvImage.getMat();
-	/// define region of interest for cropped Mat for dual stereo
-	cv::Rect roi_left(0, 0, opencvImage.cols/2, opencvImage.rows);
-	cv::Mat cropped_ref_left(opencvImage, roi_left);
-	cv::Mat cropped_left;
-	cropped_ref_left.copyTo(cropped_left);
-	cv::imshow("cam_left", cropped_left);
-	cv::Rect roi_right(opencvImage.cols/2, 0, 
-		opencvImage.cols/2, opencvImage.rows);
-	cv::Mat cropped_ref_right(opencvImage, roi_right);
-	cv::Mat cropped_right;
-	cropped_ref_right.copyTo(cropped_right);
-	cv::imshow("cam_right", cropped_right);
 
-}
 /**
  * set display mat info flag 
  * args:
@@ -1610,31 +1238,7 @@ void display_info_enable(int enable)
 {
 	enable_wrapper(display_info_ena, enable);
 }
-/**
- * unify putting text in opencv image
- * a wrapper for put_text()
- * args:
- * 		cv::Mat opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- * 		str 				- text you will put in
- * 		cordinate_y 		- vertical location that will put this line  
- */
-static void streaming_put_text(
-	cv::Mat &opencvImage,
-	const char *str, 
-	int cordinate_y)
-{
-	int scale = opencvImage.cols / 1000;
-	cv::putText(
-		opencvImage,
-		str,
-		cv::Point(scale * TEXT_SCALE_BASE, cordinate_y), // Coordinates
-		cv::FONT_HERSHEY_SIMPLEX,						 // Font
-		(float)scale,									 // Scale. 2.0 = 2x bigger
-		cv::Scalar(255, 255, 255),						 // BGR Color - white
-		2												 // Line Thickness
-	);													 // Anti-alias (Optional)
-}
+
 
 /** 
  * put a given stream's info text in: 
@@ -1687,149 +1291,22 @@ void add_beta_val(int beta_val_from_gui)
 	*beta = beta_val_from_gui;
 }
 
-/**
- * apply brightness(alpha) and contrast(beta) control from slider val
- * for both color and mono camera stream
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static void apply_brightness_and_contrast(
-	cv::InputOutputArray& _opencvImage)
-{
-	cv::Mat opencvImage = _opencvImage.getMat();
- 	if (opencvImage.type() == CV_8UC3) {
-	 	for( int y = 0; y < opencvImage.rows; y++) {
-        	for( int x = 0; x < opencvImage.cols; x++) {
-            	for( int c = 0; c < 3; c++ ) {
-                	opencvImage.at<cv::Vec3b>(y,x)[c] = cv::saturate_cast<uchar>
-					((*alpha)*(opencvImage.at<cv::Vec3b>(y,x)[c] ) + (*beta));
-				}
-			}
-		}	 
-	}
-	else { //mono
-		for( int y = 0; y < opencvImage.rows; y++) {
-        	for( int x = 0; x < opencvImage.cols; x++) {
-                opencvImage.at<uchar>(y,x) = cv::saturate_cast<uchar>
-					((*alpha)*(opencvImage.at<uchar>(y,x) ) + (*beta));
-			}
-		}
-	}
-	
-}
+
 /** callback for set sharpness for sharpness correction from gui */
 void add_sharpness_val(int sharpness_val_from_gui)
 {
 	*sharpness = sharpness_val_from_gui;
 }
 
-/**
- * apply sharpness filter to a given image
- *
- * if OpenCV CUDA is enabled, use createGaussianFilter directly,
- *  sharpness slide will work as the kernel size(3,5,7 etc up to 31)
- *
- * if OpenCV CUDA is disabled, use the algorithm of un-sharp mask: 
- * 1. apply a Gaussian smoothing filter
- * 2. subtract the smoothed version from the original image
- * (in a weighted way so the values of a constant area remain constant)
- * sharpness slide will work as the Gaussian blur parameter sigma
- *
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static void sharpness_control(
-	cv::InputOutputArray& _opencvImage)
-{
-#ifndef HAVE_OPENCV_CUDA_SUPPORT
-	cv::Mat opencvImage = _opencvImage.getMat();
-	cv::Mat blurred;
-	cv::GaussianBlur(opencvImage, blurred, cv::Size(0, 0), *sharpness);
-	cv::addWeighted(opencvImage, 1.5, blurred, -0.5, 0, blurred);
-	blurred.copyTo(opencvImage);
-#else
-	if (*sharpness > 16) *sharpness = 16;
-	int ksize = 2*(*sharpness)-1;
-	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
-	cv::cuda::GpuMat blurred;
-	cv::Ptr<cv::cuda::Filter> filter = 
-		cv::cuda::createGaussianFilter(opencvImage.type(),blurred.type(), 
-		cv::Size(ksize, ksize),1);
-	filter->apply(opencvImage, blurred);
-	cv::cuda::addWeighted(opencvImage, 1.5, blurred, -0.5, 0, blurred);
-	blurred.copyTo(opencvImage);
-#endif
-	
-}
+
 
 void add_edge_thres_val(int edge_low_thres_val_from_gui)
 {
 	*edge_low_thres = edge_low_thres_val_from_gui;
 }
-/**
- * Reason not to use OpenCV CUDA acceleration:
- * it doesn't make this process faster
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static cv::Mat canny_filter_control(cv::InputOutputArray& _opencvImage)
-{
-
-	cv::Mat opencvImage = _opencvImage.getMat();
-	const int ratio = 3;
-	const int kernel_size = 3;
-	cv::Mat edges;
-	cv::blur(opencvImage, edges, cv::Size(5,5));
-	cv::cvtColor(edges, edges, cv::COLOR_BGR2GRAY);
-	cv::Canny(edges, opencvImage, (*edge_low_thres), 
-		(*edge_low_thres)*ratio, kernel_size);
-	return opencvImage;
-
-}
-
-/**
- * debayer and apply AWB for a given frame(support both OpenCV CUDA and not)
- * args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
- */
-static void debayer_awb_a_frame(
-	cv::InputOutputArray& opencvImage)
-{
-	/** color output */
-	if (*bayer_flag != CV_MONO_FLG)
-	{
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-		// cv::cuda::cvtColor(opencvImage, opencvImage,
-		// cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-		cv::cuda::demosaicing(opencvImage, opencvImage,
-			cv::cuda::COLOR_BayerBG2BGR_MHT + add_bayer_forcv(bayer_flag));
-#else
-		cv::cvtColor(opencvImage, opencvImage,
-			cv::COLOR_BayerBG2BGR + add_bayer_forcv(bayer_flag));
-	
-#endif
-		if (*awb_flag)
-			apply_white_balance(opencvImage);
-	}
-	/** mono output */
-	if (*bayer_flag == CV_MONO_FLG && opencvImage.type() == CV_8UC3)
-	{
-#ifdef HAVE_OPENCV_CUDA_SUPPORT
-			cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-			cv::cuda::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);
-#else
-			cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BayerBG2BGR);
-			cv::cvtColor(opencvImage, opencvImage, cv::COLOR_BGR2GRAY);	
-#endif
-	}
 
 
 
-}
 
 void switch_on_keys()
 {
@@ -1850,13 +1327,25 @@ static void group_gpu_image_proc(
 	cv::InputOutputArray opencvImage)
 {
 	if (*(gamma_val) != (float)1)
-		apply_gamma_correction(opencvImage);
+		apply_gamma_correction(opencvImage,*gamma_val);
 	
+	if (*(alpha) != (float)1 || (*beta) != (float)0)
+		apply_brightness_and_contrast(opencvImage, *alpha, *beta);
+	
+	if (*abc_flag)
+		apply_auto_brightness_and_contrast(opencvImage, 1);
+
 	if (*sharpness != (float)1)
-		sharpness_control(opencvImage);
+		sharpness_control(opencvImage,*sharpness);
 
 	if (*clahe_flag)
 		apply_clahe(opencvImage);
+		
+	if (*show_edge_flag) 
+		canny_filter_control(opencvImage,*edge_low_thres);
+	
+
+
 }
 /** 
  * OpenCV only support debayering 8 and 16 bits 
@@ -1874,7 +1363,7 @@ void decode_process_a_frame(struct device *dev, const void *p)
 {
 	int height = dev->height;
 	int width = dev->width;
-	int shift = set_shift(bpp);
+	int shift = set_shift(*bpp);
 	cv::Mat share_img;
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	cv::cuda::GpuMat gpu_img;
@@ -1910,20 +1399,21 @@ void decode_process_a_frame(struct device *dev, const void *p)
 		else 
 			width = width * 2;
 		
-		
 		//swap_two_bytes(dev, p);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 		gpu_img.upload(img);
-		debayer_awb_a_frame(gpu_img);
+		debayer_awb_a_frame(gpu_img, *bayer_flag, *awb_flag);
 		gpu_img.download(img);
 #else
-		debayer_awb_a_frame(img);	
+		debayer_awb_a_frame(img, *bayer_flag, *awb_flag);	
 #endif
 
-
 		if (*rgb_matrix_flg)
-			apply_rgb_matrix_post_debayer(img);
+			apply_rgb_matrix_post_debayer(img, 
+				*rb, *rg, *rr, 
+				*gb, *gg, *gr, 
+				*bb, *bg, *br);
 		share_img = img;
 	}
 
@@ -1945,23 +1435,17 @@ void decode_process_a_frame(struct device *dev, const void *p)
 	group_gpu_image_proc(share_img);
 #endif 
 
-	if (*(alpha) != (float)1 || (*beta) != (float)0)
-		apply_brightness_and_contrast(share_img);
 	if (*flip_flag)
 		cv::flip(share_img, share_img, 0);
 	if (*mirror_flag)
 		cv::flip(share_img, share_img, 1);
-	if (*abc_flag)
-		apply_auto_brightness_and_contrast(share_img, 1);
-	if (*show_edge_flag) 
-		share_img = canny_filter_control(share_img);
 	if (*save_bmp)
 		save_frame_image_bmp(share_img);
 	if (*separate_dual) 
 		display_dual_stereo_separately(share_img);
 
 	/** if image larger than 720p by any dimension, resize the window */
-	if (*resize_window_ena) 
+	//if (*resize_window_ena) 
 		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
 			cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
 	if (*display_info_ena)
@@ -2110,7 +1594,7 @@ void display_rgbir_ir_channel(struct device *dev, const void *p)
 			dst[BOTTOM(j+2, i+2, width)] = ir_orig4;
 		}
 	}
-	perform_shift(dev, dst,  set_shift(bpp));
+	perform_shift(dev, dst,  set_shift(*bpp));
 	//cv::Mat rgbir_ir(height/2, width/2, CV_8UC1, dst);
 	cv::Mat rgbir_ir(height, width, CV_8UC1, dst);
 	cv::cvtColor(rgbir_ir, rgbir_ir, cv::COLOR_BayerBG2BGR);
@@ -2119,8 +1603,8 @@ void display_rgbir_ir_channel(struct device *dev, const void *p)
 	*gamma_val = 0.45;
 	//*blc = 64;
 	*sharpness = 10;
-	apply_gamma_correction(rgbir_ir);
-	sharpness_control(rgbir_ir);
+	apply_gamma_correction(rgbir_ir, *gamma_val);
+	sharpness_control(rgbir_ir, *sharpness);
 	cv::imshow("RGB-IR IR Channel", rgbir_ir);
 
 	

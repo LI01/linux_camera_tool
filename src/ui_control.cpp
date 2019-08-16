@@ -86,7 +86,7 @@ extern int v4l2_dev;/** global variable, file descriptor for camera device */
 
 char icon1path[30] = "./pic/leopard_cam_tool.jpg"; /** window icon for makefile */
 char icon2path[30] = "../pic/leopard_cam_tool.jpg"; /** window icon for cmake */
-char version_number[10] = "v0.3.8";
+char version_number[10] = "v0.3.9";
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
@@ -117,6 +117,7 @@ void open_config_dialog(GtkWidget *widget, gpointer window)
     ("_Cancel"),
     GTK_RESPONSE_CANCEL,
     NULL);
+    /// put this here so no warning
     gtk_window_set_transient_for(GTK_WINDOW(file_dialog), GTK_WINDOW(window));
     gtk_widget_show(file_dialog);
     gint resp = gtk_dialog_run(GTK_DIALOG(file_dialog));
@@ -165,10 +166,9 @@ void fw_update_clicked (GtkWidget *item)
 
 }
 /** callback for display linux camera tool info */
-void about_info(GtkWidget *widget)
+void about_info()
 {
 
-    (void)widget;
     GtkWidget *dialog_about = gtk_about_dialog_new();
     gtk_about_dialog_set_program_name(GTK_ABOUT_DIALOG(dialog_about), 
         "Linux Camera Tool");
@@ -318,52 +318,67 @@ void toggled_val_length(GtkWidget *widget, gpointer data)
 
 
 /** callback for register write */
-void register_write(GtkWidget *widget)
+void register_write()
 {
-    (void)widget;
-
-    /** sensor read */
+    /** sensor write */
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
         gtk_widget_set_sensitive(entry_i2c_addr,0);
+        
         int regAddr = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+            regAddr = regAddr & 0xff;
+        
         int regVal = hex_or_dec_interpreter_c_string((char *)  \
             gtk_entry_get_text(GTK_ENTRY(entry_reg_val)));
+        if ((addr_width_for_rw(value_width_flag)) == _8BIT_FLG)
+            regVal = regVal & 0xff;
+        
         sensor_reg_write(v4l2_dev, regAddr, regVal);
     }
 
-    /** generic i2c slave read */
+    /** generic i2c slave write */
     else
     {
         gtk_widget_set_sensitive(entry_i2c_addr,1);
         int slaveAddr = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)));
+        
         int regAddr = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+            regAddr = regAddr & 0xff;
+
         int regVal = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_reg_val)));
+        if ((addr_width_for_rw(value_width_flag)) == _8BIT_FLG)
+            regVal = regVal & 0xff;
         unsigned char buf[2];
         buf[0] = regVal & 0xff;
         buf[1] = (regVal >> 8) & 0xff;
 
         /** write 8/16 bit register addr and register data */
-        generic_I2C_write(v4l2_dev, (GENERIC_REG_WRITE_FLG | \
-            addr_width_for_rw(address_width_flag)),         
+        generic_I2C_write(
+            v4l2_dev, 
+            (GENERIC_REG_WRITE_FLG | addr_width_for_rw(address_width_flag)),         
             val_width_for_rw(value_width_flag),             
-            slaveAddr, regAddr, buf);
+            slaveAddr, 
+            regAddr, 
+            buf);
     }
 }
 
 /** callback for register read */
-void register_read(GtkWidget *widget)
+void register_read()
 {
-    (void)widget;
     /** sensor read */
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
         int regAddr = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+            regAddr = regAddr & 0xff;
 
         int regVal = sensor_reg_read(v4l2_dev, regAddr);
         char buf[10];
@@ -376,14 +391,18 @@ void register_read(GtkWidget *widget)
     {
         int slaveAddr = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)));
+        
         int regAddr = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
-        int regVal;
-        
-        regVal = generic_I2C_read(v4l2_dev, GENERIC_REG_READ_FLG | 
-                addr_width_for_rw(address_width_flag), 
-                val_width_for_rw(value_width_flag), 
-                slaveAddr, regAddr);
+        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+            regAddr = regAddr & 0xff;
+
+        int regVal = generic_I2C_read(
+            v4l2_dev, 
+            GENERIC_REG_READ_FLG | addr_width_for_rw(address_width_flag), 
+            val_width_for_rw(value_width_flag), 
+            slaveAddr, 
+            regAddr);
 
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
@@ -392,38 +411,37 @@ void register_read(GtkWidget *widget)
 }
 
 /** callback for capturing bmp */
-void capture_bmp(GtkWidget *widget)
+void capture_bmp()
 {
-    (void)widget;
     video_capture_save_bmp();
 }
 
 /** callback for capturing raw */
-void capture_raw(GtkWidget *widget)
+void capture_raw()
 {
-    (void)widget;
     video_capture_save_raw();
 }
 
 /** callback for gamma correction */
-void gamma_correction(GtkWidget *widget)
+void gamma_correction()
 {
-    (void)widget;
-    float gamma = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_gamma)));
+    float gamma = atof((char *)gtk_entry_get_text(
+        GTK_ENTRY(entry_gamma)));
     if (isgreater(gamma, 0.0)) 
     {
         add_gamma_val(gamma);
         g_print("gamma = %f\n", gamma);
     }
     else
-        g_print("gamma should be greater than 0, you entered gamma = %f\n", gamma);
+        g_print("gamma should be greater than 0," 
+        "you entered gamma = %f\n", gamma);
 }
 
 /** callback for triggering sensor functionality */
-void send_trigger(GtkWidget *widget)
+void send_trigger()
 {
-    (void)widget;
-    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_trig_en)))
+    if (gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(check_button_trig_en)))
     {
         g_print("trigger enabled\n");
         soft_trigger(v4l2_dev);
@@ -436,9 +454,9 @@ void send_trigger(GtkWidget *widget)
 }
 
 /** callback for enabling/disalign sensor trigger */
-void enable_trig(GtkWidget *widget)
+void enable_trig()
 {
-    (void)widget;
+    //(void)widget;
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_trig_en)))
     {
         /** positive edge */
@@ -454,9 +472,8 @@ void enable_trig(GtkWidget *widget)
 }
 
 /** callback for black level correction ctrl */
-void black_level_correction(GtkWidget *widget)
+void black_level_correction()
 {
-    (void)widget;
     float float_blc;
     float_blc = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_blc)));
     if (floor(float_blc) == ceil(float_blc))
@@ -476,9 +493,8 @@ void black_level_correction(GtkWidget *widget)
  * callback for update rgb gain
  * limit the input on MAX/MIN_RGB macros
  */
-void set_rgb_gain_offset(GtkWidget *widget)
+void set_rgb_gain_offset()
 {
-    (void) widget;
     int red_gain = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_red_gain)));
     red_gain = set_limit(red_gain, MAX_RGB_GAIN, MIN_RGB_GAIN);
@@ -504,26 +520,22 @@ void set_rgb_gain_offset(GtkWidget *widget)
     blue_offset = set_limit(blue_offset, MAX_RGB_OFFSET, MIN_RGB_OFFSET);
 
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_rgb_gain))) {
-        enable_rgb_gain_offset (red_gain, green_gain, blue_gain, red_offset, 
-        green_offset, blue_offset);
+        enable_rgb_gain_offset (
+            red_gain,   green_gain,   blue_gain, 
+            red_offset, green_offset, blue_offset);
     }
     else
-    {
         disable_rgb_gain_offset(); 
-        g_print("set rgb gain offset disabled\r\n");
-    }
-    
-
 }
+
 /**
  *  callback for update rgb2rgb color matrix
  *  limit the input on MAX/MIN_RGB macros
  * 
  *  http://www.imatest.com/docs/colormatrix/
  */
-void set_rgb_matrix(GtkWidget *widget)
+void set_rgb_matrix()
 {
-    (void) widget;
     int red_red = hex_or_dec_interpreter_c_string((char *) \
             gtk_entry_get_text(GTK_ENTRY(entry_red_red)));
     red_red = set_limit (red_red, 512, -512);
@@ -560,18 +572,15 @@ void set_rgb_matrix(GtkWidget *widget)
             gtk_entry_get_text(GTK_ENTRY(entry_blue_blue)));
     blue_blue = set_limit (blue_blue, 512, -512);
 
-    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_rgb_matrix))) {
+    if (gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(check_button_rgb_matrix))) {
         enable_rgb_matrix (red_red, red_green, red_blue, 
         green_red, green_green, green_blue,
         blue_red, blue_green, blue_blue);
     }
     else
-    {
-        disable_rgb_matrix(); 
-        g_print("set rgb matrix disabled\r\n");        
-    }
+        disable_rgb_matrix();    
     
-
 }
 
 /** callback for enabling/disabling auto white balance */
@@ -815,24 +824,15 @@ void init_grid1_widgets()
 	 *  try to increase 3 to 4, 5, 6 etc
 	 *  or ask for a firmware update, firmware exposure time mapping might be wrong
 	 */
-    int exposure_max;
-    int gain_max;
-    /* add these placeholder so you don't see invalid requests */
-    if (strcmp(get_product(), "USB Camera-OV580") == 0)
-    {
-        exposure_max = 1111;
-        gain_max = 11;  
-    }
-    else if (strcmp(get_product(), "OV580 STEREO") == 0)
-    {
-        exposure_max = 1111;
-        gain_max = query_gain_max(v4l2_dev);
-    }
-    else
-    {
-        exposure_max = query_exposure_absolute_max(v4l2_dev);
-        gain_max = query_gain_max(v4l2_dev);
-    }
+
+    int exposure_max = query_exposure_absolute_max(v4l2_dev);
+    int gain_max = query_gain_max(v4l2_dev);
+    
+    if (exposure_max == 0)
+        exposure_max = 999;
+    
+    if (gain_max == 0)
+        gain_max = 13;
 
     if (exposure_max == UNDEFINED_MAX_EXPOSURE_LINE)
         exposure_max = get_current_height(v4l2_dev) * 3;
@@ -917,8 +917,6 @@ void init_grid1_widgets()
     /** OV580 firmware doesn't have gain, exposure ctrl capabilities etc */
     if (strcmp(get_product(), "USB Camera-OV580") == 0)
     {
-        gtk_widget_set_sensitive(hscale_exposure, 0);
-        gtk_widget_set_sensitive(hscale_gain, 0);
         gtk_widget_set_sensitive(button_read, 0);
         gtk_widget_set_sensitive(button_write, 0);
         gtk_widget_set_sensitive(radio_16bit_addr,0);
@@ -930,7 +928,6 @@ void init_grid1_widgets()
     }
     else if (strcmp(get_product(), "OV580 STEREO") == 0)
     {
-        gtk_widget_set_sensitive(hscale_exposure, 0);
         gtk_widget_set_sensitive(button_read, 0);
         gtk_widget_set_sensitive(button_write, 0);
         gtk_widget_set_sensitive(radio_16bit_addr,0);
@@ -939,6 +936,12 @@ void init_grid1_widgets()
         gtk_widget_set_sensitive(radio_8bit_val,0);
         gtk_widget_set_sensitive(check_button_just_sensor,0);
     }
+    
+    if (gain_max == 13)
+        gtk_widget_set_sensitive(hscale_gain, 0);
+    if (exposure_max == 999)
+        gtk_widget_set_sensitive(hscale_exposure, 0);
+
 }
 /** 
  * init and declare all the grid2 widgets here

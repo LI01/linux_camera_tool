@@ -69,14 +69,6 @@ typedef enum
     LI_JPEG_MODE           = 0x6000
 } li_datatype_fw_flag;
 
-typedef enum
-{
-   CV_BayerBG2BGR_FLG = 1,
-   CV_BayerGB2BGR_FLG,
-   CV_BayerRG2BGR_FLG,
-   CV_BayerGR2BGR_FLG,
-   CV_MONO_FLG
-} pixel_order_flag;
 
 typedef enum
 {
@@ -96,10 +88,10 @@ int v4l2_core_save_data_to_file(const void *data, int size);
 void video_capture_save_bmp();
 inline void set_save_bmp_flag(int flag);
 
-inline int set_shift(int *shift_flag);
+inline int set_shift(int bpp);
 void change_datatype(void *datatype);
 
-inline int add_bayer_forcv(int *bayer_flag);
+inline int add_bayer_forcv(int bayer_flag);
 void change_bayerpattern(void *bayer);
 
 void add_gamma_val(float gamma_val_from_gui);
