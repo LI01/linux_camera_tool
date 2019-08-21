@@ -20,10 +20,26 @@
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/isp_lib.h"
+#include "../includes/utility.h"
 
+void tic(double &t)
+{
+	t = (double)cv::getTickCount();
+}
 
 /** 
- *  Apply auto white balance in-place for a given image array
+ * getTickcount: return number of ticks from OS
+ * getTickFrequency: returns the number of ticks per second
+ * t = ((double)getTickCount() - t)/getTickFrequency();
+ * fps is t's reciprocal
+ */
+double toc(double &t)
+{
+	return ((double)cv::getTickCount() - t) / cv::getTickFrequency();
+}
+
+/** 
+ *  Apply gamma correction in-place for a given image array
  *  When *gamma_val < 1, the original dark regions will be brighter 
  *  and the histogram will be shifted to the right 
  *  Whereas it will be the opposite with *gamma_val > 1
@@ -43,6 +59,7 @@ void apply_gamma_correction(
 	{
 		p[i] = cv::saturate_cast<uchar>(pow(i / 255.0, gamma_value) * 255.0);
 	}
+
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	cv::Ptr<cv::cuda::LookUpTable> lutAlg =
 		cv::cuda::createLookUpTable(look_up_table);
@@ -54,10 +71,12 @@ void apply_gamma_correction(
 
 /** 
  *  Apply auto white balance in-place for a given image array
- *  the basic idea of Leopard AWB algorithm is to find the gray
- *  area of the image and apply Red, Green and Blue gains to make
- *  it gray, and then use the gray area to estimate the color 
- *  temperature.
+ *  Ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
+ * 
+ *  The basic idea of this AWB algorithm is 
+ *  1. defining white as the highest values of R,G,B observed in the image 
+ *  2. stretch as much as it can for rgb channels, so that they occupy
+ *  maximal range by applying an affine transform ax+b to each channel.
  *  args:
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
@@ -80,64 +99,119 @@ void apply_white_balance(
 	cv::cuda::merge(bgr_planes, opencvImage);
 	
 #else
-	/// ref: https://gist.github.com/tomykaira/94472e9f4921ec2cf582
+	
 	cv::Mat _opencvImage = opencvImage.getMat();
 	double discard_ratio = 0.05;
-	int hists[3][256];
-	CLEAR(hists);
-
-	for (int y = 0; y < _opencvImage.rows; ++y)
-	{
-		uchar *ptr = _opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < _opencvImage.cols; ++x)
-		{
-			for (int j = 0; j < 3; ++j)
-			{
-				hists[j][ptr[x * 3 + j]] += 1;
-			}
-		}
-	}
-
-	/// cumulative hist
-	int total = _opencvImage.cols * _opencvImage.rows;
 	int vmin[3], vmax[3];
-	for (int i = 0; i < 3; ++i)
-	{
-		for (int j = 0; j < 255; ++j)
-		{
-			hists[i][j + 1] += hists[i][j];
-		}
+	int total = _opencvImage.cols * _opencvImage.rows;
+	/// build cumulative histogram
+	/// method 1: naive pixel access
+	// int hists[3][256];
+	// for (int y = 0; y < _opencvImage.rows; y++)
+	// {
+	// 	uchar *ptr = _opencvImage.ptr<uchar>(y);
+	// 	for (int x = 0; x < _opencvImage.cols; x++) 
+	// 	{
+	// 		for (int j = 0; j < 3; ++j)
+	// 		{
+	// 			hists[j][ptr[x * 3 + j]] += 1;
+	// 		}
+	// 	}
+ 	// }
 
-		vmin[i] = 0;
-		vmax[i] = 255;
-		while (hists[i][vmin[i]] < discard_ratio * total)
-			vmin[i] += 1;
-		while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
-			vmax[i] -= 1;
-		if (vmax[i] < 255 - 1)
+	/// method 2: pointer arithmetic 
+	// int hists[3][256];
+	// Pixel* pixel = _opencvImage.ptr<Pixel>(0,0);
+	// const Pixel* endPixel = pixel + _opencvImage.cols * _opencvImage.rows;
+	// for (; pixel!= endPixel; pixel++) 
+	// {
+	// 	hists[0][pixel->x] ++;
+	// 	hists[1][pixel->y] ++;
+	// 	hists[2][pixel->z] ++;
+	// }
+
+	/// method 3: use OpenCV calcHist to accelerate build histogram
+	cv::Mat bgr_planes[3];
+	cv::Mat hist[3];
+	cv::split(_opencvImage, bgr_planes);
+	float range[] = {0,256};
+	const float *histRange = {range};
+	int hist_size = 256;
+	cv::calcHist(&bgr_planes[0], 1, 0, cv::Mat(), hist[0], 1, &hist_size, &histRange);
+	cv::calcHist(&bgr_planes[1], 1, 0, cv::Mat(), hist[1], 1, &hist_size, &histRange);
+	cv::calcHist(&bgr_planes[2], 1, 0, cv::Mat(), hist[2], 1, &hist_size, &histRange);
+	
+
+	/// cumulative hist and search for vmin and vmax
+	/// method 1&2: use int hists[3][256] to accumulate and compare
+	// for (int i = 0; i < 3; ++i)
+	// {
+	// 	for (int j = 0; j < 255; ++j)
+	// 	{
+	// 		hists[i][j + 1] += hists[i][j];
+	// 	}
+	// 	vmin[i] = 0;
+	// 	vmax[i] = 255;
+	// 	while (hists[i][vmin[i]] < discard_ratio * total)
+	// 		vmin[i] += 1;
+	// 	while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
+	// 		vmax[i] -= 1;
+	// 	if (vmax[i] < 255 - 1)
+	// 		vmax[i] += 1;
+	// }
+
+	/// method 3: use float accumulator[3][256] to accumulate and compare
+	float accumulator[3][256];
+	for (int i = 0; i < 3; i++) {
+		for (int j=0; j < (hist_size-1); j++)
+		{
+			accumulator[i][j+1] = accumulator[i][j] + hist[i].at<float>(j);
+			vmin[i] = 0;
+			vmax[i] = 255;
+			while (accumulator[i][vmin[i]] < discard_ratio * total)
+				vmin[i] += 1;
+			while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
+				vmax[i] -= 1;
+			if (vmax[i] < 255 - 1)
 			vmax[i] += 1;
-	}
-
-	for (int y = 0; y < _opencvImage.rows; ++y)
-	{
-		uchar *ptr = _opencvImage.ptr<uchar>(y);
-		for (int x = 0; x < _opencvImage.cols; ++x)
-		{
-			for (int j = 0; j < 3; ++j)
-			{
-				int val = ptr[x * 3 + j];
-				if (val < vmin[j])
-					val = vmin[j];
-				if (val > vmax[j])
-					val = vmax[j];
-				ptr[x * 3 + j] = static_cast<uchar>((val - vmin[j]) * 255.0 / (vmax[j] - vmin[j]));
-			}
 		}
 	}
 
+	/// original raw pointer access, slower
+	// for (int y = 0; y < _opencvImage.rows; ++y)
+	// {
+	// 	uchar *ptr = _opencvImage.ptr<uchar>(y);
+	// 	for (int x = 0; x < _opencvImage.cols; ++x)
+	// 	{
+	// 		for (int j = 0; j < 3; ++j)
+	// 		{
+	// 			int val = ptr[x * 3 + j];
+	// 			if (val < vmin[j])
+	// 				val = vmin[j];
+	// 			if (val > vmax[j])
+	// 				val = vmax[j];
+	// 			ptr[x * 3 + j] = static_cast<uchar>((val - vmin[j]) * 255.0 / (vmax[j] - vmin[j]));
+	// 		}
+	// 	}
+	// }
+
+	/// use lambda, faster 
+	_opencvImage.forEach<Pixel> (
+		[&vmin, &vmax] (Pixel &ptr, const int *position) -> void {
+			/// saturate the pixels	
+			int b = ptr.x < vmin[0] ? vmin[0] : ptr.x > vmax[0] ? vmax[0] : ptr.x;
+			int g = ptr.y < vmin[1] ? vmin[1] : ptr.y > vmax[1] ? vmax[1] : ptr.y;
+			int r = ptr.z < vmin[2] ? vmin[2] : ptr.z > vmax[2] ? vmax[2] : ptr.z;
+
+			/// rescale the pixels
+			ptr.x = static_cast<uchar>((b-vmin[0])*255.0/(vmax[0] - vmin[0]));
+			ptr.y = static_cast<uchar>((g-vmin[1])*255.0/(vmax[1] - vmin[1]));
+			ptr.z = static_cast<uchar>((r-vmin[2])*255.0/(vmax[2] - vmin[2]));
+
+		}
+	);
 
 #endif
-	
 }
 
 /** 
@@ -559,6 +633,39 @@ void streaming_put_text(
 	);													 // Anti-alias (Optional)
 }
 
+/** 
+ * put a given stream's info text in: 
+ * res, fps, ESC, 
+ * automatically adjust text size with different camera resolutions
+ *  args:
+ * 		cv::InputOutputArray opencvImage - camera stream buffer array
+ * 		that can be modified inside the functions
+*/
+void display_current_mat_stream_info(
+	cv::InputOutputArray& opencvImage,
+	double *cur_time)
+{
+	cv::Mat _opencvImage = opencvImage.getMat();
+	int height_scale = (_opencvImage.cols / 1000);
+	streaming_put_text(_opencvImage, "ESC: close application",
+					   height_scale * TEXT_SCALE_BASE);
+
+	char resolution[25];
+	sprintf(resolution, "Current Res:%dx%d", 
+		_opencvImage.cols, _opencvImage.rows);
+	streaming_put_text(_opencvImage, resolution,
+					   height_scale * TEXT_SCALE_BASE * 2);
+
+	double fps = 1.0 / toc(*cur_time);
+	char string_frame_rate[10];				 // string to save fps
+	sprintf(string_frame_rate, "%.2f", fps); // to 2 decimal places
+	char fpsString[20];
+	strcpy(fpsString, "Current Fps:");
+	strcat(fpsString, string_frame_rate);
+	streaming_put_text(_opencvImage, fpsString,
+					   height_scale * TEXT_SCALE_BASE * 3);
+}
+
 /**
  * Apply brightness(alpha) and contrast(beta) control from slider val
  * for both color and mono camera stream
@@ -577,7 +684,7 @@ void apply_brightness_and_contrast(
 #ifndef HAVE_OPENCV_CUDA_SUPPORT
 	cv::Mat _opencvImage = opencvImage.getMat();
 #else
-	cv::cuda::GpuMat opencvImage = _opencvImage.getGpuMat();
+	cv::cuda::GpuMat _opencvImage = opencvImage.getGpuMat();
 #endif 
 	_opencvImage.convertTo(
 	opencvImage,	// dst 
@@ -611,7 +718,10 @@ void debayer_awb_a_frame(
 	
 #endif
 		if (awb_flg)
+		{	
+			//Timer timer;
 			apply_white_balance(opencvImage);
+		}
 	}
 	/** mono output */
 	if (bayer_flg == CV_MONO_FLG && opencvImage.type() == CV_8UC3)
@@ -639,24 +749,77 @@ void debayer_awb_a_frame(
  */
 void apply_rgb_matrix_post_debayer(
 	cv::InputOutputArray& opencvImage,
-	int rb, int rg, int rr,
-	int gb, int gg, int gr,
-	int bb, int bg, int br)
+	int* ccm)
 {
-	cv::Mat _opencvImage = opencvImage.getMat();
-	uchar r,g,b;
+	
+	int rb = *ccm;
+	int rg = *(ccm+1);
+	int rr = *(ccm+2);
+	int gb = *(ccm+3);
+	int gg = *(ccm+4);
+	int gr = *(ccm+5);
+	int bb = *(ccm+6);
+	int bg = *(ccm+7);
+	int br = *(ccm+8);
 
-	for (int i=0; i < _opencvImage.rows;++i) {
-		/// point to first pixel in row
-		cv::Vec3b* pixel = _opencvImage.ptr<cv::Vec3b>(i); 
-		for (int j=0; j < _opencvImage.cols;++j) {
-			r = pixel[j][2];
-			g = pixel[j][1];
-			b = pixel[j][0];
-			pixel[j][2] = ((rb) * b + (rg) * g + (rr) * r)/256;
-			pixel[j][1] = ((gb) * b + (gg) * g + (gr) * r)/256;
-			pixel[j][0] = ((bb) * b + (bg) * g + (br) * r)/256;
+	cv::Mat _opencvImage = opencvImage.getMat();
+
+	/// method 1: raw pointer access, 150ms
+	// uchar r,g,b;
+	// for (int i=0; i < _opencvImage.rows;++i) {
+	// 	/// point to first pixel in row
+	// 	cv::Vec3b* pixel = _opencvImage.ptr<cv::Vec3b>(i); 
+	// 	for (int j=0; j < _opencvImage.cols;++j) {
+	// 		r = pixel[j][2];
+	// 		g = pixel[j][1];
+	// 		b = pixel[j][0];
+	// 		pixel[j][2] = ((rb) * b + (rg) * g + (rr) * r)/256;
+	// 		pixel[j][1] = ((gb) * b + (gg) * g + (gr) * r)/256;
+	// 		pixel[j][0] = ((bb) * b + (bg) * g + (br) * r)/256;
+	// 	}
+	// }
+
+	/// method 2: raw pointer access, 60ms
+	// uchar r,g,b;
+	// for (int i=0; i < _opencvImage.rows;++i) {
+	// 	/// point to first pixel in row
+	// 	Pixel* ptr = _opencvImage.ptr<Pixel>(i);
+	// 	const Pixel* ptr_end = ptr + _opencvImage.cols;
+    // 	for (; ptr != ptr_end; ++ptr) {
+	// 		b = ptr->x;
+	// 		g = ptr->y;
+	// 		r = ptr->z;
+	// 		ptr->z = ((rb) * b + (rg) * g + (rr) * r)/256;
+	// 		ptr->y = ((gb) * b + (gg) * g + (gr) * r)/256;
+	// 		ptr->x = ((bb) * b + (bg) * g + (br) * r)/256;
+
+	// 	}
+	// }
+
+	/// method 3: using MatIterator, 150ms
+	// uchar r,g,b;
+	// for (Pixel &ptr : cv::Mat_<Pixel>(_opencvImage)) {
+	// 	b = ptr.x;
+	//  	g = ptr.y;
+	//  	r = ptr.z;
+	//  	ptr.z = ((rb) * b + (rg) * g + (rr) * r)/256;
+	//  	ptr.y = ((gb) * b + (gg) * g + (gr) * r)/256;
+	//  	ptr.x = ((bb) * b + (bg) * g + (br) * r)/256;
+	// }
+
+	/// method 4: using lambda, 18ms
+	/// capture everything by value
+	/// Pixel (x,y,z) = (1,2,3) is (b,g,r) = (1,2,3).
+	_opencvImage.forEach<Pixel>( 
+		[=] (Pixel &ptr, const int *position) -> void {
+
+			uchar b = ptr.x;
+	 		uchar g = ptr.y;
+	 		uchar r = ptr.z;
+	 		ptr.z = ((rb) * b + (rg) * g + (rr) * r)/256;
+	 		ptr.y = ((gb) * b + (gg) * g + (gr) * r)/256;
+	 		ptr.x = ((bb) * b + (bg) * g + (br) * r)/256;			
 		}
-	}
+	);
 
 }

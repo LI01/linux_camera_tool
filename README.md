@@ -134,12 +134,14 @@ $ linux_camera_tool .
 |   ├── json_parser.h
 │   ├── batch_cmd_parser.h
 │   ├── ui_control.h
+|   ├── isp_lib.h
 │   ├── uvc_extension_unit_ctrl.h
 │   └── v4l2_devices.h
 │
 ├── src
 │   ├── cam_property.cpp                  # gain, exposure, ptz ctrl etc
 │   ├── extend_cam_ctrl.cpp               # camera stream, capture ctrl etc
+|   ├── isp_lib.cpp                       # image signal processing using OpenCV
 |   ├── core_io.cpp                       # string manipulation for parser
 |   ├── json_parser.cpp                   # json parser
 |   ├── batch_cmd_parser.cpp              # BatchCmd.txt parser
@@ -160,16 +162,17 @@ Benchmark test is performed on a _12M pixel RAW12 bayer_ camera (IMX477).
 
 | Functions| Non-CUDA OpenCV Support | Latency | CUDA OpenCV Support | Latency |
 |----------|-------------------------|---------|---------------------|---------|
-| ```Auto White Balance```   | Yes                                | 300ms   | Yes                            | 3700us  |
+| ```Auto White Balance```   | Yes                                | 55ms   | Yes                            | 3700us  |
 | ```CLAHE```                | Yes                                | 40ms    | Yes                            | 7700us  |
 | ```Gamma Correction```     | Yes                                | 2.7ms   | Yes                            | 1100us  |
 | ```Sharpness```            | Yes                                | 200ms   | Yes                            | 20ms    |
 | ```Show Edge```            | Yes                                | 20ms    | Yes                            | 16ms    |
-| ```Perform Shift```        | No                                 | 28ms    | No                             | N/A     |
+| ```Color Correction Matrix``` | Yes                             | 18ms    | No                             | N/A     |
+| ```Perform Shift```        | No                                 | 13ms    | No                             | N/A     |
 | ```Seperate Display```     | Yes                                | 9000us  | No                             | N/A     |
 | ```Brightness```           | Yes                                | 300ms   | Yes                            | 400us   |
 | ```Contrast```             | Yes                                | 300ms   | Yes                            | 400us   |
-| ```Auto Bright&Contrast``` | Yes                                | 14ms    | Yes                            | 1180us  |
+| ```Auto Brightness & Contrast``` | Yes                                | 14ms    | Yes                            | 1180us  |
 
 ### Auto Exposure
 Auto exposure is usually implemented on sensor/ISP, which when enabled, won't further slow down the streaming. You need to check with camera driver for auto exposure support. If some sensor don't have AE support built-in, the check button in grid1 (```Enable auto exposure```)won't work. 

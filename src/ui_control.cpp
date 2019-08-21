@@ -90,19 +90,53 @@ char version_number[10] = "v0.3.9";
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
+int entry_formater(
+    GtkWidget *entry_val, 
+    const char* str,
+    const char type,
+    int max, 
+    int min)
+{
+    int val = hex_or_dec_interpreter_c_string((char *) \
+            gtk_entry_get_text(GTK_ENTRY(entry_val)));
+    if (type == 'x' && (val > max || val < min)) // hex
+    {
+        g_print("Please enter a valid number for %-20s,"
+            " within range (0x%x,0x%x)\r\n", 
+            str, min, max);
+    }
+    else if (type == 'd' && (val > max || val < min))// int
+    {
+        g_print("Please enter a valid number for %-12s,"
+            " within range (%d,%d)\r\n", 
+            str, min, max);
+    }
+    return set_limit(val, max, min);
+};
+
+
+void enable_flg_formater(
+    GtkToggleButton *toggle_button, 
+    const char* str, 
+    void(*func)(int))
+{
+     if (gtk_toggle_button_get_active(toggle_button))
+     {
+         g_print("%s enable\r\n", str);
+         func(1);
+     }
+     else 
+     {
+         g_print("%s disable\r\n", str);
+         func(0);
+     }
+}
+
 /** callback for enabling/disabling auto white balance */
 void enable_resize_window(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("resize window enable\n");
-        resize_window_enable(1);
-    }
-    else
-    {
-        g_print("resize window disable\n");
-        resize_window_enable(0);
-    }
+    void (*func)(int) = &resize_window_enable;
+    enable_flg_formater(toggle_button, "resize window", func);
 }
 /**-------------------------menu bar callbacks------------------------------*/
 /** callback for find and load config files */
@@ -266,31 +300,17 @@ void enable_ae(GtkToggleButton *toggle_button)
 /** callback for enabling/disabling auto white balance */
 void enable_awb(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("awb enable\n");
-        awb_enable(1);
-    }
-    else
-    {
-        g_print("awb disable\n");
-        awb_enable(0);
-    }
+    auto func = &awb_enable;
+    enable_flg_formater(toggle_button, "awb", func);
 }
+
 
 /** callback for enabling/disabling CLAHE optimization */
 void enable_clahe(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("contrast limited adaptive histogram equalization enable\n");
-        clahe_enable(1);
-    }
-    else
-    {
-        g_print("contrast limited adaptive histogram equalization disable\n");
-        clahe_enable(0);
-    }
+    auto func = &clahe_enable;
+    enable_flg_formater(toggle_button, 
+    "contrast limited adaptive histogram equalization", func);
 }
 
 /** callback for updating register address length 8/16 bits */
@@ -325,13 +345,21 @@ void register_write()
     {
         gtk_widget_set_sensitive(entry_i2c_addr,0);
         
-        int regAddr = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        int regAddr = entry_formater(
+            entry_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
         if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
         
-        int regVal = hex_or_dec_interpreter_c_string((char *)  \
-            gtk_entry_get_text(GTK_ENTRY(entry_reg_val)));
+        int regVal = entry_formater(
+            entry_reg_val, 
+            "register value", 
+            'x', 
+            0xffff, 
+            0x00);
         if ((addr_width_for_rw(value_width_flag)) == _8BIT_FLG)
             regVal = regVal & 0xff;
         
@@ -342,16 +370,26 @@ void register_write()
     else
     {
         gtk_widget_set_sensitive(entry_i2c_addr,1);
-        int slaveAddr = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)));
-        
-        int regAddr = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        int slaveAddr = entry_formater(
+            entry_i2c_addr, 
+            "slave address", 
+            'x', 
+            0xff, 
+            0x0);
+        int regAddr = entry_formater(
+            entry_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
         if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
-
-        int regVal = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_reg_val)));
+        int regVal = entry_formater(
+            entry_reg_val, 
+            "register value", 
+            'x', 
+            0xffff, 
+            0x0);
         if ((addr_width_for_rw(value_width_flag)) == _8BIT_FLG)
             regVal = regVal & 0xff;
         unsigned char buf[2];
@@ -375,8 +413,12 @@ void register_read()
     /** sensor read */
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
-        int regAddr = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        int regAddr = entry_formater(
+            entry_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
         if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
 
@@ -389,11 +431,18 @@ void register_read()
     /** generic i2c slave read */
     else
     {
-        int slaveAddr = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_i2c_addr)));
-        
-        int regAddr = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_reg_addr)));
+        int slaveAddr = entry_formater(
+            entry_i2c_addr, 
+            "slave address", 
+            'x', 
+            0xff, 
+            0x0);
+        int regAddr = entry_formater(
+            entry_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
         if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
 
@@ -474,18 +523,9 @@ void enable_trig()
 /** callback for black level correction ctrl */
 void black_level_correction()
 {
-    float float_blc;
-    float_blc = atof((char *)gtk_entry_get_text(GTK_ENTRY(entry_blc)));
-    if (floor(float_blc) == ceil(float_blc))
-    {
-        add_blc((int)float_blc);
-        g_print("Apply black level correction = %d\n", (int)float_blc);
-    }
-    else
-    {
-         g_print("Please enter an integer for each pixel black level correction\r\n");
-    }
-    
+    int blc = entry_formater(entry_blc, 
+    "black level correction", 'd', 512, -512);
+    add_blc(blc);
 }
 
 /**-------------------------grid2 callbacks-------------------------------*/
@@ -495,29 +535,42 @@ void black_level_correction()
  */
 void set_rgb_gain_offset()
 {
-    int red_gain = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_red_gain)));
-    red_gain = set_limit(red_gain, MAX_RGB_GAIN, MIN_RGB_GAIN);
-
-    int green_gain = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_green_gain)));
-    green_gain = set_limit(green_gain, MAX_RGB_GAIN, MIN_RGB_GAIN);
-    
-    int blue_gain = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_blue_gain)));
-    blue_gain = set_limit(blue_gain, MAX_RGB_GAIN, MIN_RGB_GAIN);
-    
-    int red_offset = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_red_offset)));
-    red_offset = set_limit(red_offset, MAX_RGB_OFFSET, MIN_RGB_OFFSET);
-
-    int green_offset = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_green_offset)));
-    green_offset = set_limit(green_offset, MAX_RGB_OFFSET, MIN_RGB_OFFSET);
-
-    int blue_offset = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_blue_offset)));
-    blue_offset = set_limit(blue_offset, MAX_RGB_OFFSET, MIN_RGB_OFFSET);
+    int red_gain    = entry_formater(
+        entry_red_gain,    
+        "red gain",    
+        'd', 
+        MAX_RGB_GAIN, 
+        MIN_RGB_GAIN);
+    int green_gain  = entry_formater(
+        entry_green_gain,  
+        "green gain",  
+        'd', 
+        MAX_RGB_GAIN, 
+        MIN_RGB_GAIN);
+    int blue_gain   = entry_formater(
+        entry_blue_gain,   
+        "blue gain",   
+        'd', 
+        MAX_RGB_GAIN, 
+        MIN_RGB_GAIN);
+    int red_offset  = entry_formater(
+        entry_red_offset,  
+        "red offset",  
+        'd', 
+        MAX_RGB_OFFSET
+        , MIN_RGB_OFFSET);
+    int green_offset = entry_formater(
+        entry_green_offset,
+        "green offset",
+        'd', 
+        MAX_RGB_OFFSET
+        , MIN_RGB_OFFSET);
+    int blue_offset = entry_formater(
+        entry_blue_offset, 
+        "blue offset", 
+        'd', 
+        MAX_RGB_OFFSET
+        , MIN_RGB_OFFSET);
 
     if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_rgb_gain))) {
         enable_rgb_gain_offset (
@@ -528,6 +581,7 @@ void set_rgb_gain_offset()
         disable_rgb_gain_offset(); 
 }
 
+
 /**
  *  callback for update rgb2rgb color matrix
  *  limit the input on MAX/MIN_RGB macros
@@ -536,47 +590,23 @@ void set_rgb_gain_offset()
  */
 void set_rgb_matrix()
 {
-    int red_red = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_red_red)));
-    red_red = set_limit (red_red, 512, -512);
-
-    int red_green = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_red_green)));
-    red_green = set_limit (red_green, 512, -512);
-
-    int red_blue = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_red_blue)));
-    red_blue = set_limit (red_blue, 512, -512);
-
-    int green_red = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_green_red)));
-    green_red = set_limit (green_red, 512, -512);
-
-    int green_green = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_green_green)));
-    green_green = set_limit (green_green, 512, -512);
-
-    int green_blue = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_green_blue)));
-    green_blue = set_limit (green_blue, 512, -512);
-
-    int blue_red = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_blue_red)));
-    blue_red = set_limit (blue_red, 512, -512);
-
-    int blue_green = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_blue_green)));
-    blue_green = set_limit (blue_green, 512, -512);
-
-    int blue_blue = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_blue_blue)));
-    blue_blue = set_limit (blue_blue, 512, -512);
+    
+    int red_red     = entry_formater(entry_red_red,    "red red",    'd', 512, -512);
+    int red_green   = entry_formater(entry_red_green,  "red green",  'd', 512, -512);
+    int red_blue    = entry_formater(entry_red_blue,   "red blue",   'd', 512, -512);
+    int green_red   = entry_formater(entry_green_red,  "green red",  'd', 512, -512);
+    int green_green = entry_formater(entry_green_green,"green green",'d', 512, -512);
+    int green_blue  = entry_formater(entry_green_blue, "green blue", 'd', 512, -512);
+    int blue_red    = entry_formater(entry_blue_red,   "blue red",   'd', 512, -512);
+    int blue_green  = entry_formater(entry_blue_green, "blue green", 'd', 512, -512);
+    int blue_blue   = entry_formater(entry_blue_blue,  "blue blue",  'd', 512, -512);
 
     if (gtk_toggle_button_get_active(
         GTK_TOGGLE_BUTTON(check_button_rgb_matrix))) {
-        enable_rgb_matrix (red_red, red_green, red_blue, 
-        green_red, green_green, green_blue,
-        blue_red, blue_green, blue_blue);
+        enable_rgb_matrix (
+            red_red,   red_green,   red_blue, 
+            green_red, green_green, green_blue,
+            blue_red,  blue_green,  blue_blue);
     }
     else
         disable_rgb_matrix();    
@@ -586,17 +616,18 @@ void set_rgb_matrix()
 /** callback for enabling/disabling auto white balance */
 void enable_soft_ae(GtkToggleButton *toggle_button)
 {
+
+    auto func = &soft_ae_enable;
+    enable_flg_formater(toggle_button, 
+    "Software AE", func);
+
     if (gtk_toggle_button_get_active(toggle_button))
     {
-        g_print("software ae enable\n");
-        soft_ae_enable(1);
         gtk_widget_set_sensitive(hscale_exposure, 0); //disable change for exposure
         gtk_widget_set_sensitive(hscale_gain,0);//disable change for gain
     }
     else
     {
-        g_print("software ae disable\n");
-        soft_ae_enable(0);
         gtk_widget_set_sensitive(hscale_exposure, 1); //enable change for exposure
         gtk_widget_set_sensitive(hscale_gain,1);    //enable change for gain
     }
@@ -604,46 +635,28 @@ void enable_soft_ae(GtkToggleButton *toggle_button)
 /** callback for enabling/disabling image flip */
 void enable_flip(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("flip enable\n");
-        flip_enable(1);
-    }
-    else
-    {
-        g_print("flip disable\n");
-        flip_enable(0);
-    }
+    auto func = &flip_enable;
+    enable_flg_formater(toggle_button, 
+    "Flip", func);
 }
 /** callback for enabling/disabling image mirror */
 void enable_mirror(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("mirror enable\n");
-        mirror_enable(1);
-    }
-    else
-    {
-        g_print("mirror disable\n");
-        mirror_enable(0);
-    }
+    auto func = &mirror_enable;
+    enable_flg_formater(toggle_button, 
+    "Mirror", func);
 }
 /** callback for enabling/disabling show image edge */
 void enable_show_edge(GtkToggleButton *toggle_button)
 {
+    auto func = &canny_filter_enable;
+    enable_flg_formater(toggle_button, 
+    "Show canny edge", func);
     if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("show canny edge enable\n");
-        canny_filter_enable(1);
         gtk_widget_set_sensitive(hscale_edge_low_thres,1);
-    }
-    else
-    {
-        g_print("show canny edge disable\n");
-        canny_filter_enable(0);
+    else 
         gtk_widget_set_sensitive(hscale_edge_low_thres,0);
-    }
+
 }
 /** 
  * callback for enabling/disabling displaying RGB IR color
@@ -651,73 +664,39 @@ void enable_show_edge(GtkToggleButton *toggle_button)
  */
 void enable_rgb_ir_color(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("RGB-IR color correction enable\n");
-        rgb_ir_correction_enable(1);
-    }
-    else
-    {
-        g_print("RGB-IR color correction disable\n");
-        rgb_ir_correction_enable(0);
-    }
+    auto func = &rgb_ir_correction_enable;
+    enable_flg_formater(toggle_button, 
+    "RGB-IR color correction", func);
 }
 /** allback for enabling/disabling displaying RGB IR IR channel */
 void enable_rgb_ir_ir(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("RGB-IR IR display enable\n");
-        rgb_ir_ir_display_enable(1);
-    }
-    else
-    {
-        g_print("RGB-IR IR display disable\n");
-        rgb_ir_ir_display_enable(0);
-    }
+    auto func = &rgb_ir_ir_display_enable;
+    enable_flg_formater(toggle_button, 
+    "RGB-IR IR display", func);
 }
 
 /** callback for enabling/disabling separate show dual stereo cam */
 void enable_display_dual_stereo(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("Separate display dual stereo cam enable\n");
-        separate_dual_enable(1);
-    }
-    else
-    {
-        g_print("Separate display dual stereo cam disable\n");
-        separate_dual_enable(0);
-    }
+    auto func = &separate_dual_enable;
+    enable_flg_formater(toggle_button, 
+    "Separate display dual stereo cam", func);
 }
 /** callback for enabling/disabling display camera info */
 void enable_display_mat_info(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("stream info display enable\n");
-        display_info_enable(1);
-    }
-    else
-    {
-        g_print("stream info display disable\n");
-        display_info_enable(0);
-    }
+    auto func = &display_info_enable;
+    enable_flg_formater(toggle_button, 
+    "Stream info display enable", func);
+
 }
 /** callback for enabling/disabling auto white balance */
 void enable_abc(GtkToggleButton *toggle_button)
 {
-    if (gtk_toggle_button_get_active(toggle_button))
-    {
-        g_print("auto brightness and contrast enable\n");
-        abc_enable(1);
-    }
-    else
-    {
-        g_print("auto brightness and contrast disable\n");
-        abc_enable(0);
-    }
+    auto func = &abc_enable;
+    enable_flg_formater(toggle_button, 
+    "Auto brightness and contrast enable", func);
 }
 
 /** callback for update alpha value */
@@ -1466,8 +1445,13 @@ void iterate_grid_elements(
     FOREACH_NELEM(elements, members, ele)
     {
         g_assert(ele->widget != NULL);
-        gtk_grid_attach(GTK_GRID(grid), ele->widget, ele->col,
-                        ele->row, ele->width, 1);
+        gtk_grid_attach(
+            GTK_GRID(grid), 
+            ele->widget, 
+            ele->col,
+            ele->row, 
+            ele->width, 
+            1);
     }
 }
 
@@ -1591,7 +1575,11 @@ void iterate_element_cb(element_callback *callbacks, size_t members)
     FOREACH_NELEM(callbacks, members, cb) {
         g_assert(cb->widget != NULL);
         g_assert(cb->handler != NULL);
-        g_signal_connect (cb->widget, cb->signal, cb->handler, cb->data);
+        g_signal_connect (
+            cb->widget, 
+            cb->signal, 
+            cb->handler, 
+            cb->data);
     }
 }
 /** element_callback to hold all grid1 elements callback info */
@@ -1792,7 +1780,11 @@ void iterate_window_signals(GtkWidget *widget,
 {
     FOREACH_NELEM(signals, members, sig)
     {
-        g_signal_connect(widget, sig->signal, sig->handler, sig->data);
+        g_signal_connect(
+            widget, 
+            sig->signal, 
+            sig->handler, 
+            sig->data);
     }
 }
 /** signal to hold all window signals info */
@@ -1852,7 +1844,11 @@ void grid3_setup(GtkWidget *grid)
     check_button_resize_window  = gtk_check_button_new();
     gtk_button_set_label(GTK_BUTTON(check_button_resize_window), "resize_window");
     gtk_grid_attach(GTK_GRID(grid), check_button_resize_window, 0, 0, 1, 1);
-    g_signal_connect (check_button_resize_window, "toggled", G_CALLBACK(enable_resize_window), NULL);
+    g_signal_connect (
+        check_button_resize_window, 
+        "toggled", 
+        G_CALLBACK(enable_resize_window), 
+        NULL);
 }
 void notebook_setup(GtkWidget *maintable)
 {

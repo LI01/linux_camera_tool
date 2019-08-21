@@ -76,6 +76,8 @@ typedef enum
    CROPPED_HEIGHT = 720
 } cropped_resolution;
 
+
+
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
@@ -83,7 +85,9 @@ void resize_window_enable(int enable);
 
 void video_capture_save_raw();
 inline void set_save_raw_flag(int flag);
-int v4l2_core_save_data_to_file(const void *data, int size);
+int v4l2_core_save_data_to_file(
+   const void *data, 
+   int size);
 
 void video_capture_save_bmp();
 inline void set_save_bmp_flag(int flag);
@@ -101,14 +105,18 @@ void awb_enable(int enable);
 void clahe_enable(int enable);
 void abc_enable(int enable);
 
-int open_v4l2_device(char *device_name, struct device *dev);
+int open_v4l2_device(
+   char *device_name, 
+   struct device *dev);
 
 void *mmap_wrapper(int len);
 void mmap_variables();
 int set_bpp(int datatype);
 void initialize_shared_memory_var();
+
 template<class T>
 void unmap_wrapper(T *data);
+
 void unmap_variables();
 
 void start_camera(struct device *dev);
@@ -131,7 +139,8 @@ void swap_two_bytes(struct device *dev, const void *p);
 
 void rgb_ir_correction_enable(int enable);
 void apply_color_correction_rgb_ir(
-   struct device *dev, const void *p);
+   struct device *dev, 
+   const void *p);
 
 int set_limit(int val, int max, int min);
 void enable_rgb_gain_offset(
@@ -163,7 +172,10 @@ void add_sharpness_val(int sharpness_val_from_gui);
 void add_edge_thres_val(int edge_low_thres_val_from_gui);
 void switch_on_keys();
 
-void decode_process_a_frame(struct device *dev, const void *p);
+void decode_process_a_frame(
+   struct device *dev, 
+   const void *p,
+   double *cur_time);
 
 int video_alloc_buffers(struct device *dev, int nbufs);
 int video_free_buffers(struct device *dev);

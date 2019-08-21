@@ -42,7 +42,7 @@
 #include "../includes/shortcuts.h"
 #include "../includes/extend_cam_ctrl.h"
 #include "../includes/isp_lib.h"
-//#include "../includes/utility.h"
+#include "../includes/utility.h"
 
 #include <omp.h> /**for openmp */
 
@@ -89,7 +89,7 @@ int *cur_exposure; 				  /// update current exposure for AE
 int *cur_gain;	 				  /// update current gain for AE
 
 static int image_count;			  /// image count number add to capture name
-double cur_time = 0;			  /// time measured in OpenCV for fps
+		  
 struct v4l2_buffer queuebuffer;   /// queuebuffer for enqueue, dequeue buffer
 static constexpr const char* window_name = "Camera View"; 
 /*****************************************************************************
@@ -166,7 +166,9 @@ inline void set_save_raw_flag(int flag)
  *
  * returns: error code
  */
-int v4l2_core_save_data_to_file(const void *data, int size)
+int v4l2_core_save_data_to_file(
+	const void *data, 
+	int size)
 {
 	FILE *fp;
 	int ret = 0;
@@ -712,9 +714,13 @@ void streaming_loop(struct device *dev)
  */
 void get_a_frame(struct device *dev)
 {
+	
 	for (size_t i = 0; i < dev->nbufs; i++)
 	{
-		cur_time = (double)cv::getTickCount();
+		/// time measured in OpenCV for fps
+		double cur;
+		tic(cur);
+		double *cur_time = &cur;
 		queuebuffer.index = i;
 
 		/// The buffer's waiting in the outgoing queue
@@ -724,7 +730,7 @@ void get_a_frame(struct device *dev)
 			return;
 		}
 
-		decode_process_a_frame(dev, dev->buffers[i].start);
+		decode_process_a_frame(dev, dev->buffers[i].start, cur_time);
 
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
 		{
@@ -863,7 +869,8 @@ void apply_soft_ae(
 void perform_shift(
 	struct device *dev, const void *p, int shift)
 {
-	
+
+	//Timer timer;
 	unsigned char tmp;
 	unsigned short *src_short = (unsigned short *)p;
 	unsigned char *dst = (unsigned char *)p;
@@ -990,6 +997,9 @@ void disable_rgb_gain_offset()
 void apply_rgb_gain_offset_pre_debayer(
 	struct device *dev, const void *p)
 {
+	if ( *r_gain == 256 && *g_gain == 256 && *b_gain == 256 &&
+		 *r_offset == 0 && *g_offset == 0 && *b_offset == 0)
+		return;
 	int pixel_max_val = BIT(*bpp) - 1;
 	int height = dev->height;
 	int width = dev->width;
@@ -1172,6 +1182,7 @@ void enable_rgb_matrix(
 	*bg = blue_green;
 	*bb = blue_blue;
 	*rgb_matrix_flg = 1;
+	
 	printf("-----------rgb matrix enabled-----------\r\n");
 	printf("rr = %-4d\trg = %-4d\trb = %-4d\r\n"
 		   "gr = %-4d\tgg = %-4d\tgb = %-4d\r\n"
@@ -1208,6 +1219,7 @@ void mirror_enable(int enable)
 {
 	enable_wrapper(mirror_flag, enable);
 }
+
 /**
  * set canny filter flag 
  * args:
@@ -1228,7 +1240,6 @@ void separate_dual_enable(int enable)
 	enable_wrapper(separate_dual, enable);
 }
 
-
 /**
  * set display mat info flag 
  * args:
@@ -1239,58 +1250,17 @@ void display_info_enable(int enable)
 	enable_wrapper(display_info_ena, enable);
 }
 
-
-/** 
- * put a given stream's info text in: 
- * res, fps, ESC, 
- * automatically adjust text size with different camera resolutions
- *  args:
- * 		cv::InputOutputArray opencvImage - camera stream buffer array
- * 		that can be modified inside the functions
-*/
-static void display_current_mat_stream_info(
-	cv::InputOutputArray& _opencvImage)
-{
-	cv::Mat opencvImage = _opencvImage.getMat();
-	int height_scale = (opencvImage.cols / 1000);
-	streaming_put_text(opencvImage, "ESC: close application",
-					   height_scale * TEXT_SCALE_BASE);
-
-	char resolution[25];
-	sprintf(resolution, "Current Res:%dx%d", 
-		opencvImage.cols, opencvImage.rows);
-	streaming_put_text(opencvImage, resolution,
-					   height_scale * TEXT_SCALE_BASE * 2);
-
-	/** 
-  	 * getTickcount: return number of ticks from OS
-	 * getTickFrequency: returns the number of ticks per second
-	 * t = ((double)getTickCount() - t)/getTickFrequency();
-	 * fps is t's reciprocal
-	 */
-	cur_time = ((double)cv::getTickCount() - cur_time) /
-			   cv::getTickFrequency();
-	double fps = 1.0 / cur_time;			 // frame rate
-	char string_frame_rate[10];				 // string to save fps
-	sprintf(string_frame_rate, "%.2f", fps); // to 2 decimal places
-	char fpsString[20];
-	strcpy(fpsString, "Current Fps:");
-	strcat(fpsString, string_frame_rate);
-	streaming_put_text(opencvImage, fpsString,
-					   height_scale * TEXT_SCALE_BASE * 3);
-}
-
 /** callback for set alpha for contrast correction from gui */
 void add_alpha_val(int alpha_val_from_gui)
 {
 	*alpha = alpha_val_from_gui;
 }
+
 /** callback for set beta for brightness correction from gui */
 void add_beta_val(int beta_val_from_gui)
 {
 	*beta = beta_val_from_gui;
 }
-
 
 /** callback for set sharpness for sharpness correction from gui */
 void add_sharpness_val(int sharpness_val_from_gui)
@@ -1298,15 +1268,11 @@ void add_sharpness_val(int sharpness_val_from_gui)
 	*sharpness = sharpness_val_from_gui;
 }
 
-
-
+/** callback for add edge detection for threshold value from gui */
 void add_edge_thres_val(int edge_low_thres_val_from_gui)
 {
 	*edge_low_thres = edge_low_thres_val_from_gui;
 }
-
-
-
 
 void switch_on_keys()
 {
@@ -1326,6 +1292,7 @@ void switch_on_keys()
 static void group_gpu_image_proc(
 	cv::InputOutputArray opencvImage)
 {
+
 	if (*(gamma_val) != (float)1)
 		apply_gamma_correction(opencvImage,*gamma_val);
 	
@@ -1343,8 +1310,6 @@ static void group_gpu_image_proc(
 		
 	if (*show_edge_flag) 
 		canny_filter_control(opencvImage,*edge_low_thres);
-	
-
 
 }
 /** 
@@ -1359,7 +1324,10 @@ static void group_gpu_image_proc(
 
  * 
  */
-void decode_process_a_frame(struct device *dev, const void *p)
+void decode_process_a_frame(
+	struct device *dev, 
+	const void *p,
+	double *cur_time)
 {
 	int height = dev->height;
 	int width = dev->width;
@@ -1410,10 +1378,20 @@ void decode_process_a_frame(struct device *dev, const void *p)
 #endif
 
 		if (*rgb_matrix_flg)
-			apply_rgb_matrix_post_debayer(img, 
-				*rb, *rg, *rr, 
-				*gb, *gg, *gr, 
-				*bb, *bg, *br);
+		{	
+			//Timer timer;
+			int ccm[3][3] = {
+				{*rr, *rg, *rb},
+				{*gr, *gg, *gb},
+				{*br, *bg, *bb}
+			};
+			if (TRUE != (*rr==256 && *rg==0 && *rb==0 && \
+						*gr==0 && *gg==256 && *gb==0 && \
+						*br==0 && *bg==0 && *bb==256))
+					apply_rgb_matrix_post_debayer(img, 
+					(int *)ccm);
+			
+		}
 		share_img = img;
 	}
 
@@ -1441,15 +1419,20 @@ void decode_process_a_frame(struct device *dev, const void *p)
 		cv::flip(share_img, share_img, 1);
 	if (*save_bmp)
 		save_frame_image_bmp(share_img);
+
 	if (*separate_dual) 
 		display_dual_stereo_separately(share_img);
-
+	else 
+	{
+		cv::destroyWindow("cam_left");
+		cv::destroyWindow("cam_right");
+	}
 	/** if image larger than 720p by any dimension, resize the window */
 	//if (*resize_window_ena) 
 		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
 			cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
 	if (*display_info_ena)
-		display_current_mat_stream_info(share_img);
+		display_current_mat_stream_info(share_img, cur_time);
 
 	cv::imshow(window_name, share_img);
 	switch_on_keys();

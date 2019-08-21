@@ -23,13 +23,15 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/xphoto.hpp>
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 #include <opencv4/opencv2/cudaobjdetect.hpp>
 #include <opencv4/opencv2/cudaimgproc.hpp>
 #include <opencv4/opencv2/cudafilters.hpp>
 #include <opencv4/opencv2/cudaarithm.hpp>
 #endif
+
+// Define a pixel
+typedef cv::Point3_<uint8_t> Pixel;
 
 typedef enum
 {
@@ -40,6 +42,8 @@ typedef enum
    CV_MONO_FLG
 } pixel_order_flag;
 
+void tic(double &t);
+double toc(double &t);
 
 void apply_gamma_correction(
 	cv::InputOutputArray& opencvImage,
@@ -76,6 +80,10 @@ void streaming_put_text(
 	const char *str, 
 	int cordinate_y);
 
+void display_current_mat_stream_info(
+	cv::InputOutputArray& opencvImage,
+	double *cur_time);
+
 void debayer_awb_a_frame(
 	cv::InputOutputArray& opencvImage,
 	int bayer_flg,
@@ -83,6 +91,4 @@ void debayer_awb_a_frame(
 
 void apply_rgb_matrix_post_debayer(
 	cv::InputOutputArray& opencvImage,
-	int rb, int rg, int rr,
-	int gb, int gg, int gr,
-	int bb, int bg, int br);
+	int* ccm);
