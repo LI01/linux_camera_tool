@@ -35,11 +35,13 @@
 #include <sys/mman.h>       /** for using mmap */
 #include <math.h>           /** pow */
 #include "hardware.h"
-
-/** ----------------------------------Bool----------------------------------*/
+/*****************************************************************************
+**                      	            Bool
+*****************************************************************************/
 typedef enum { FALSE, TRUE } BOOL;
-
-/* -----------------------------------Bits----------------------------------*/
+/*****************************************************************************
+**                      	            Bits
+*****************************************************************************/
 #define BIT(x)              (1<<(x))
 #define SETBIT(x,mask)      ((x)|(1<<(mask)))
 #define CLEARBIT(x,mask)    ((x)&(~(1<<(mask))))
@@ -49,13 +51,16 @@ typedef enum { FALSE, TRUE } BOOL;
 #define LOWBYTE(x)          ((unsigned char) (x))
 #define HIGHBYTE(x)         ((unsigned char) (((unsigned int) (x)) >> 8))
 #define BYTES_PER_BPP(bpp)  ((bpp -1)/8 + 1)
-/** ------------------------------Arrays------------------------------------*/
+/*****************************************************************************
+**                      	           Arrays
+*****************************************************************************/
 #define CLEAR(a)            memset(&(a), 0, sizeof(a))
 /** Get number of elements in an array */
 #define SIZE(a)             (sizeof(a) / sizeof(*a)) 
 #define IS_ARRAY(a)         ((void *)&a == (void *)a)
-
-/** ----------------------------------Loops---------------------------------*/
+/*****************************************************************************
+**                      	            Loops
+*****************************************************************************/
 /** Loop over an array of given size */
 #define FOREACH_NELEM(array, nelem, iter)       \
 	for (__typeof__(*(array)) *iter = (array);    \
@@ -65,8 +70,9 @@ typedef enum { FALSE, TRUE } BOOL;
 /** Loop over an array of known size */
 #define FOREACH(array, iter)                    \
 	FOREACH_NELEM(array, SIZE(array), iter)
-
-/**--------------------------------Maths------------------------------------*/
+/*****************************************************************************
+**                      	           Maths
+*****************************************************************************/
 #define PI                  3.14159265
 
 #define MIN(x,y)          ({ __typeof__ (x) _x = (x);   \
@@ -82,8 +88,9 @@ typedef enum { FALSE, TRUE } BOOL;
 #define IS_BETWEEN(x,L,H)   ((unsigned char)((x) >= (L) && (n) <= (H)))
 /** clip value between 0 and 255 */
 #define CLIP(value) (uint8_t)(((value)>0xFF)?0xff:(((value)<0)?0:(value)))
-
-/**----------------------------------Pixels---------------------------------*/
+/*****************************************************************************
+**                      	           Pixels
+*****************************************************************************/
 /** x is column number, y is row number */ 
 #define PIX(x, y, width)	        ((x) + (y) * (width))
 #define LEFT(x, y, width)	        ((x) - 1 + (y) * (width))
@@ -117,8 +124,9 @@ typedef enum { FALSE, TRUE } BOOL;
 #define INTERPOLATE_X(in, x, y, w) \
 	(((uint32_t)in[TOP_LEFT(x, y, w)] + in[BOTTOM_LEFT(x, y, w)] + \
 		in[TOP_RIGHT(x, y, w)] + in[BOTTOM_RIGHT(x, y, w)]) / 4)
-
-/**-------------------------------Threads-----------------------------------*/
+/*****************************************************************************
+**                      	     Threads
+*****************************************************************************/
 #define __THREAD_TYPE       pthread_t
 #define __THREAD_CREATE(t,f,d) (pthread_create(t,NULL,f,d))
 #define __THREAD_CREATE_ATTRIB(t,a,f,d) (pthread_create(t,a,f,d))
@@ -130,8 +138,9 @@ typedef enum { FALSE, TRUE } BOOL;
 #define __CLOSE_MUTEX(m)    (pthread_mutex_destroy(m) )
 #define __LOCK_MUTEX(m)     (pthread_mutex_lock(m) )
 #define __UNLOCK_MUTEX(m)   (pthread_mutex_unlock(m) )
-
-/**-------------------------------OpenCV GUI Shortcuts-----------------------*/
+/*****************************************************************************
+**                      	   OpenCV GUI Shortcuts
+*****************************************************************************/
 #define _1MS                 (1)
 #define _ESC_KEY_ASCII       (27)
 #define _SPACE_KEY_ASCII     (32)

@@ -81,7 +81,7 @@ int is_ov580_stereo()
  */
 int is_leopard_usb3(struct udev_device *dev)
 {
-    return !(strcmp("2a0b", udev_device_get_sysattr_value(dev, "idVendor")));
+    return (strcmp(LI_USB3_VID, udev_device_get_sysattr_value(dev, "idVendor")) == 0);
 }
 /**
  * 05a9:0581 is LI-USB Camera-OV9282-OV580, Camera-OV7251-OV580
@@ -90,13 +90,12 @@ int is_leopard_usb3(struct udev_device *dev)
 int is_ov580_stereo(struct udev_device *dev)
 {
    
-    int is_ov9272_ov580 = 
-        ((strcmp("05a9", udev_device_get_sysattr_value(dev, "idVendor"))) == 0) &&
-        ((strcmp("0581", udev_device_get_sysattr_value(dev, "idProduct"))) == 0);
+    int is_ov580 = 
+        (strcmp(OV580_ST_VID, udev_device_get_sysattr_value(dev, "idVendor")) == 0);
     int is_ov4689_ov580 = 
-        ((strcmp("2b03", udev_device_get_sysattr_value(dev, "idVendor"))) == 0) &&
-        ((strcmp("0580", udev_device_get_sysattr_value(dev, "idProduct"))) == 0);
-    *is_ov580_st = is_ov9272_ov580 || is_ov4689_ov580;
+        ((strcmp(OV580_OV4689_VID, udev_device_get_sysattr_value(dev, "idVendor")) == 0) 
+      && (strcmp(OV580_OV4689_PID, udev_device_get_sysattr_value(dev, "idProduct")) == 0));
+    *is_ov580_st = is_ov580 || is_ov4689_ov580;
     return *is_ov580_st;
 }
 /**

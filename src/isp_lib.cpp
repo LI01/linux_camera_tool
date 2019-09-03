@@ -93,9 +93,41 @@ void apply_white_balance(
 	cv::cuda::GpuMat _opencvImage = opencvImage.getGpuMat();
 	std::vector<cv::cuda::GpuMat> bgr_planes;
 	cv::cuda::split(_opencvImage, bgr_planes);
+	// cv::cuda::GpuMat hist[3];
+	// cv::Mat histogram[3];
+	// for (int i=0; i< 3; i++)
+	// {
+	// 	cv::cuda::calcHist(bgr_planes[i], hist[i]);
+	// 	hist[i].download(histogram[i]);
+	// }
+	// float accumulator[3][256];
+	// double discard_ratio = 0.05;
+	// int vmin[3], vmax[3];
+	// int total = _opencvImage.cols * _opencvImage.rows;
+	// for (int i = 0; i < 3; i++) {
+	// 	for (int j=0; j < (256-1); j++)
+	// 	{
+	// 		accumulator[i][j+1] = accumulator[i][j] + histogram[i].at<float>(j);
+	// 	}
+	// 	vmin[i] = 0;
+	// 	vmax[i] = 255;
+	// 	while (accumulator[i][vmin[i]] < discard_ratio * total)
+	// 		vmin[i] += 1;
+	// 	while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
+	// 		vmax[i] -= 1;
+	// 	if (vmax[i] < 255 - 1)
+	// 	vmax[i] += 1;
+		
+	// }
+	// for(int i=0; i< 3; i++)
+	// {
+	// 	printf("vmin[%d]=%d\r\n", i, vmin[i]);
+	// 	printf("vmax[%d]=%d\r\n", i, vmax[i]);
+	// }
 	cv::cuda::equalizeHist(bgr_planes[0], bgr_planes[0]);
 	cv::cuda::equalizeHist(bgr_planes[1], bgr_planes[1]);
 	cv::cuda::equalizeHist(bgr_planes[2], bgr_planes[2]);
+	
 	cv::cuda::merge(bgr_planes, opencvImage);
 	
 #else
@@ -137,9 +169,18 @@ void apply_white_balance(
 	float range[] = {0,256};
 	const float *histRange = {range};
 	int hist_size = 256;
-	cv::calcHist(&bgr_planes[0], 1, 0, cv::Mat(), hist[0], 1, &hist_size, &histRange);
-	cv::calcHist(&bgr_planes[1], 1, 0, cv::Mat(), hist[1], 1, &hist_size, &histRange);
-	cv::calcHist(&bgr_planes[2], 1, 0, cv::Mat(), hist[2], 1, &hist_size, &histRange);
+	for (int i=0; i<3; i++)
+	{
+		cv::calcHist(
+			&bgr_planes[i],  // src(const Mat*)
+			1, 				 // n_images
+			0, 			     // channels(gray = 0)
+			cv::Mat(), 		 // mask (for ROI)
+			hist[i], 		 // Mat hist
+			1, 				 // dimension
+			&hist_size, 	 // histSize = bins = 256
+			&histRange);     // ranges for pixel
+	}
 	
 
 	/// cumulative hist and search for vmin and vmax
@@ -166,15 +207,16 @@ void apply_white_balance(
 		for (int j=0; j < (hist_size-1); j++)
 		{
 			accumulator[i][j+1] = accumulator[i][j] + hist[i].at<float>(j);
-			vmin[i] = 0;
-			vmax[i] = 255;
-			while (accumulator[i][vmin[i]] < discard_ratio * total)
-				vmin[i] += 1;
-			while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
-				vmax[i] -= 1;
-			if (vmax[i] < 255 - 1)
-			vmax[i] += 1;
 		}
+		vmin[i] = 0;
+		vmax[i] = 255;
+		while (accumulator[i][vmin[i]] < discard_ratio * total)
+			vmin[i] += 1;
+		while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
+			vmax[i] -= 1;
+		if (vmax[i] < 255 - 1)
+		vmax[i] += 1;
+		
 	}
 
 	/// original raw pointer access, slower

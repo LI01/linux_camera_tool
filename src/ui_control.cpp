@@ -1,26 +1,25 @@
 /*****************************************************************************
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
- 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
- 
-  You should have received a copy of the GNU General Public License along
-  with this program; if not, write to the Free Software Foundation, Inc., 
-  
-  This is the sample code for Leopard USB3.0 camera, mainly for the camera tool
-  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you 
-  have problem running Gtk3 with your current compiled openCV, please refer to
-  README.md guide to rebuild your OpenCV for supporting Gtk3.
-
-  Author: Danyu L
-  Last edit: 2019/08
+*  This program is free software; you can redistribute it and/or modify      *
+*  it under the terms of the GNU General Public License as published by      *
+*  the Free Software Foundation; either version 2 of the License, or         *
+*  (at your option) any later version.                                       *
+*                                                                            *
+*  This program is distributed in the hope that it will be useful,           *
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
+*  GNU General Public License for more details.                              *
+*                                                                            *
+*  You should have received a copy of the GNU General Public License along   *
+*  with this program; if not, write to the Free Software Foundation, Inc.,   *
+*                                    s                                        *
+*  This is the sample code for Leopard USB3.0 camera, mainly for camera tool *
+*  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you* 
+*  have problem running Gtk3 with your current compiled openCV, please refer * 
+*  to README.md guide to rebuild your OpenCV for supporting Gtk3.            *
+*                                                                            *
+*  Author: Danyu L                                                           *
+*  Last edit: 2019/08                                                        *
 *****************************************************************************/
-
 #include "../includes/shortcuts.h"
 #include "../includes/ui_control.h"
 #include "../includes/v4l2_devices.h"
@@ -29,7 +28,7 @@
 #include "../includes/cam_property.h"
 #include "../includes/json_parser.h"
 #include "../includes/core_io.h"
-
+#include "../includes/gitversion.h"
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -65,9 +64,9 @@ GtkWidget *seperator_tab2_1, *seperator_tab2_2;
 GtkWidget *check_button_rgb_matrix, *button_update_rgb_matrix;
 GtkWidget *label_red_hor, *label_green_hor, *label_blue_hor;
 GtkWidget *label_red_ver, *label_green_ver, *label_blue_ver;
-GtkWidget *entry_red_red, *entry_red_green, *entry_red_blue; 
-GtkWidget *entry_green_red, *entry_green_green, *entry_green_blue; 
-GtkWidget *entry_blue_red, *entry_blue_green, *entry_blue_blue; 
+GtkWidget *entry_rr, *entry_rg, *entry_rb; 
+GtkWidget *entry_gr, *entry_gg, *entry_gb; 
+GtkWidget *entry_br, *entry_bg, *entry_bb; 
 GtkWidget *check_button_soft_ae , *check_button_flip;
 GtkWidget *check_button_edge, *check_button_mirror;
 GtkWidget *check_button_rgb_ir_color, *check_button_rgb_ir_ir;
@@ -83,13 +82,34 @@ static int address_width_flag;
 static int value_width_flag;
 
 extern int v4l2_dev;/** global variable, file descriptor for camera device */
-
-char icon1path[30] = "./pic/leopard_cam_tool.jpg"; /** window icon for makefile */
-char icon2path[30] = "../pic/leopard_cam_tool.jpg"; /** window icon for cmake */
-char version_number[10] = "v0.3.9";
 /*****************************************************************************
-**                      	Internal Callbacks
+**                      	Helper functions
 *****************************************************************************/
+/** interpret c string for both hex and decimal */
+int hex_or_dec_interpreter_c_string(
+    char *in_string)
+{
+    int out_val;
+    char *hex_prefix = (char*)"0x";
+
+    char *pch =strstr(in_string, hex_prefix);
+    if (pch)
+        out_val = strtol(in_string, NULL, 16);
+    else
+        out_val = strtol(in_string, NULL, 10);
+    return out_val;
+    
+}
+/**
+ * format the entry input between hex and decimal input
+ * print a warning message if it is out of a set range,
+ * and set the value to a given max/min value
+ * args:    
+ *      GtkWidget *entry_val - entry
+ *      str - string message that will be added in print out
+ *      type - tell the function whether it is hex or decimal
+ *      max, min - max, min value for that entry range
+ */
 int entry_formater(
     GtkWidget *entry_val, 
     const char* str,
@@ -112,9 +132,14 @@ int entry_formater(
             str, min, max);
     }
     return set_limit(val, max, min);
-};
-
-
+}
+/** 
+ * a toggle button enable/disable wrapper
+ * args:
+ *      GtkToggleButton *toggle_button - toggle_button,
+ *      str - string message that will be added in print out
+ *      *func - function pointer for that enable/disable function
+ */
 void enable_flg_formater(
     GtkToggleButton *toggle_button, 
     const char* str, 
@@ -131,26 +156,82 @@ void enable_flg_formater(
          func(0);
      }
 }
+/** a wapper for set address and value length */
+int toggle_length_formater(char* data)
+{
+    if (strcmp(data, "1") == 0)
+        return _8BIT_FLG;
+    if (strcmp(data, "2") == 0)
+        return _16BIT_FLG;
+    return _8BIT_FLG;
+}
+/** a hscale wrapper to save some type */
+void hscale_formater(
+    GtkRange *range,
+    void(*func)(int))
+{
+    func((int)gtk_range_get_value(range));
+}
 
-/** callback for enabling/disabling auto white balance */
+/** a wrapper for a horizontal scale initialization */
+GtkWidget* gtk_hscale_new(
+    int range_low, 
+    int range_max)
+{
+    GtkWidget* widget = 
+        gtk_scale_new_with_range(
+            GTK_ORIENTATION_HORIZONTAL,
+            (double)range_low, 
+            (double)range_max, 
+            1.0);
+    return widget;
+                    
+}
+/** a menu_item formater to save some typing */
+void menu_item_formater(
+    GtkWidget *item,
+    GtkWidget *menu,
+    GCallback handler)
+{
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+    g_signal_connect(item, "activate", handler, window);
+}
+
+GtkWidget* gtk_radio_button_new_with_group(
+    GtkWidget* group)
+{
+  GtkWidget* new_widget = 
+    gtk_radio_button_new(gtk_radio_button_get_group
+    (GTK_RADIO_BUTTON(group)));
+  return new_widget;
+}
+
+/*****************************************************************************
+**                      	Internal Callbacks
+*****************************************************************************/
+/** callback for enabling/disabling resize window in grid3 */
 void enable_resize_window(GtkToggleButton *toggle_button)
 {
-    void (*func)(int) = &resize_window_enable;
-    enable_flg_formater(toggle_button, "resize window", func);
+    enable_flg_formater(
+        toggle_button, 
+        "resize window", 
+        &resize_window_enable);
 }
+
 /**-------------------------menu bar callbacks------------------------------*/
 /** callback for find and load config files */
 void open_config_dialog(GtkWidget *widget, gpointer window)
 {
     (void)widget;
-    GtkWidget *file_dialog = gtk_file_chooser_dialog_new("Load Config File",
-    GTK_WINDOW(window),
-    GTK_FILE_CHOOSER_ACTION_OPEN,
-    ("_Open"),
-    GTK_RESPONSE_OK,
-    ("_Cancel"),
-    GTK_RESPONSE_CANCEL,
-    NULL);
+    GtkWidget *file_dialog = gtk_file_chooser_dialog_new(
+        "Load Config File",
+        GTK_WINDOW(window),
+        GTK_FILE_CHOOSER_ACTION_OPEN,
+        ("_Open"),
+        GTK_RESPONSE_OK,
+        ("_Cancel"),
+        GTK_RESPONSE_CANCEL,
+        NULL);
     /// put this here so no warning
     gtk_window_set_transient_for(GTK_WINDOW(file_dialog), GTK_WINDOW(window));
     gtk_widget_show(file_dialog);
@@ -163,17 +244,7 @@ void open_config_dialog(GtkWidget *widget, gpointer window)
     {
         char *file_name = gtk_file_chooser_get_filename(
             GTK_FILE_CHOOSER(file_dialog));
-
-        if ((strcmp(get_file_extension(file_name), "json") == 0) | \
-            (strcmp(get_file_extension(file_name), "bin") == 0) | \
-            (strcmp(get_file_extension(file_name), "txt") == 0))
-        {
-            //g_print("Load %s\r\n", get_file_basename(file_name));
-            load_control_profile(v4l2_dev, file_name);
-        }
-        else
-            g_print("Choose another type of file\r\n");
-
+        load_control_profile(v4l2_dev, file_name);
     }
     else
         g_print("You pressed the cancel\r\n");
@@ -204,10 +275,10 @@ void about_info()
 {
 
     GtkWidget *dialog_about = gtk_about_dialog_new();
+  
     gtk_about_dialog_set_program_name(GTK_ABOUT_DIALOG(dialog_about), 
         "Linux Camera Tool");
-    gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(dialog_about), 
-        version_number);
+    gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(dialog_about), gitversion);
     gtk_about_dialog_set_copyright(GTK_ABOUT_DIALOG(dialog_about),
     "Copyright \xc2\xa9 Leopard Imaging Inc, 2019");
     gtk_about_dialog_set_license_type(GTK_ABOUT_DIALOG(dialog_about),
@@ -267,8 +338,7 @@ void radio_bayerpattern(GtkWidget *widget, gpointer data)
 /** callback for updating exposure time line */
 void hscale_exposure_up(GtkRange *widget)
 {
-    int exposure_time;
-    exposure_time = (int)gtk_range_get_value(widget);
+    int exposure_time = (int)gtk_range_get_value(widget);
     set_exposure_absolute(v4l2_dev, exposure_time);
     g_print("exposure is %d lines\n",get_exposure_absolute(v4l2_dev));
 }
@@ -276,8 +346,7 @@ void hscale_exposure_up(GtkRange *widget)
 /** callback for updating analog gain */
 void hscale_gain_up(GtkRange *widget)
 {
-    int gain;
-    gain = (int)gtk_range_get_value(widget);
+    int gain = (int)gtk_range_get_value(widget);
     set_gain(v4l2_dev, gain);
     g_print("gain is %d\n", get_gain(v4l2_dev));
 }
@@ -300,39 +369,36 @@ void enable_ae(GtkToggleButton *toggle_button)
 /** callback for enabling/disabling auto white balance */
 void enable_awb(GtkToggleButton *toggle_button)
 {
-    auto func = &awb_enable;
-    enable_flg_formater(toggle_button, "awb", func);
+    enable_flg_formater(
+        toggle_button, 
+        "awb", 
+        &awb_enable);
 }
 
 
 /** callback for enabling/disabling CLAHE optimization */
 void enable_clahe(GtkToggleButton *toggle_button)
 {
-    auto func = &clahe_enable;
-    enable_flg_formater(toggle_button, 
-    "contrast limited adaptive histogram equalization", func);
+    enable_flg_formater(
+        toggle_button, 
+        "contrast limited adaptive histogram equalization", 
+        &clahe_enable);
 }
+
 
 /** callback for updating register address length 8/16 bits */
 void toggled_addr_length(GtkWidget *widget, gpointer data)
 {
     (void)widget;
-    if (strcmp((char *)data, "1") == 0)
-        address_width_flag = _8BIT_FLG;
+    address_width_flag = toggle_length_formater((char *)data);
 
-    if (strcmp((char *)data, "2") == 0)
-        address_width_flag = _16BIT_FLG;
 }
 
 /** callback for updating register value length 8/16 bits */
 void toggled_val_length(GtkWidget *widget, gpointer data)
 {
     (void)widget;
-    if (strcmp((char *)data, "1") == 0)
-        value_width_flag = _8BIT_FLG;
-
-    if (strcmp((char *)data, "2") == 0)
-        value_width_flag = _16BIT_FLG;
+    value_width_flag = toggle_length_formater((char *)data);
 }
 
 
@@ -351,7 +417,7 @@ void register_write()
             'x', 
             0xffff, 
             0x0);
-        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+        if ((address_width_flag) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
         
         int regVal = entry_formater(
@@ -360,7 +426,7 @@ void register_write()
             'x', 
             0xffff, 
             0x00);
-        if ((addr_width_for_rw(value_width_flag)) == _8BIT_FLG)
+        if ((value_width_flag) == _8BIT_FLG)
             regVal = regVal & 0xff;
         
         sensor_reg_write(v4l2_dev, regAddr, regVal);
@@ -382,7 +448,7 @@ void register_write()
             'x', 
             0xffff, 
             0x0);
-        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+        if ((address_width_flag) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
         int regVal = entry_formater(
             entry_reg_val, 
@@ -390,7 +456,7 @@ void register_write()
             'x', 
             0xffff, 
             0x0);
-        if ((addr_width_for_rw(value_width_flag)) == _8BIT_FLG)
+        if ((value_width_flag) == _8BIT_FLG)
             regVal = regVal & 0xff;
         unsigned char buf[2];
         buf[0] = regVal & 0xff;
@@ -399,8 +465,8 @@ void register_write()
         /** write 8/16 bit register addr and register data */
         generic_I2C_write(
             v4l2_dev, 
-            (GENERIC_REG_WRITE_FLG | addr_width_for_rw(address_width_flag)),         
-            val_width_for_rw(value_width_flag),             
+            (GENERIC_REG_WRITE_FLG | address_width_flag),         
+            value_width_flag,             
             slaveAddr, 
             regAddr, 
             buf);
@@ -419,7 +485,7 @@ void register_read()
             'x', 
             0xffff, 
             0x0);
-        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+        if ((address_width_flag) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
 
         int regVal = sensor_reg_read(v4l2_dev, regAddr);
@@ -443,13 +509,13 @@ void register_read()
             'x', 
             0xffff, 
             0x0);
-        if ((addr_width_for_rw(address_width_flag)) == _8BIT_FLG)
+        if ((address_width_flag) == _8BIT_FLG)
             regAddr = regAddr & 0xff;
 
         int regVal = generic_I2C_read(
             v4l2_dev, 
-            GENERIC_REG_READ_FLG | addr_width_for_rw(address_width_flag), 
-            val_width_for_rw(value_width_flag), 
+            GENERIC_REG_READ_FLG | address_width_flag, 
+            value_width_flag, 
             slaveAddr, 
             regAddr);
 
@@ -503,10 +569,9 @@ void send_trigger()
 }
 
 /** callback for enabling/disalign sensor trigger */
-void enable_trig()
+void enable_trig(GtkToggleButton *toggle_button)
 {
-    //(void)widget;
-    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_trig_en)))
+    if (gtk_toggle_button_get_active(toggle_button))
     {
         /** positive edge */
         trigger_enable(v4l2_dev, 1, 1);
@@ -523,8 +588,12 @@ void enable_trig()
 /** callback for black level correction ctrl */
 void black_level_correction()
 {
-    int blc = entry_formater(entry_blc, 
-    "black level correction", 'd', 512, -512);
+    int blc = entry_formater(
+        entry_blc, 
+        "black level correction", 
+        'd', 
+        512, 
+        -512);
     add_blc(blc);
 }
 
@@ -572,7 +641,8 @@ void set_rgb_gain_offset()
         MAX_RGB_OFFSET
         , MIN_RGB_OFFSET);
 
-    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_rgb_gain))) {
+    if (gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(check_button_rgb_gain))) {
         enable_rgb_gain_offset (
             red_gain,   green_gain,   blue_gain, 
             red_offset, green_offset, blue_offset);
@@ -591,15 +661,15 @@ void set_rgb_gain_offset()
 void set_rgb_matrix()
 {
     
-    int red_red     = entry_formater(entry_red_red,    "red red",    'd', 512, -512);
-    int red_green   = entry_formater(entry_red_green,  "red green",  'd', 512, -512);
-    int red_blue    = entry_formater(entry_red_blue,   "red blue",   'd', 512, -512);
-    int green_red   = entry_formater(entry_green_red,  "green red",  'd', 512, -512);
-    int green_green = entry_formater(entry_green_green,"green green",'d', 512, -512);
-    int green_blue  = entry_formater(entry_green_blue, "green blue", 'd', 512, -512);
-    int blue_red    = entry_formater(entry_blue_red,   "blue red",   'd', 512, -512);
-    int blue_green  = entry_formater(entry_blue_green, "blue green", 'd', 512, -512);
-    int blue_blue   = entry_formater(entry_blue_blue,  "blue blue",  'd', 512, -512);
+    int red_red     = entry_formater(entry_rr,    "red red", 'd', 512, -512);
+    int red_green   = entry_formater(entry_rg,  "red green", 'd', 512, -512);
+    int red_blue    = entry_formater(entry_rb,   "red blue", 'd', 512, -512);
+    int green_red   = entry_formater(entry_gr,  "green red", 'd', 512, -512);
+    int green_green = entry_formater(entry_gg,"green green", 'd', 512, -512);
+    int green_blue  = entry_formater(entry_gb, "green blue", 'd', 512, -512);
+    int blue_red    = entry_formater(entry_br,   "blue red", 'd', 512, -512);
+    int blue_green  = entry_formater(entry_bg, "blue green", 'd', 512, -512);
+    int blue_blue   = entry_formater(entry_bb,  "blue blue", 'd', 512, -512);
 
     if (gtk_toggle_button_get_active(
         GTK_TOGGLE_BUTTON(check_button_rgb_matrix))) {
@@ -617,41 +687,47 @@ void set_rgb_matrix()
 void enable_soft_ae(GtkToggleButton *toggle_button)
 {
 
-    auto func = &soft_ae_enable;
-    enable_flg_formater(toggle_button, 
-    "Software AE", func);
+    enable_flg_formater(
+        toggle_button, 
+        "Software AE", 
+        &soft_ae_enable);
 
     if (gtk_toggle_button_get_active(toggle_button))
     {
-        gtk_widget_set_sensitive(hscale_exposure, 0); //disable change for exposure
-        gtk_widget_set_sensitive(hscale_gain,0);//disable change for gain
+        /// disable change for exposure and gain
+        gtk_widget_set_sensitive(hscale_exposure, 0); 
+        gtk_widget_set_sensitive(hscale_gain,0);
     }
     else
     {
-        gtk_widget_set_sensitive(hscale_exposure, 1); //enable change for exposure
-        gtk_widget_set_sensitive(hscale_gain,1);    //enable change for gain
+        /// enable change for exposure and gain
+        gtk_widget_set_sensitive(hscale_exposure, 1); 
+        gtk_widget_set_sensitive(hscale_gain,1);    
     }
 }
 /** callback for enabling/disabling image flip */
 void enable_flip(GtkToggleButton *toggle_button)
 {
-    auto func = &flip_enable;
-    enable_flg_formater(toggle_button, 
-    "Flip", func);
+    enable_flg_formater(
+        toggle_button, 
+        "Flip", 
+        &flip_enable);
 }
 /** callback for enabling/disabling image mirror */
 void enable_mirror(GtkToggleButton *toggle_button)
 {
-    auto func = &mirror_enable;
-    enable_flg_formater(toggle_button, 
-    "Mirror", func);
+    enable_flg_formater(
+        toggle_button, 
+        "Mirror", 
+        &mirror_enable);
 }
 /** callback for enabling/disabling show image edge */
 void enable_show_edge(GtkToggleButton *toggle_button)
 {
-    auto func = &canny_filter_enable;
-    enable_flg_formater(toggle_button, 
-    "Show canny edge", func);
+    enable_flg_formater(
+        toggle_button, 
+        "Show canny edge", 
+        &canny_filter_enable);
     if (gtk_toggle_button_get_active(toggle_button))
         gtk_widget_set_sensitive(hscale_edge_low_thres,1);
     else 
@@ -664,64 +740,65 @@ void enable_show_edge(GtkToggleButton *toggle_button)
  */
 void enable_rgb_ir_color(GtkToggleButton *toggle_button)
 {
-    auto func = &rgb_ir_correction_enable;
-    enable_flg_formater(toggle_button, 
-    "RGB-IR color correction", func);
+    enable_flg_formater(
+        toggle_button, 
+        "RGB-IR color correction", 
+        &rgb_ir_correction_enable);
 }
 /** allback for enabling/disabling displaying RGB IR IR channel */
 void enable_rgb_ir_ir(GtkToggleButton *toggle_button)
 {
-    auto func = &rgb_ir_ir_display_enable;
-    enable_flg_formater(toggle_button, 
-    "RGB-IR IR display", func);
+    enable_flg_formater(
+        toggle_button, 
+        "RGB-IR IR display", 
+        &rgb_ir_ir_display_enable);
 }
 
 /** callback for enabling/disabling separate show dual stereo cam */
 void enable_display_dual_stereo(GtkToggleButton *toggle_button)
 {
-    auto func = &separate_dual_enable;
-    enable_flg_formater(toggle_button, 
-    "Separate display dual stereo cam", func);
+    enable_flg_formater(
+        toggle_button, 
+        "Separate display dual stereo cam", 
+        &separate_dual_enable);
 }
 /** callback for enabling/disabling display camera info */
 void enable_display_mat_info(GtkToggleButton *toggle_button)
 {
-    auto func = &display_info_enable;
-    enable_flg_formater(toggle_button, 
-    "Stream info display enable", func);
+    enable_flg_formater(
+        toggle_button, 
+        "Stream info display enable", 
+        &display_info_enable);
 
 }
 /** callback for enabling/disabling auto white balance */
 void enable_abc(GtkToggleButton *toggle_button)
 {
-    auto func = &abc_enable;
-    enable_flg_formater(toggle_button, 
-    "Auto brightness and contrast enable", func);
+    enable_flg_formater(
+        toggle_button, 
+        "Auto brightness and contrast enable", 
+        &abc_enable);
 }
 
 /** callback for update alpha value */
 void hscale_alpha_up(GtkRange *widget)
 {
-    int alpha = (int)gtk_range_get_value(widget);
-    add_alpha_val(alpha);
+    hscale_formater(widget, &add_alpha_val);
 }
 /** callback for update beta value */
 void hscale_beta_up(GtkRange *widget)
 {
-    int beta = (int)gtk_range_get_value(widget);
-    add_beta_val(beta);
+    hscale_formater(widget, &add_beta_val);
 }
 /** callback for update sharpness value */
 void hscale_sharpness_up(GtkRange *widget)
 {
-    int sharpness = (int)gtk_range_get_value(widget);
-    add_sharpness_val(sharpness);
+    hscale_formater(widget, &add_sharpness_val);
 }
 /** callback for update edge threashold value */
 void hscale_edge_thres_up(GtkRange *widget)
 {
-    int edge_low_thres = (int)gtk_range_get_value(widget);
-    add_edge_thres_val(edge_low_thres);
+    hscale_formater(widget, &add_edge_thres_val);
 }
 /**-------------------------micellanous callbacks---------------------------*/
 /** exit streaming loop */
@@ -734,7 +811,9 @@ void exit_loop(GtkWidget *widget)
 }
 
 /** escape gui from pressing ESC */
-gboolean check_escape(GtkWidget *widget, GdkEventKey *event)
+gboolean check_escape(
+    GtkWidget *widget, 
+    GdkEventKey *event)
 {
     (void)widget;
     if (event->keyval == GDK_KEY_Escape)
@@ -745,42 +824,7 @@ gboolean check_escape(GtkWidget *widget, GdkEventKey *event)
     return FALSE;
 }
 
-/*****************************************************************************
-**                      	Helper functions
-*****************************************************************************/
-/** generate register address width flag for callback in register read/write */
-int addr_width_for_rw(int address_width_flag)
-{
-    if (address_width_flag == _8BIT_FLG)
-        return 1;
-    if (address_width_flag == _16BIT_FLG)
-        return 2;
-    return 1;
-}
 
-/** generate register value width flag for callback in register read/write */
-int val_width_for_rw(int value_width_flag)
-{
-    if (value_width_flag == _8BIT_FLG)
-        return 1;
-    if (value_width_flag == _16BIT_FLG)
-        return 2;
-    return 1;
-}
-/** interpret c string for both hex and decimal */
-int hex_or_dec_interpreter_c_string(char *in_string)
-{
-    int out_val;
-    char *hex_prefix = (char*)"0x";
-
-    char *pch =strstr(in_string, hex_prefix);
-    if (pch)
-        out_val = strtol(in_string, NULL, 16);
-    else
-        out_val = strtol(in_string, NULL, 10);
-    return out_val;
-    
-}
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE
 *****************************************************************************/
@@ -792,13 +836,12 @@ void init_grid1_widgets()
 {
       
 	/**
-	 * this part is to get the gain and exposure maximum value defined in firmware
-	 * and update the range in GUI
-	 * if MAX_EXPOSURE_TIME is undefined in firmware, will put a upper limit for 
-	 * exposure time range so the range won't be as large as 65535 which confuses people
-	 * 
-	 *  if UNSET_MAX_EXPOSURE_LINE, firmware didn't define MAX_EXPOSURE_TIME...
-	 * 	place holder = 3, it should be enough for most cases
+	 *  This part is to get the gain and exposure maximum value defined in firmware
+	 *  and update the range in GUI, if MAX_EXPOSURE_TIME is undefined in firmware, 
+     *  it will put a upper limit for exposure time range so the range won't be as 
+     *  large as 65535 which confuses people
+	 *  If UNSET_MAX_EXPOSURE_LINE, firmware didn't define MAX_EXPOSURE_TIME...
+	 * 	place holder = 3 * vertical_line#, it should be enough for most cases
 	 *  if you adjust exposure to maximum, and image is still dark 
 	 *  try to increase 3 to 4, 5, 6 etc
 	 *  or ask for a firmware update, firmware exposure time mapping might be wrong
@@ -816,22 +859,22 @@ void init_grid1_widgets()
     if (exposure_max == UNDEFINED_MAX_EXPOSURE_LINE)
         exposure_max = get_current_height(v4l2_dev) * 3;
 
-    label_device   = gtk_label_new(NULL);
-    label_fw_rev   = gtk_label_new(NULL);
-    label_datatype = gtk_label_new(NULL);
-    label_bayer    = gtk_label_new(NULL);
-    label_exposure = gtk_label_new(NULL);
-    label_gain     = gtk_label_new(NULL);  
-    label_i2c_addr = gtk_label_new(NULL);
+    label_device     = gtk_label_new(NULL);
+    label_fw_rev     = gtk_label_new(NULL);
+    label_datatype   = gtk_label_new(NULL);
+    label_bayer      = gtk_label_new(NULL);
+    label_exposure   = gtk_label_new(NULL);
+    label_gain       = gtk_label_new(NULL);  
+    label_i2c_addr   = gtk_label_new(NULL);
     label_addr_width = gtk_label_new(NULL);
     label_val_width  = gtk_label_new(NULL);
-    label_reg_addr = gtk_label_new(NULL);
-    label_reg_val  = gtk_label_new(NULL);
-    label_capture  = gtk_label_new(NULL);  
-    label_gamma    = gtk_label_new(NULL);
-    label_trig     = gtk_label_new(NULL);
-    label_blc      = gtk_label_new(NULL);
-
+    label_reg_addr   = gtk_label_new(NULL);
+    label_reg_val    = gtk_label_new(NULL);
+    label_capture    = gtk_label_new(NULL);  
+    label_gamma      = gtk_label_new(NULL);
+    label_trig       = gtk_label_new(NULL);
+    label_blc        = gtk_label_new(NULL);
+  
     button_exit_streaming   = gtk_button_new();
     button_read             = gtk_button_new();
     button_write            = gtk_button_new();
@@ -841,9 +884,9 @@ void init_grid1_widgets()
     button_capture_raw      = gtk_button_new();
     button_apply_blc        = gtk_button_new();
 
-    check_button_auto_exp  = gtk_check_button_new();
+    check_button_auto_exp       = gtk_check_button_new();
     check_button_awb            = gtk_check_button_new();
-    check_button_clahe      = gtk_check_button_new();    
+    check_button_clahe          = gtk_check_button_new();    
     check_button_trig_en        = gtk_check_button_new();
     check_button_just_sensor    = gtk_check_button_new();
 
@@ -853,10 +896,9 @@ void init_grid1_widgets()
     entry_gamma     = gtk_entry_new();
     entry_blc       = gtk_entry_new();
 
-    hscale_exposure = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
-                                               0.0, (double)exposure_max, 1.0);
-    hscale_gain     = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL,
-                                           0.0, (double)gain_max, 1.0);
+    hscale_exposure = gtk_hscale_new(0, exposure_max);
+    hscale_gain     = gtk_hscale_new(0, gain_max);
+
 
     hbox_val_width  = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     hbox_addr_width = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
@@ -864,30 +906,23 @@ void init_grid1_widgets()
     hbox_datatype   = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
 
     radio_raw10 = gtk_radio_button_new(NULL);
-    radio_raw12 = gtk_radio_button_new(gtk_radio_button_get_group
-        (GTK_RADIO_BUTTON(radio_raw10)));
-    radio_yuyv  = gtk_radio_button_new(gtk_radio_button_get_group
-        (GTK_RADIO_BUTTON(radio_raw10)));
-    radio_raw8  = gtk_radio_button_new(gtk_radio_button_get_group
-        (GTK_RADIO_BUTTON(radio_raw10)));
+    radio_raw12 = gtk_radio_button_new_with_group(radio_raw10);
+    radio_yuyv  = gtk_radio_button_new_with_group(radio_raw10);
+    radio_raw8  = gtk_radio_button_new_with_group(radio_raw10);
+
 
     radio_bg    = gtk_radio_button_new(NULL);
-    radio_gb    = gtk_radio_button_new(gtk_radio_button_get_group   
-        (GTK_RADIO_BUTTON(radio_bg)));
-    radio_rg    = gtk_radio_button_new(gtk_radio_button_get_group
-        (GTK_RADIO_BUTTON(radio_bg)));
-    radio_gr    = gtk_radio_button_new(gtk_radio_button_get_group
-        (GTK_RADIO_BUTTON(radio_bg)));
-    radio_mono  = gtk_radio_button_new(gtk_radio_button_get_group
-        (GTK_RADIO_BUTTON(radio_bg)));
+    radio_gb    = gtk_radio_button_new_with_group(radio_bg);
+    radio_rg    = gtk_radio_button_new_with_group(radio_bg);
+    radio_gr    = gtk_radio_button_new_with_group(radio_bg);
+    radio_mono  = gtk_radio_button_new_with_group(radio_bg);
 
     radio_8bit_addr    = gtk_radio_button_new(NULL);
-    radio_16bit_addr   = gtk_radio_button_new(gtk_radio_button_get_group
-                (GTK_RADIO_BUTTON(radio_8bit_addr)));
+    radio_16bit_addr   = gtk_radio_button_new_with_group(radio_8bit_addr);
 
     radio_8bit_val     = gtk_radio_button_new(NULL);
-    radio_16bit_val    = gtk_radio_button_new(gtk_radio_button_get_group
-                (GTK_RADIO_BUTTON(radio_8bit_val)));
+    radio_16bit_val    = gtk_radio_button_new_with_group(radio_8bit_val);
+
 
     seperator_tab1_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     seperator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
@@ -939,8 +974,7 @@ void init_grid2_widgets()
     check_button_dual_stereo    = gtk_check_button_new();
     check_button_stream_info    = gtk_check_button_new();
     check_button_abc            = gtk_check_button_new();
-    gtk_toggle_button_set_active(
-        GTK_TOGGLE_BUTTON(check_button_stream_info), TRUE);
+
     button_update_rgb_gain      = gtk_button_new();
     button_update_rgb_matrix    = gtk_button_new();
     
@@ -967,28 +1001,29 @@ void init_grid2_widgets()
     entry_red_offset            = gtk_entry_new();
     entry_green_offset          = gtk_entry_new();
     entry_blue_offset           = gtk_entry_new();
-    entry_red_red               = gtk_entry_new();
-    entry_red_green             = gtk_entry_new();
-    entry_red_blue              = gtk_entry_new();
-    entry_green_red             = gtk_entry_new();
-    entry_green_green           = gtk_entry_new();
-    entry_green_blue            = gtk_entry_new();
-    entry_blue_red              = gtk_entry_new();
-    entry_blue_green            = gtk_entry_new();
-    entry_blue_blue             = gtk_entry_new();
+    entry_rr                    = gtk_entry_new();
+    entry_rg                    = gtk_entry_new();
+    entry_rb                    = gtk_entry_new();
+    entry_gr                    = gtk_entry_new();
+    entry_gg                    = gtk_entry_new();
+    entry_gb                    = gtk_entry_new();
+    entry_br                    = gtk_entry_new();
+    entry_bg                    = gtk_entry_new();
+    entry_bb                    = gtk_entry_new();
 
     seperator_tab2_1           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     seperator_tab2_2           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     
-    hscale_alpha                = gtk_scale_new_with_range(
-        GTK_ORIENTATION_HORIZONTAL, 1.0, (double)ALPHA_MAX, 1.0);
-    hscale_beta = gtk_scale_new_with_range(
-        GTK_ORIENTATION_HORIZONTAL, 0.0, (double)BETA_MAX, 1.0);
-    hscale_sharpness = gtk_scale_new_with_range(
-        GTK_ORIENTATION_HORIZONTAL, 1.0, (double)SHARPNESS_MAX, 1.0);
-    hscale_edge_low_thres = gtk_scale_new_with_range(
-        GTK_ORIENTATION_HORIZONTAL, 0.0, (double)LOW_THRESHOLD_MAX, 1.0);  
-    gtk_widget_set_sensitive(hscale_edge_low_thres,0);                                              
+ 
+    hscale_alpha                = gtk_hscale_new(1, ALPHA_MAX);
+    hscale_beta                 = gtk_hscale_new(-BETA_MAX, BETA_MAX);
+    gtk_range_set_value(GTK_RANGE(hscale_beta), 0);
+    hscale_sharpness            = gtk_hscale_new(1, SHARPNESS_MAX);
+    hscale_edge_low_thres       = gtk_hscale_new(0, LOW_THRESHOLD_MAX);
+
+    gtk_widget_set_sensitive(hscale_edge_low_thres,0);      
+    gtk_toggle_button_set_active(
+        GTK_TOGGLE_BUTTON(check_button_stream_info), TRUE);                                        
 }
 
 /** def_element hold all gtk type widgets initialization setup */
@@ -1344,39 +1379,39 @@ void init_grid2_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
          .label_str = "Blue:"},
-        {.widget = entry_red_red, 
+        {.widget = entry_rr, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "256"},
-        {.widget = entry_red_green, 
+        {.widget = entry_rg, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "0"},
-        {.widget = entry_red_blue, 
+        {.widget = entry_rb, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "0"},
-        {.widget = entry_green_red, 
+        {.widget = entry_gr, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "0"},
-        {.widget = entry_green_green, 
+        {.widget = entry_gg, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "256"},
-        {.widget = entry_green_blue, 
+        {.widget = entry_gb, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "0"},
-        {.widget = entry_blue_red, 
+        {.widget = entry_br, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "0"},
-        {.widget = entry_blue_green, 
+        {.widget = entry_bg, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "0"},        
-        {.widget = entry_blue_blue, 
+        {.widget = entry_bb, 
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "256"},         
@@ -1461,7 +1496,7 @@ void list_all_grid1_elements(GtkWidget *grid)
 
     int row;
     int col;
-    grid_elements elements[] = {
+    static grid_elements elements[] = {
         {.widget = label_device,             .col =col=0, .row =row=0, .width =1},
         {.widget = label_fw_rev,             .col =++col, .row =row,   .width =1},
         {.widget = button_exit_streaming,    .col =++col, .row =row++, .width =1},
@@ -1472,11 +1507,11 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = hbox_bayer,               .col =++col, .row =row++, .width =2},
         {.widget = check_button_auto_exp,    .col =col=0, .row =row,   .width =1},
         {.widget = check_button_awb,         .col =++col, .row =row,   .width =1},
-        {.widget = check_button_clahe,   .col =++col, .row =row++, .width =1},
+        {.widget = check_button_clahe,       .col =++col, .row =row++, .width =1},
         {.widget = label_exposure,           .col =col=0, .row =row,   .width =1},
-        {.widget = hscale_exposure,          .col =++col, .row =row++, .width =3},
+        {.widget = hscale_exposure,          .col =++col, .row =row++, .width =2},
         {.widget = label_gain,               .col =col=0, .row =row,   .width =1},
-        {.widget = hscale_gain,              .col =++col, .row =row++, .width =3},
+        {.widget = hscale_gain,              .col =++col, .row =row++, .width =2},
         {.widget = seperator_tab1_2,         .col =col=0, .row =row++, .width =3},
         {.widget = label_i2c_addr,           .col =col=0, .row =row,   .width =1},
         {.widget = entry_i2c_addr,           .col =++col, .row =row,   .width =1},
@@ -1513,7 +1548,7 @@ void list_all_grid2_elements(GtkWidget *grid)
 {
     int row;
     int col;
-    grid_elements elements[] = { 
+    static grid_elements elements[] = { 
         {.widget = check_button_rgb_gain,    .col =col=0, .row =row=0, .width =2},
         {.widget = button_update_rgb_gain,   .col =col=3, .row =row,   .width =1},
         {.widget = label_red_gain,           .col =col=0, .row =++row, .width =1},
@@ -1538,15 +1573,15 @@ void list_all_grid2_elements(GtkWidget *grid)
         {.widget = label_red_ver,            .col =col=0, .row =row,   .width =1},
         {.widget = label_green_ver,          .col =col,   .row =++row, .width =1},
         {.widget = label_blue_ver,           .col =col++, .row =++row, .width =1},
-        {.widget = entry_red_red,            .col =col,   .row =row-=2,.width =1},
-        {.widget = entry_red_green,          .col =++col, .row =row,   .width =1},
-        {.widget = entry_red_blue,           .col =++col, .row =row++, .width =1},
-        {.widget = entry_green_red,          .col =col-=2,.row =row,   .width =1},
-        {.widget = entry_green_green,        .col =++col, .row =row,   .width =1},
-        {.widget = entry_green_blue,         .col =++col, .row =row++, .width =1}, 
-        {.widget = entry_blue_red,           .col =col-=2,.row =row,   .width =1},
-        {.widget = entry_blue_green,         .col =++col, .row =row,   .width =1},
-        {.widget = entry_blue_blue,          .col =++col, .row =row++, .width =1},
+        {.widget = entry_rr,                 .col =col,   .row =row-=2,.width =1},
+        {.widget = entry_rg,                 .col =++col, .row =row,   .width =1},
+        {.widget = entry_rb,                 .col =++col, .row =row++, .width =1},
+        {.widget = entry_gr,                 .col =col-=2,.row =row,   .width =1},
+        {.widget = entry_gg,                 .col =++col, .row =row,   .width =1},
+        {.widget = entry_gb,                 .col =++col, .row =row++, .width =1}, 
+        {.widget = entry_br,                 .col =col-=2,.row =row,   .width =1},
+        {.widget = entry_bg,                 .col =++col, .row =row,   .width =1},
+        {.widget = entry_bb,                 .col =++col, .row =row++, .width =1},
         {.widget = seperator_tab2_2,         .col =col=0, .row =row++, .width =4},
         {.widget = check_button_soft_ae,     .col =col++, .row =row,   .width =1},
         {.widget = check_button_flip,        .col =col++, .row =row,   .width =1},
@@ -1822,6 +1857,7 @@ void grid_layout_setup(GtkWidget *grid)
     gtk_grid_set_column_spacing(GTK_GRID(grid), 6);
     gtk_container_set_border_width(GTK_CONTAINER(grid), 2);
 }
+
 void grid1_setup(GtkWidget *grid)
 {
     init_grid1_widgets();
@@ -1850,14 +1886,27 @@ void grid3_setup(GtkWidget *grid)
         G_CALLBACK(enable_resize_window), 
         NULL);
 }
+
 void notebook_setup(GtkWidget *maintable)
 {
     GtkWidget *notebook = gtk_notebook_new();
     gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_BOTTOM);
- 
-    GtkWidget *tab1 = gtk_label_new("tab1");
-    GtkWidget *tab2 = gtk_label_new("tab2");
-    GtkWidget *tab3 = gtk_label_new("tab3");
+    
+    GtkWidget *icon_image = gtk_image_new_from_icon_name(
+        "camera-photo", 
+        GTK_ICON_SIZE_LARGE_TOOLBAR);
+    GtkWidget *icon_video = gtk_image_new_from_icon_name(
+        "video-display", 
+        GTK_ICON_SIZE_LARGE_TOOLBAR);
+    GtkWidget *icon_ctrl  = gtk_image_new_from_icon_name(
+        "media-flash", 
+        GTK_ICON_SIZE_LARGE_TOOLBAR);
+    // GtkWidget *label1 = gtk_label_new("Camera Control");
+    // GtkWidget *label2 = gtk_label_new("ISP Control");
+    // GtkWidget *box1 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+    // GtkWidget *box2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+    // gtk_container_add(GTK_CONTAINER(box1), icon_image);
+    // gtk_container_add(GTK_CONTAINER(box1), label1);
 
     GtkWidget *grid1 = gtk_grid_new();
     GtkWidget *grid2 = gtk_grid_new();
@@ -1867,9 +1916,10 @@ void notebook_setup(GtkWidget *maintable)
     grid2_setup(grid2);
     grid3_setup(grid3);
 
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid1, tab1);
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid2, tab2);
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, tab3);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid1, icon_image);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid2, icon_video);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, icon_ctrl);
+
     gtk_container_add(GTK_CONTAINER(maintable), notebook);
 
 }
@@ -1880,7 +1930,8 @@ void menu_bar_setup(GtkWidget *maintable)
     GtkWidget *menu_bar = gtk_menu_bar_new();
     gtk_menu_bar_set_pack_direction(GTK_MENU_BAR(menu_bar), 
         GTK_PACK_DIRECTION_LTR); 
-    
+    gtk_widget_set_hexpand(menu_bar, TRUE);
+    gtk_widget_set_halign(menu_bar, GTK_ALIGN_FILL);
     /** init all menus */
     GtkWidget *device_menu = gtk_menu_new();
     GtkWidget *file_menu = gtk_menu_new();
@@ -1888,45 +1939,68 @@ void menu_bar_setup(GtkWidget *maintable)
     GtkWidget *help_menu = gtk_menu_new();
 
     /** device items */
-    GtkWidget *device_item = gtk_menu_item_new_with_label("Devices");
+    GtkWidget *device_item = 
+        gtk_menu_item_new_with_label("Devices");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(device_item), device_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), device_item);
 
-
     /** config file items */
-    GtkWidget *config_file_item = gtk_menu_item_new_with_label("Config File");
+    GtkWidget *config_file_item = 
+        gtk_menu_item_new_with_label("Config File");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(config_file_item), file_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), config_file_item);
 
-    config_file_item = gtk_menu_item_new_with_label("Load json");
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
+    config_file_item = 
+        gtk_menu_item_new_with_label("Load json");
+    menu_item_formater(
+        config_file_item, 
+        file_menu, 
+        G_CALLBACK(open_config_dialog));
+    
+    config_file_item = 
+        gtk_menu_item_new_with_label("Load BatchCmd.txt");
+    menu_item_formater(
+        config_file_item, 
+        file_menu, 
+        G_CALLBACK(open_config_dialog));
 
-    config_file_item = gtk_menu_item_new_with_label("Load BatchCmd.txt");
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
-
-    config_file_item = gtk_menu_item_new_with_label("Program Flash");
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
-  
-    config_file_item = gtk_menu_item_new_with_label("Program EEPROM");
-    gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
+    config_file_item = 
+        gtk_menu_item_new_with_label("Program Flash");
+    menu_item_formater(
+        config_file_item, 
+        file_menu, 
+        G_CALLBACK(open_config_dialog));
+    
+    config_file_item = 
+        gtk_menu_item_new_with_label("Program EEPROM");
+    menu_item_formater(
+        config_file_item, 
+        file_menu, 
+        G_CALLBACK(open_config_dialog));
+    // gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
+    // g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
     
 
     /** firmware update items */
-    GtkWidget *fw_update_item = gtk_menu_item_new_with_label("FW Update");
+    GtkWidget *fw_update_item = 
+        gtk_menu_item_new_with_label("FW Update");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(fw_update_item), fw_update_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), fw_update_item);
 
-    fw_update_item = gtk_menu_item_new_with_label("Reset Camera");
-    gtk_menu_shell_append(GTK_MENU_SHELL(fw_update_menu), fw_update_item);
-    g_signal_connect(fw_update_item, "activate", G_CALLBACK(fw_update_clicked), NULL);
+    fw_update_item = 
+        gtk_menu_item_new_with_label("Reset Camera");
+    menu_item_formater(
+        fw_update_item,
+        fw_update_menu, 
+        G_CALLBACK(fw_update_clicked));
 
-    fw_update_item = gtk_menu_item_new_with_label("Erase Firmware");
-    gtk_menu_shell_append(GTK_MENU_SHELL(fw_update_menu), fw_update_item);
-    g_signal_connect(fw_update_item, "activate", G_CALLBACK(fw_update_clicked), NULL);
+    fw_update_item = 
+        gtk_menu_item_new_with_label("Erase Firmware");
+    menu_item_formater(
+        fw_update_item, 
+        fw_update_menu, 
+        G_CALLBACK(fw_update_clicked));
+
 
     /** help items */
     GtkWidget *help_item = gtk_menu_item_new_with_label("Help");
@@ -1934,14 +2008,72 @@ void menu_bar_setup(GtkWidget *maintable)
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), help_item);
 
     help_item = gtk_menu_item_new_with_label("About");
-    gtk_menu_shell_append(GTK_MENU_SHELL(help_menu), help_item);
-    g_signal_connect(help_item, "activate", G_CALLBACK(about_info), NULL);
+    menu_item_formater(
+        help_item, 
+        help_menu, 
+        G_CALLBACK(about_info));
 
     help_item = gtk_menu_item_new_with_label("Exit");
-    gtk_menu_shell_append(GTK_MENU_SHELL(help_menu), help_item);
-    g_signal_connect(help_item, "activate", G_CALLBACK(exit_loop), NULL);
+    menu_item_formater(
+        help_item, 
+        help_menu, 
+        G_CALLBACK(exit_loop));
 
     gtk_container_add(GTK_CONTAINER(maintable), menu_bar);
+}
+
+void statusbar_setup(GtkWidget *maintable)
+{
+    GtkWidget* status_bar = gtk_statusbar_new();
+    
+    #ifdef HAVE_OPENCV_CUDA_SUPPORT
+        gtk_statusbar_push(
+            GTK_STATUSBAR (status_bar), 
+            0, 
+            (gchar *)"Build Status: OpenCV CUDA Support");
+
+    #else
+        gtk_statusbar_push(
+            GTK_STATUSBAR (status_bar), 
+            0, 
+            (gchar *)"Build Status: OpenCV non-CUDA Support");
+    #endif
+    gtk_widget_set_name(status_bar, "myStatusBar");
+
+    gtk_widget_set_margin_top(GTK_WIDGET(status_bar), 0);
+    gtk_widget_set_margin_bottom(GTK_WIDGET(status_bar), 0);
+    gtk_container_add(GTK_CONTAINER(maintable), status_bar);
+}
+
+void css_setup()
+{
+    GtkCssProvider *provider;
+    GdkDisplay *display;
+    GdkScreen *screen;
+
+    provider = gtk_css_provider_new();
+    display = gdk_display_get_default();
+    screen = gdk_display_get_default_screen(display);
+    gtk_style_context_add_provider_for_screen(
+        screen, 
+        GTK_STYLE_PROVIDER(provider), 
+        GTK_STYLE_PROVIDER_PRIORITY_USER);
+    
+    if (g_file_test("../gui_style.css", G_FILE_TEST_EXISTS)) 
+    {    
+        gtk_css_provider_load_from_file(
+            provider, 
+            g_file_new_for_path("../gui_style.css"), 
+            NULL);
+    }
+    else
+    {        
+        gtk_css_provider_load_from_file(
+            provider, 
+            g_file_new_for_path("./gui_style.css"), 
+            NULL);
+    }
+    g_object_unref(provider);
 }
 
 void gui_run()
@@ -1949,20 +2081,24 @@ void gui_run()
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Camera Control");
     gtk_widget_set_size_request(window, 500, 100);
-
-    /// whether use makefile or cmake
+    const char* icon1path = "./pic/leopard_cam_tool.jpg";  
+    const char* icon2path = "../pic/leopard_cam_tool.jpg"; 
+    /// whether use Makefile or cmake
     if (g_file_test(icon1path, G_FILE_TEST_EXISTS)) 
         gtk_window_set_default_icon_from_file(icon1path, NULL);
     else 
         gtk_window_set_default_icon_from_file(icon2path, NULL);
     
-    GtkWidget *maintable = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+    GtkWidget *maintable = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     menu_bar_setup(maintable);
     notebook_setup(maintable);
+    statusbar_setup(maintable);
+ 
     gtk_container_add(GTK_CONTAINER(window), maintable);
-
+    
     list_all_window_signals(window);
     gtk_widget_show_all(window);
+    
     gtk_main();
 }
 
@@ -1977,5 +2113,6 @@ void gui_run()
 void ctrl_gui_main()
 {
     gui_init();
+    css_setup();
     gui_run();
 }

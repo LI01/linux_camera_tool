@@ -1,18 +1,18 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(leopard_tools CXX)
+project (leopard_tools CXX)
 
-find_package( OpenMP REQUIRED)
-find_package( OpenCV REQUIRED)
+find_package (OpenMP REQUIRED)
+find_package (OpenCV REQUIRED)
 
-find_library(V4l2Libs v4l2 REQUIRED)
-find_library(udevLibs udev REQUIRED)
-find_library(jsoncLibs json-c REQUIRED)
+find_library (V4l2Libs v4l2 REQUIRED)
+find_library (udevLibs udev REQUIRED)
+find_library (jsoncLibs json-c REQUIRED)
 
 
 
 # check c++ compiler flag
-include(CheckCXXCompilerFlag)
+include (CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 
@@ -34,8 +34,10 @@ include_directories(
 	${GTK3_INCLUDE_DIRS}
 )
 
+# find all the files in src directory and save in SRCS 
 aux_source_directory(src SRCS)
 
+# create static library
 add_library(${PROJECT_NAME}  STATIC
 	${SRCS}
 )
@@ -51,7 +53,8 @@ target_link_libraries(${PROJECT_NAME}
 
 # default set USE_OPENCV_CUDA off
 # use cmake -DUSE_OPENCV_CUDA=ON .. to turn on
-option(USE_OPENCV_CUDA "Set to switch to build use OpenCV CUDA" OFF)
+option (USE_OPENCV_CUDA 
+	"Set to switch to build use OpenCV CUDA" OFF)
 if (USE_OPENCV_CUDA)
 	add_definitions(-DHAVE_OPENCV_CUDA_SUPPORT)
 	message(STATUS "Build with OPENCV_CUDA")

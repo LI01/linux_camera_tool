@@ -31,12 +31,13 @@
 int v4l2_dev; /** global variable, file descriptor for camera device */
 
 static struct option opts[] = {
-
-	{"nbufs", 1, 0, 'n'},
-	{"size", 1, 0, 's'},
-	{"time-per-frame", 1, 0, 't'},
-	{"device", 1, 0, 'd'},
-	{0, 0, 0, 0}};
+	{"nbufs", 			1, 0, 'n'},
+	{"size", 			1, 0, 's'},
+	{"time-per-frame", 	1, 0, 't'},
+	{"device", 			1, 0, 'd'},
+	{"help", 			0, 0, 'h'},
+	{0, 				0, 0,  0}
+};
 
 /******************************************************************************
 **                           Function definition
@@ -82,7 +83,7 @@ int main(int argc, char **argv)
 	{
 		Timer timer;
 		printf("********************Camera Tool Usages***********************\n");
-		while ((c = getopt_long(argc, argv, "n:s:t:d:", opts, NULL)) != -1)
+		while ((c = getopt_long(argc, argv, "n:s:t:d:h", opts, NULL)) != -1)
 		{
 			switch (c)
 			{
@@ -121,12 +122,25 @@ int main(int argc, char **argv)
 					sprintf(ret_dev_name, "/dev/video%s", dev_number);
 					printf("ret dev name = %s\r\n", ret_dev_name);
 				}
-
+				else if (dev_number[0] == '/'
+				&& dev_number[1] == 'd'
+				&& dev_number[2] == 'e'
+				&& dev_number[3] == 'v')
+				{
+					strcpy(ret_dev_name, dev_number);
+		
+					printf("ret dev name = %s\r\n", ret_dev_name);
+				}
+				break;
+			case 'h':
+				usage(argv[0]);
+				exit(1);
 				break;
 			default:
 				printf("Invalid option -%c\n", c);
+				usage(argv[0]);
 				printf("Run %s -h for help.\n", argv[0]);
-				return -1;
+				exit(2);
 			}
 		}
 
@@ -141,7 +155,7 @@ int main(int argc, char **argv)
 			printf("open camera %s failed,err code:%d\n\r", ret_dev_name, v4l2_dev);
 			return -1;
 		}
-
+		
 		printf("********************List Available Resolutions***************\n");
 		/** 
 	 	 * list all the resolutions 
@@ -150,8 +164,9 @@ int main(int argc, char **argv)
 	 	 */
 		std::string _dev_name(ret_dev_name);
 		std::cout << get_stdout_from_cmd(
-			"v4l2-ctl --device=" + _dev_name +
-			" --list-formats-ext | grep Size | "
+			"v4l2-ctl --device=" 
+			+ _dev_name 
+			+" --list-formats-ext | grep Size | "
 			"awk '{print $1 $3}'| sed 's/Size/Resolution/g'");
 
 		/** Set the video format. */

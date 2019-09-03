@@ -1,43 +1,43 @@
 /*****************************************************************************
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
- 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
- 
-  You should have received a copy of the GNU General Public License along
-  with this program; if not, write to the Free Software Foundation, Inc., 
-
-  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for 
-  camera streaming and display.
-
-  Common implementation of a v4l2 application
-  1. Open a descriptor to the device.
-  2. Retrieve and analyse the device's capabilities.
-  3. Set the capture format(YUYV etc).
-  4. Prepare the device for buffering handling. 
-     when capturing a frame, you have to submit a buffer to the device(queue)
-     and retrieve it once it's been filled with data(dequeue)
-     Before you can do this, you must inform the cdevice about 
-     your buffer(buffer request)
-  5. For each buffer you wish to use, you must negotiate characteristics with 
-     the device(buffer size, frame start offset in memory), and create a new
-     memory mapping for it
-  6. Put the device into streaming mode
-  7. Once your buffers are ready, all you have to do is keep queueing and
-     dequeueing your buffer repeatedly, and every call will bring you a new 
-     frame. The delay you set between each frames by putting your program to
-     sleep is what determines your fps
-  8. Turn off streaming mode
-  9. Unmap the buffer
- 10. Close your descriptor to the device 
-  
-  Author: Danyu L
-  Last edit: 2019/08
+*  This program is free software; you can redistribute it and/or modify      *
+*  it under the terms of the GNU General Public License as published by      *
+*  the Free Software Foundation; either version 2 of the License, or         *
+*  (at your option) any later version.                                       *
+*                                                                            *
+*  This program is distributed in the hope that it will be useful,           *
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
+*  GNU General Public License for more details.                              *
+*                                                                            *
+*  You should have received a copy of the GNU General Public License along   *
+*  with this program; if not, write to the Free Software Foundation, Inc.,   *
+*                                                                            *
+*  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for *
+*  camera streaming and display.                                             *
+*                                                                            *
+*  Common implementation of a v4l2 application                               *
+*  1. Open a descriptor to the device.                                       *
+*  2. Retrieve and analyse the device's capabilities.                        *
+*  3. Set the capture format(YUV422 etc).                                    *
+*  4. Prepare the device for buffering handling.                             *
+*     When capturing a frame, you have to submit a buffer to the             *
+*     device(queue) and retrieve it once it's been filled with               *
+*     data(dequeue). Before you can do this, you must inform the device      * 
+*     about your buffer(buffer request)                                      *
+*  5. For each buffer you wish to use, you must negotiate characteristics    * 
+*     with the device(buffer size, frame start offset in memory), and        * 
+*     create a new memory mapping for it                                     *
+*  6. Put the device into streaming mode                                     *
+*  7. Once your buffers are ready, all you have to do is keep queueing and   *
+*     dequeueing your buffer repeatedly, and every call will bring you a new *
+*     frame. The delay you set between each frames by putting your program   * 
+*     to sleep is what determines your fps                                   *
+*  8. Turn off streaming mode                                                *
+*  9. Unmap the buffer                                                       *
+* 10. Close your descriptor to the device                                    *
+*                                                                            *
+*  Author: Danyu L                                                           *
+*  Last edit: 2019/08                                                        *
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/extend_cam_ctrl.h"
@@ -229,13 +229,16 @@ inline void set_save_bmp_flag(int flag)
  * asserts:
  *   none
  */
-static int save_frame_image_bmp(cv::InputOutputArray& opencvImage)
+static int save_frame_image_bmp(
+	cv::InputOutputArray& opencvImage)
 {
 
 	printf("save one capture bmp\n");
-	cv::imwrite(cv::format("captures_%s_%d.bmp",
-						   get_product(), image_count),
-				opencvImage);
+	cv::imwrite(cv::format(
+		"captures_%s_%d.bmp",
+		get_product(), 
+		image_count),
+		opencvImage);
 	image_count++;
 	set_save_bmp_flag(0);
 	return 0;
@@ -382,7 +385,9 @@ void clahe_enable(int enable)
  * returns: 
  * 		file descriptor v4l2_dev
  */
-int open_v4l2_device(char *device_name, struct device *dev)
+int open_v4l2_device(
+	char *device_name, 
+	struct device *dev)
 {
 	int v4l2_dev;
 
@@ -399,6 +404,7 @@ int open_v4l2_device(char *device_name, struct device *dev)
 
 	return v4l2_dev;
 }
+/** a mmap wrapper */
 void *mmap_wrapper(int len)
 {
 	void *p = mmap(NULL, len, PROT_READ | PROT_WRITE, 
@@ -453,7 +459,10 @@ void mmap_variables()
 	edge_low_thres 		 = (int *)mmap_wrapper(sizeof(int));
 	resize_window_ena 	 = (int *)mmap_wrapper(sizeof(int));
 }
-
+/** 
+ * set bit per pixel of the camera read from uvc extension unit
+ * datatype flag that is written in the camera driver
+ */
 int set_bpp(int datatype)
 {
 	switch(datatype)
@@ -760,7 +769,8 @@ void soft_ae_enable(int enable)
  * 		const void *p 		- camera streaming buffer pointer
  */
 double calc_mean(
-	struct device *dev, const void *p)
+	struct device *dev, 
+	const void *p)
 {
 	/// define ROI: 256x256 square pixels in the middle of image
 	int size = ROI_SIZE;
@@ -809,7 +819,8 @@ double calc_mean(
  * 		const void *p 		- camera streaming buffer pointer
  */
 void apply_soft_ae(
-	struct device *dev, const void *p)
+	struct device *dev, 
+	const void *p)
 {
 	int local_gain = *cur_gain;
 	int local_exposure = *cur_exposure;
@@ -867,7 +878,9 @@ void apply_soft_ae(
  * 		int shift 			- shift bits
  * */
 void perform_shift(
-	struct device *dev, const void *p, int shift)
+	struct device *dev, 
+	const void *p, 
+	int shift)
 {
 
 	//Timer timer;
@@ -1166,6 +1179,8 @@ void apply_rgb_gain_offset_pre_debayer(
  * pass the variable from GUI to camera streaming thread
  * and print out these values
  * set the flag on enable rgb to rgb matrix
+  * args: 
+ * 		red_red, red_green etc - rgb2rgb matrix parameters
  */
 void enable_rgb_matrix(
 	int red_red, 	int red_green, 		int red_blue,
@@ -1274,6 +1289,7 @@ void add_edge_thres_val(int edge_low_thres_val_from_gui)
 	*edge_low_thres = edge_low_thres_val_from_gui;
 }
 
+/** add switch keep to exit program */
 void switch_on_keys()
 {
 	char key = (char)cv::waitKey(_1MS);
@@ -1288,7 +1304,13 @@ void switch_on_keys()
 		break;
 	}
 }
-
+/** 
+ * like the name said, group all the isp functions that can 
+ * perform on both OpenCV non-CUDA and OpenCV CUDA
+ * args:
+ *     cv::InputOutputArray opencvImage - camera stream buffer array
+ * 			that can be modified inside the functions
+ */
 static void group_gpu_image_proc(
 	cv::InputOutputArray opencvImage)
 {
@@ -1449,6 +1471,7 @@ void rgb_ir_correction_enable(int enable)
 {
 	enable_wrapper(rgb_ir_color, enable);
 }
+
 /**
  *  Bayer color correction for RGB-IR sensor
  *
@@ -1476,7 +1499,9 @@ void rgb_ir_correction_enable(int enable)
  * 		struct device *dev - every infomation for camera
  * 		const void *p 		- camera streaming buffer pointer
  */
-void apply_color_correction_rgb_ir(struct device *dev, const void *p)
+void apply_color_correction_rgb_ir(
+	struct device *dev, 
+	const void *p)
 {
 	int pixel_max_val = BIT(*bpp) - 1;
 	int height = dev->height;
@@ -1526,6 +1551,7 @@ void apply_color_correction_rgb_ir(struct device *dev, const void *p)
 	}
 	
 }
+
 /**
  * set rgb ir ir channel flag 
  * args:
@@ -1535,8 +1561,16 @@ void rgb_ir_ir_display_enable(int enable)
 {
 	enable_wrapper(rgb_ir_ir, enable);
 }
-
-void display_rgbir_ir_channel(struct device *dev, const void *p)
+/** display the IR channel in a RGB-IR raw camera,
+ *  the size of the image will be usually 1/4 of the full resolution
+ *  (depend on the RGB-IR sensor's CCM)
+ *  args: 
+ * 		struct device *dev - every infomation for camera
+ * 		const void *p 		- camera streaming buffer pointer
+ */
+void display_rgbir_ir_channel(
+	struct device *dev, 
+	const void *p)
 {
 	int pixel_max_val = BIT(*bpp) - 1;
 	int height = dev->height;
@@ -1592,6 +1626,7 @@ void display_rgbir_ir_channel(struct device *dev, const void *p)
 
 	
 }
+
 /**
  * request, allocate and map buffers
  * 
@@ -1602,7 +1637,9 @@ void display_rgbir_ir_channel(struct device *dev, const void *p)
  * 		errno 
  * 
  */
-int video_alloc_buffers(struct device *dev, int nbufs)
+int video_alloc_buffers(
+	struct device *dev, 
+	int nbufs)
 {
 	struct buffer *buffers;
 
@@ -1680,6 +1717,7 @@ int video_alloc_buffers(struct device *dev, int nbufs)
 	}
 	return 0;
 }
+
 /**
  * free, unmap buffers
  * 

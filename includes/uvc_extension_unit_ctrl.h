@@ -1,23 +1,23 @@
 /*****************************************************************************
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
- 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
- 
-  You should have received a copy of the GNU General Public License along
-  with this program; if not, write to the Free Software Foundation, Inc., 
-
-  This is the sample code for Leopard USB3.0 camera for register control & 
-  trigger/strobe & fw&hw revision under Linux using V4L2. For supporting more
-  UVC extension unit features, firmware will need to get updated.
-  
-  Author: Danyu L
-  Last edit: 2019/08
+*  This program is free software; you can redistribute it and/or modify      *
+*  it under the terms of the GNU General Public License as published by	     *
+*  the Free Software Foundation; either version 2 of the License, or		 *
+*  (at your option) any later version.										 *
+* 																			 *
+*  This program is distributed in the hope that it will be useful,			 *
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of	         *
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the			 *
+*  GNU General Public License for more details.					             *
+* 																		     *
+*  You should have received a copy of the GNU General Public License along   *
+*  with this program; if not, write to the Free Software Foundation, Inc.,   *
+*																		     *
+*  This is the sample code for Leopard USB3.0 camera for register control &  *
+*  trigger/strobe & fw&hw revision under Linux using V4L2. For supporting 	 *
+*  more UVC extension unit features, firmware will need to get updated.      *
+*  																			 *
+*  Author: Danyu L 														     *
+*  Last edit: 2019/08 														 *
 *****************************************************************************/
 #pragma once
 /*****************************************************************************
@@ -82,10 +82,6 @@ typedef struct reg_seq
 
 #define SENSOR_REG_WRITE_FLG    (1)
 #define SENSOR_REG_READ_FLG     (0)
-
-// /** --- for LI_XU_GENERIC_I2C_RW --- */
-// #define GENERIC_REG_WRITE_FLG (0x80)
-// #define GENERIC_REG_READ_FLG  (0x00)
 
 /** --- for LI_XU_SENSOR_REGISTER_CONFIGURATION --- */
 typedef struct reg_pair
@@ -230,11 +226,17 @@ void imx334_mipi_testing(int fd);
 /** --------------------------- helper function ----------------------------*/
 void error_handle_extension_unit();
 
-void write_to_UVC_extension(int fd, int property_id,
-                            int length, unsigned char *buffer);
+void write_to_UVC_extension(
+    int fd, 
+    int property_id,
+    int length, 
+    unsigned char *buffer);
 
-void read_from_UVC_extension(int fd, int property_id,
-                             int length, unsigned char *buffer);
+void read_from_UVC_extension(
+    int fd, 
+    int property_id,
+    int length, 
+    unsigned char *buffer);
 
 /**------------------------------------------------------------------------ */
 
@@ -247,12 +249,19 @@ void set_sensor_mode(int fd, int mode);
 void set_pos(int fd, int start_x, int start_y);
 
 void get_led_status(int fd);
-void set_led(int fd, int left_0, int left_1, int right_0, int right_1);
+void set_led(
+    int fd, 
+    int left_0, 
+    int left_1, 
+    int right_0, 
+    int right_1);
 
-void set_sensor_gain_rgb(int fd, unsigned int rGain,
-                         unsigned int grGain,
-                         unsigned int gbGain,
-                         unsigned int bGain);
+void set_sensor_gain_rgb(
+    int fd, 
+    unsigned int rGain,
+    unsigned int grGain,
+    unsigned int gbGain,
+    unsigned int bGain);
 
 int get_hw_rev();
 int get_li_datatype();
@@ -265,27 +274,54 @@ void get_pts(int fd);
 void set_pts(int fd, unsigned long initVal);
 
 void soft_trigger(int fd);
-void trigger_delay_time(int fd, unsigned int delay_time);
-void trigger_enable(int fd, int ena, int enb);
+void trigger_delay_time(
+    int fd, 
+    unsigned int delay_time);
+void trigger_enable(
+    int fd, 
+    int ena, 
+    int enb);
 
-void load_register_setting_from_configuration(int fd, int regCount,
-                                              const struct reg_pair *buffer);
+void load_register_setting_from_configuration(
+    int fd, 
+    int regCount,
+    const struct reg_pair *buffer);
 void load_register_setting_from_flash_manually(int fd);
 
-void sensor_reg_write(int fd, int regAddr, int regVal);
-int sensor_reg_read(int fd, int regAddr);
+void sensor_reg_write(
+    int fd, 
+    int regAddr, 
+    int regVal);
+int sensor_reg_read(
+    int fd, 
+    int regAddr);
 
 void firmware_erase(int fd);
 void reboot_camera(int fd);
-void set_spi_port_select(int fd, int mode);
+void set_spi_port_select(
+    int fd, 
+    int mode);
 
-void generic_I2C_write(int fd, int rw_flag, int bufCnt,
-                       int slaveAddr, int regAddr, unsigned char *i2c_data);
-int generic_I2C_read(int fd, int rw_flag, int bufCnt,
-                     int slaveAddr, int regAddr);
+void generic_I2C_write(
+    int fd, 
+    int rw_flag, 
+    int bufCnt,
+    int slaveAddr, 
+    int regAddr, 
+    unsigned char *i2c_data);
+int generic_I2C_read(
+    int fd, 
+    int rw_flag, 
+    int bufCnt,
+    int slaveAddr, 
+    int regAddr);
 
-void write_cam_defect_pixel_table(int fd, unsigned char *w_buf);
-void read_cam_defect_pixel_table(int fd, unsigned char *r_buf);
+void write_cam_defect_pixel_table(
+    int fd, 
+    unsigned char *w_buf);
+void read_cam_defect_pixel_table(
+    int fd, 
+    unsigned char *r_buf);
 
 void ap020x_send_command(int fd, AP0200_CMD cmd, int time_out);
 void ap020x_soft_reset(int fd);

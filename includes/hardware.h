@@ -141,7 +141,15 @@
  * FYI: default VID for Leopard Imaging USB3 camera in case you 
  * want to add your own udev rules for USB video device
  */ 
-#define USB_VENDOR_ID           (0x2A0B) 
+#define LI_USB3_VID               "2a0b"
+#define OV580_ST_VID              "05a9"
+#define OV580_OV9271_PID          "0581"
+#define OV580_OV7251_PID          "0581"
+#define OV580_OG01A_PID           "0583"
+
+#define OV580_OV4689_VID          "2b03"     
+#define OV580_OV4689_PID          "0580"
+
 
 /** --- for LI_XU_GENERIC_I2C_RW --- */
 #define GENERIC_REG_WRITE_FLG   (0x80)

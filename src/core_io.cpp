@@ -1,23 +1,22 @@
-
 /*****************************************************************************
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
- 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
- 
-  You should have received a copy of the GNU General Public License along
-  with this program; if not, write to the Free Software Foundation, Inc., 
-  
-  This is the sample code for Leopard USB3.0 camera, this file is mainly for 
-  string and file manipulation.
-
-  Author: Danyu L
-  Last edit: 2019/06
+*  This program is free software; you can redistribute it and/or modify      *   
+*  it under the terms of the GNU General Public License as published by      *
+*  the Free Software Foundation; either version 2 of the License, or         *
+*  (at your option) any later version.                                       *
+*                                                                            *
+*  This program is distributed in the hope that it will be useful,           *
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
+*  GNU General Public License for more details.                              *
+*                                                                            *
+*  You should have received a copy of the GNU General Public License along   *
+*  with this program; if not, write to the Free Software Foundation, Inc.,   * 
+*                                                                            *
+*  This is the sample code for Leopard USB3.0 camera, this file is mainly    *
+*  for string and file manipulation.                                         *
+*                                                                            *
+*  Author: Danyu L                                                           *
+*  Last edit: 2019/06                                                        *
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/core_io.h"
@@ -125,7 +124,8 @@ config_file_type config_file_identifier(char *filename)
         return CONFIG_FILE_JSON;
     else if (strcmp(file_type, "txt") == 0)
         return CONFIG_FILE_TXT;
-    return CONFIG_FILE_BIN;
+    else 
+        return CONFIG_FILE_WRONG;
 }
 
 
@@ -181,6 +181,11 @@ void load_control_profile(int fd, char *filename)
         //ap020x_program_flash_eeprom(fd, (unsigned char *)buffer, (int)l_size);
         printf("*******************Flash Finish From BIN file*****************\n");
         break;
+    case CONFIG_FILE_WRONG:
+    default: 
+        printf("*************Choose another type of file**********************\n");
+        break;
+   
     }
 
     fclose(fp);
