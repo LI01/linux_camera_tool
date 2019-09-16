@@ -1,8 +1,10 @@
 Leopard USB3.0 Camera Linux Camera Tool
 =======
 This is the sample code for Leopard USB3.0 camera linux camera tool. It is a simple interface for capturing, viewing, controlling video stream from Leopard's uvc compatible devices, with a special emphasis for the linux v4l2 driver. 
-
 For Leopard USB3.0 Firmware Update Tool, please refer to [FW_UPDATE_README](/li_firmware_updates/README.md)
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Languages](https://img.shields.io/github/languages/count/danyu9394/linux_camera_tool)](https://github.com/danyu9394/linux_camera_tool)
+
 
 Table of Contents
 -----------------  
@@ -11,6 +13,7 @@ Table of Contents
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
     - [Hardware Prerequisites](#hardware-prerequisites)
+    - [Run Linux Camera Tool on Docker](#run-linux-camera-tool-on-docker)
     - [Dependencies](#dependencies)
       - [OpenCV Prerequisites](#opencv-prerequisites)
       - [OpenCV CUDA support](#opencv-cuda-support)
@@ -38,12 +41,48 @@ Table of Contents
 ### Hardware Prerequisites
 - __Camera__: any Leopard USB3.0/2.0 cameras
 - __Host PC__: with USB3.0 port connectivity 
-  Some boards like OV580 has more strict voltage requirements toward USB3.0 port. It is suggested to use a USB3.0 hub to regulate the voltage out from PC's USB3.0 port. 
-  Do a `lsusb` and found your camera device after connection: VID of the device is usually `2a0b`.
+  Some boards like `OV580-STEREO` has more strict voltage requirements toward USB3.0 port. It is highly suggested to use a __USB3.0 powered hub__ to regulate the voltage out from PC's USB3.0 port if a `OV580-STEREO` USB3 device is used. 
+  The underlying issue is that different host PCs/USB3 PCIe manufacturers have different USB3 controllers. Some of the USB3 cameras are not able to handle transient voltage droop from the USB3 port from PC. So a __USB3.0 powered hub__ is highly recommended if this issue is repeatable with direct USB3 connection on your host PC. (Any serdes USB3 camera which have an external 12V power supply will be immune to this as you assumed :D)
+  - Do a `lsusb` and found your Leopard USB3.0 camera device after connection: VID of our USB device is usually `2a0b` (for more hardware information like OV580-STEREO, please refer to [hardware.h](includes/hardware.h)).
+  - Do a `ls /dev/vi*` and make sure there is video device listed. 
+  - Once you know which `/dev/videoX` the camera is at, use `./leopard_cam -d X` when you run your camera
 - __USB3.0, USB2.0 connectivity__: 
   If you plug in your USB camera device slow enough to a USB3.0 port, your host PC might still recognize the USB3.0 device as USB2.0. 
   To be able to tell if your host PC has been recognized this USB3.0 camera truly as a USB3.0 device, do a `v4l2-ctl --device=/dev/videoX --all`, where `X` is the device number that being recognized by your PC. And check if its resolution, frame rate listed is the right one, (USB2.0 camera will have much lower bandwidth, so usually small resolution and frame rate).
-  
+```console
+foo@bar:~$ lsusb ## list all your USB device on your host PC
+Bus 002 Device 034: ID 05e3:0612 Genesys Logic, Inc. 
+Bus 002 Device 035: ID 2a0b:00cd  
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 001 Device 035: ID 046d:c52b Logitech, Inc. Unifying Receiver
+Bus 001 Device 034: ID 046d:c53d Logitech, Inc. 
+Bus 001 Device 031: ID 05e3:0610 Genesys Logic, Inc. 4-port hub
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+foo@bar:~$ lsusb -v -d 2a0b:00cd ## list verbose information on connected Leopard USB3 camera 
+Bus 002 Device 035: ID 2a0b:00cd  
+Device Descriptor:
+  bLength                18
+  bDescriptorType         1
+  bcdUSB               3.00
+  bDeviceClass          239 Miscellaneous Device
+  bDeviceSubClass         2 ?
+  bDeviceProtocol         1 Interface Association
+  bMaxPacketSize0         9
+  idVendor           0x2a0b 
+  idProduct          0x00cd 
+  bcdDevice            0.00
+  iManufacturer           1 
+  iProduct                2 
+  iSerial                 3 
+  bNumConfigurations      1
+...
+foo@bar:~$ ls /dev//vi* ## list all the video device in your host PC
+/dev/video0  /dev/video1
+```
+
+### Run Linux Camera Tool on Docker
+Please refer to [Docker Readme](/docker/README.md) for more information
+
 ### Dependencies
 Make sure the libraries have installed. Run [configure.sh](configure.sh) in current directory for completing installing all the required dependencies.
 ```sh
@@ -118,6 +157,8 @@ $ sudo cp ./leopard_cam /usr/bin
 ```sh
 $ sudo rm -f /usr/bin/leopard_cam 
 ```
+
+
 ---
 
 ## Code Structure
@@ -169,7 +210,7 @@ $ linux_camera_tool .
 --- 
 ## Declarations 
 ### Image Processing Functionalities
-Most of the image processing jobs in Linux Camera Tool are done by using OpenCV. Since there are histogram matrix calculations and many other heavy image processing involved, enabling these features will slow down the streaming a lot. If you build Linux Camera Tool with __OpenCV CUDA support__, these feature speed won't be compromised a lot. Detailed benchmark result is listed below.
+Most of the image processing jobs in Linux Camera Tool([code for ISP](src/isp_lib.cpp)) are done by using OpenCV. Since there are histogram matrix calculations and many other heavy image processing involved, enabling these features will slow down the streaming a lot. If you build Linux Camera Tool with __OpenCV CUDA support__, these feature speed won't be compromised a lot. Detailed benchmark result is listed below.
 
 #### Benchmark Results
 Benchmark test is performed on a _12M pixel RAW12 bayer_ camera (IMX477).
@@ -183,7 +224,7 @@ Benchmark test is performed on a _12M pixel RAW12 bayer_ camera (IMX477).
 | `Show Edge`            | Yes                                | 20ms    | Yes                            | 16ms    |
 | `Color Correction Matrix` | Yes                             | 18ms    | No                             | N/A     |
 | `Perform Shift`        | No                                 | 13ms    | No                             | N/A     |
-| `Seperate Display`     | Yes                                | 9000us  | No                             | N/A     |
+| `Separate Display`     | Yes                                | 9000us  | No                             | N/A     |
 | `Brightness`           | Yes                                | 7ms   | Yes                            | 400us   |
 | `Contrast`             | Yes                                | 7ms   | Yes                            | 400us   |
 | `Auto Brightness & Contrast` | Yes                                | 14ms    | Yes                            | 1180us  |
@@ -203,7 +244,7 @@ Since _Linux V4L2 API_ doesn't provide a easier way to tell you what exact expos
 `Exposure time = exposure_time_line_number / (frame_rate * total_line_number)`
 
 , where 
-1. __exposure_time_line_number__ is the value that display is linux camera tool exposure control
+1. __exposure_time_line_number__ is the value that display is linux camera tool exposure control.
 2. you can get __frame_rate__ from the log message `Get Current Frame Rate =`, don't refer to `Current Fps` that displays in the `Camera View`, that's the frame rate your PC can process, not the physically USB received frame rate from camera.
 3. __total_line_number__ is usually around the height of the camera's current resolution, usually slightly larger than that since VD needs blanking. To get the exact __total_line_number__, you might want to read __VTS__ register value for your sensor, which might be a hassle for you so I will only tell you this roughly calculation method...
 4. Noticing for exposure time change in Linux Camera Tool Control GUI, the exposure time range will usually be over the camera's resolution height. If you have the exposure value set to be over camera's resolution height, it might affect your frame rate. Since when camera exposure time line number is greater than the total line number, that will slow down your camera's frame rate. This varies from different sensors. Some sensors don't allow that happen, so the exposure time will stick the same when it is over total line number.
@@ -220,10 +261,10 @@ __Original streaming after debayer for IMX477:__
 > <img src="pic/imx477Orig.jpg" width="1000">
 
 __Modified streaming for IMX477:__
-> enabled software AWB, gamma correction, black level correction with _non OpenCV CUDA support_
+> enabled AWB, gamma correction, black level correction with _non OpenCV CUDA support_
 > <img src="pic/imx477.jpg" width="1000">
 
-> enable software awb, auto brightness & contrast, sharpness control with _OpenCV CUDA support_
+> enable awb, auto brightness & contrast, sharpness control with _OpenCV CUDA support_
 > <img src="pic/imx477Cuda.jpg" width="1000">
 
 #### Test on RAW sensor 5 Megapixel OS05A20
