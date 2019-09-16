@@ -2,6 +2,8 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.4.2 - 2019-09-16  
+- add Docker support
 ## v0.4.1 - 2019-09-03  
 **Added:**
 - version number read from CHANGELOG.md instead of hard coded

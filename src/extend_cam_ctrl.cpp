@@ -1407,9 +1407,9 @@ void decode_process_a_frame(
 				{*gr, *gg, *gb},
 				{*br, *bg, *bb}
 			};
-			if (TRUE != (*rr==256 && *rg==0 && *rb==0 && \
-						*gr==0 && *gg==256 && *gb==0 && \
-						*br==0 && *bg==0 && *bb==256))
+			if (*rr==256 && *rg==0 && *rb==0 && \
+				*gr==0 && *gg==256 && *gb==0 && \
+				*br==0 && *bg==0 && *bb==256)
 					apply_rgb_matrix_post_debayer(img, 
 					(int *)ccm);
 			
@@ -1689,8 +1689,13 @@ int video_alloc_buffers(
 
 		buffers[i].length = querybuffer.length; /** remember for munmap() */
 
-		buffers[i].start = mmap(NULL, querybuffer.length, PROT_READ | PROT_WRITE,
-		 MAP_SHARED, dev->fd, querybuffer.m.offset);
+		buffers[i].start = mmap(
+			NULL, 
+			querybuffer.length, 
+			PROT_READ | PROT_WRITE,
+		 	MAP_SHARED, 
+			dev->fd, 
+			querybuffer.m.offset);
 
 		if (buffers[i].start == MAP_FAILED)
 		{
@@ -1775,3 +1780,4 @@ void set_loop(int exit)
 {
 	*loop = exit;
 }
+

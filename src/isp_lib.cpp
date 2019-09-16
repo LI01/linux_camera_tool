@@ -1,22 +1,22 @@
 /*****************************************************************************
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
- 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
- 
-  You should have received a copy of the GNU General Public License along
-  with this program; if not, write to the Free Software Foundation, Inc., 
-
-  This is the sample code for image signal processing library that used
-  in this application.
-
-  Author: Danyu L
-  Last edit: 2019/08
+*  This program is free software; you can redistribute it and/or modify	     *
+*  it under the terms of the GNU General Public License as published by		 *
+*  the Free Software Foundation; either version 2 of the License, or		 *
+*  (at your option) any later version.										 *
+* 																			 *
+*  This program is distributed in the hope that it will be useful,			 *
+*  but WITHOUT ANY WARRANTY; without even the implied warranty of			 *
+*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the		     *
+*  GNU General Public License for more details.							     *
+* 																			 *
+*  You should have received a copy of the GNU General Public License along	 *
+*  with this program; if not, write to the Free Software Foundation, Inc., 	 *
+*																		     *
+*  This is the sample code for image signal processing library that used     *
+*  in this application.														 *
+*																			 *
+*  Author: Danyu L														     *
+*  Last edit: 2019/08														 *
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/isp_lib.h"
@@ -116,14 +116,15 @@ void apply_white_balance(
 	// 	while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
 	// 		vmax[i] -= 1;
 	// 	if (vmax[i] < 255 - 1)
-	// 	vmax[i] += 1;
+	// 		vmax[i] += 1;-
 		
 	// }
 	// for(int i=0; i< 3; i++)
 	// {
 	// 	printf("vmin[%d]=%d\r\n", i, vmin[i]);
-	// 	printf("vmax[%d]=%d\r\n", i, vmax[i]);
+	// 	//printf("vmax[%d]=%d\r\n", i, vmax[i]);
 	// }
+
 	cv::cuda::equalizeHist(bgr_planes[0], bgr_planes[0]);
 	cv::cuda::equalizeHist(bgr_planes[1], bgr_planes[1]);
 	cv::cuda::equalizeHist(bgr_planes[2], bgr_planes[2]);
@@ -166,7 +167,7 @@ void apply_white_balance(
 	cv::Mat bgr_planes[3];
 	cv::Mat hist[3];
 	cv::split(_opencvImage, bgr_planes);
-	float range[] = {0,256};
+	float range[] = {0.0f,256.0f};
 	const float *histRange = {range};
 	int hist_size = 256;
 	for (int i=0; i<3; i++)
@@ -215,7 +216,7 @@ void apply_white_balance(
 		while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
 			vmax[i] -= 1;
 		if (vmax[i] < 255 - 1)
-		vmax[i] += 1;
+			vmax[i] += 1;
 		
 	}
 

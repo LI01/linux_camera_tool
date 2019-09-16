@@ -28,6 +28,7 @@ char *manufacturer;
 char *product;
 char *serial;
 int *is_ov580_st;
+
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
@@ -102,10 +103,9 @@ int is_ov580_stereo(struct udev_device *dev)
  * enumerate v4l2 device
  * input device set to default /dev/video0
  * will find any leopard image USB3 device and return the first found for fd
- * FIXME: probably return too early before unref udev -> 
  * two video devices for one camera, later one is dummy...
  */
-char *enum_v4l2_device(char *dev_name)
+void enum_v4l2_device(char *dev_name)
 {
 
     struct udev *udev;
@@ -113,6 +113,7 @@ char *enum_v4l2_device(char *dev_name)
     struct udev_list_entry *devices;
     struct udev_list_entry *dev_list_entry;
     struct udev_device *dev;
+    int is_li_dev = 1;
     /** put these variables on heap so it doesn't get buffer overflow */
     manufacturer    = (char *) malloc(20);
     product         = (char *) malloc (20);
@@ -124,6 +125,7 @@ char *enum_v4l2_device(char *dev_name)
     if (!udev)
     {
         printf("Can't create udev\n");
+        free_device_vars();
         exit(1);
     }
 
@@ -166,7 +168,8 @@ char *enum_v4l2_device(char *dev_name)
         if (!dev)
         {
             printf("Unable to find parent usb device.");
-            exit(1);
+            free_device_vars();
+            exit(2);
         }
 
 
@@ -195,9 +198,8 @@ char *enum_v4l2_device(char *dev_name)
                a firmware updates, values will get from FX3 and sensor fuse id */
             // printf("  serial: %s\n",
             //        serial);
-
-            //TODO:delete this for other computer?
-            return dev_name;
+            udev_device_unref(dev);
+            break;
         }
 
         else if (is_ov580_stereo(dev))
@@ -224,17 +226,24 @@ char *enum_v4l2_device(char *dev_name)
                a firmware updates, values will get from FX3 and sensor fuse id */
             // printf("  serial: %s\n",
             //        serial);
-
-            //TODO:delete this for other computer?
-            return dev_name;
+            udev_device_unref(dev);
+            break;
         }
-
-        udev_device_unref(dev);
+        else 
+        {
+            udev_device_unref(dev);
+            is_li_dev = 0;
+            printf("Couldn't find Leopard USB3 Camera\r\n");
+        }
     }
     /** Free the enumerator object */
     udev_enumerate_unref(enumerate);
-
     udev_unref(udev);
-    return dev_name;
+    /** If it is not Leopard device, just exit */
+    if (!is_li_dev) 
+    {
+        free_device_vars();
+        exit(0);
+    }
 }
 

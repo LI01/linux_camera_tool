@@ -51,7 +51,7 @@ get_stdout_from_cmd(std::string cmd)
 
 	std::string data;
 	FILE *stream;
-	const int max_buffer = 256;
+	const int max_buffer= 256;
 	char buffer[max_buffer];
 	cmd.append(" 2>&1");
 
@@ -69,78 +69,90 @@ get_stdout_from_cmd(std::string cmd)
 int main(int argc, char **argv)
 {
 	struct device dev;
-	char dev_name[64] = "/dev/video0";
+	dev.nbufs = V4L_BUFFERS_DEFAULT;
+
+	// assign 20 bytes in case user input jibberish
+	char dev_name[20] = "/dev/video0";
+	enum_v4l2_device(dev_name);
 	int do_set_format = 0;
 	int do_set_time_per_frame = 0;
-	char *endptr;
-	dev.nbufs = V4L_BUFFERS_DEFAULT;
-	int c;
-	int sys_ret;
-	struct v4l2_fract time_per_frame = {1, 15};
-	char *ret_dev_name = enum_v4l2_device(dev_name);
-	char *dev_number;
+	uint32_t time_per_frame  = 15;
+	int choice;
 	
 	{
 		Timer timer;
 		printf("********************Camera Tool Usages***********************\n");
-		while ((c = getopt_long(argc, argv, "n:s:t:d:h", opts, NULL)) != -1)
+		while ((choice = getopt_long(argc, argv, "n:s:t:d:h", opts, NULL)) != -1)
 		{
-			switch (c)
+			switch (choice)
 			{
-			case 'n':
-				/** set buffer number */
-				dev.nbufs = atoi(optarg);
-				if (dev.nbufs > V4L_BUFFERS_MAX)
-					dev.nbufs = V4L_BUFFERS_MAX;
-				printf("device nbuf %d\n", dev.nbufs);
-				break;
-			case 's':
-				do_set_format = 1;
-				dev.width = strtol(optarg, &endptr, 10);
-				if (*endptr != 'x' || endptr == optarg)
+				case 'n':
 				{
-					printf("Invalid size '%s'\n", optarg);
-					return 1;
+					/** set buffer number */
+					dev.nbufs = atoi(optarg);
+					if (dev.nbufs > V4L_BUFFERS_MAX)
+						dev.nbufs = V4L_BUFFERS_MAX;
+					printf("device nbuf %d\n", dev.nbufs);
+					break;
 				}
-				dev.height = strtol(endptr + 1, &endptr, 10);
-				if (*endptr != 0)
+				case 's':
 				{
-					printf("Invalid size '%s'\n", optarg);
-					return 1;
+					do_set_format = 1;
+					char *endptr;
+					dev.width = strtol(optarg, &endptr, 10);
+					if (*endptr != 'x' || endptr == optarg)
+					{
+						printf("Invalid size '%s'\n", optarg);
+						return 1;
+					}
+					dev.height = strtol(endptr + 1, &endptr, 10);
+					if (*endptr != 0)
+					{
+						printf("Invalid size '%s'\n", optarg);
+						return 1;
+					}
+					break;
 				}
-				break;
-			case 't':
-				do_set_time_per_frame = 1;
-				time_per_frame.denominator = atoi(optarg);
-				break;
-			case 'd':
-				dev_number = optarg;
-				if (dev_number[0] >= '0' 
-					&& dev_number[0] <= '9' 
-					&& strlen(dev_number) <= 3)
+				case 't':
 				{
-					sprintf(ret_dev_name, "/dev/video%s", dev_number);
-					printf("ret dev name = %s\r\n", ret_dev_name);
+					do_set_time_per_frame = 1;
+					time_per_frame = atoi(optarg);
+					break;
 				}
-				else if (dev_number[0] == '/'
-				&& dev_number[1] == 'd'
-				&& dev_number[2] == 'e'
-				&& dev_number[3] == 'v')
+				case 'd':
 				{
-					strcpy(ret_dev_name, dev_number);
-		
-					printf("ret dev name = %s\r\n", ret_dev_name);
+					char *dev_number;
+					dev_number = optarg;
+					if (dev_number[0] >= '0' 
+						&& dev_number[0] <= '9' 
+						&& strlen(dev_number) <= 3)
+					{
+						sprintf(dev_name, "/dev/video%s", dev_number);
+						printf("ret dev name = %s\r\n", dev_name);
+					}
+					else if (dev_number[0] == '/'
+					&& dev_number[1] == 'd'
+					&& dev_number[2] == 'e'
+					&& dev_number[3] == 'v')
+					{
+						strcpy(dev_name, dev_number);
+						printf("ret dev name = %s\r\n", dev_name);
+					}
+					break;
 				}
-				break;
-			case 'h':
-				usage(argv[0]);
-				exit(1);
-				break;
-			default:
-				printf("Invalid option -%c\n", c);
-				usage(argv[0]);
-				printf("Run %s -h for help.\n", argv[0]);
-				exit(2);
+				case 'h':
+				{
+					usage(argv[0]);
+					exit(0);
+				}
+				default:
+				{
+					printf("Invalid option -%c\n", choice);
+					usage(argv[0]);
+					printf("Run %s -h for help.\n", argv[0]);
+					/// refer to cat /usr/includes/sysexits.h for exit code
+					exit(128);
+				}
 			}
 		}
 
@@ -148,11 +160,11 @@ int main(int argc, char **argv)
 			usage(argv[0]);
 		
 		
-		v4l2_dev = open_v4l2_device(ret_dev_name, &dev);
+		v4l2_dev = open_v4l2_device(dev_name, &dev);
 
 		if (v4l2_dev < 0)
 		{
-			printf("open camera %s failed,err code:%d\n\r", ret_dev_name, v4l2_dev);
+			printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
 			return -1;
 		}
 		
@@ -162,7 +174,7 @@ int main(int argc, char **argv)
 	 	 * run a v4l2-ctl --list-formats-ext 
 	 	 * to see the resolution and available frame rate 
 	 	 */
-		std::string _dev_name(ret_dev_name);
+		std::string _dev_name(dev_name);
 		std::cout << get_stdout_from_cmd(
 			"v4l2-ctl --device=" 
 			+ _dev_name 
@@ -175,7 +187,7 @@ int main(int argc, char **argv)
 		
 		/** Set the frame rate. */
 		if (do_set_time_per_frame)
-			set_frame_rate(v4l2_dev, time_per_frame.denominator);
+			set_frame_rate(v4l2_dev, time_per_frame);
 		
 
 		printf("********************Device Infomation************************\n");
@@ -236,9 +248,7 @@ int main(int argc, char **argv)
 		close(v4l2_dev);
 	}
 
-
-	//FIXME:why when close the window, it won't kill the process
-	sys_ret = system("killall -9 leopard_cam");
+	int sys_ret = system("killall -9 leopard_cam");
 
 	if (sys_ret < 0)
 	{
