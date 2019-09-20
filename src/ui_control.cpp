@@ -29,12 +29,16 @@
 #include "../includes/json_parser.h"
 #include "../includes/core_io.h"
 #include "../includes/gitversion.h"
+#include <iostream>
+#include <string>
+#include <vector>
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
 static GtkWidget *window;
 /// grid1 elements
-static GtkWidget *label_device, *label_fw_rev, *button_exit_streaming;
+static GtkWidget *check_button_resize_window, *button_exit_streaming;
+static GtkWidget *check_button_stream_info;
 static GtkWidget *label_datatype, *hbox_datatype;
 static GtkWidget *radio_raw10, *radio_raw12, *radio_yuyv, *radio_raw8;
 static GtkWidget *label_bayer, *hbox_bayer;
@@ -70,13 +74,12 @@ static GtkWidget *entry_br, *entry_bg, *entry_bb;
 static GtkWidget *check_button_soft_ae , *check_button_flip;
 static GtkWidget *check_button_edge, *check_button_mirror;
 static GtkWidget *check_button_rgb_ir_color, *check_button_rgb_ir_ir;
-static GtkWidget *check_button_dual_stereo, *check_button_stream_info;
+static GtkWidget *check_button_dual_stereo;
 static GtkWidget *label_alpha, *label_beta, *label_sharpness;
 static GtkWidget *check_button_abc;
 static GtkWidget *hscale_alpha, *hscale_beta, *hscale_sharpness;
 static GtkWidget *label_edge_low_thres, *hscale_edge_low_thres;
-/// grid3 elements
-static GtkWidget *check_button_resize_window;
+
 
 static int address_width_flag;
 static int value_width_flag;
@@ -859,8 +862,8 @@ void init_grid1_widgets()
     if (exposure_max == UNDEFINED_MAX_EXPOSURE_LINE)
         exposure_max = get_current_height(v4l2_dev) * 3;
 
-    label_device     = gtk_label_new(NULL);
-    label_fw_rev     = gtk_label_new(NULL);
+
+
     label_datatype   = gtk_label_new(NULL);
     label_bayer      = gtk_label_new(NULL);
     label_exposure   = gtk_label_new(NULL);
@@ -884,12 +887,15 @@ void init_grid1_widgets()
     button_capture_raw      = gtk_button_new();
     button_apply_blc        = gtk_button_new();
 
+    check_button_stream_info    = gtk_check_button_new();
+    check_button_resize_window  = gtk_check_button_new();
     check_button_auto_exp       = gtk_check_button_new();
     check_button_awb            = gtk_check_button_new();
     check_button_clahe          = gtk_check_button_new();    
     check_button_trig_en        = gtk_check_button_new();
     check_button_just_sensor    = gtk_check_button_new();
 
+    
     entry_i2c_addr  = gtk_entry_new();
     entry_reg_addr  = gtk_entry_new();
     entry_reg_val   = gtk_entry_new();
@@ -928,28 +934,6 @@ void init_grid1_widgets()
     seperator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     seperator_tab1_3 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
 
-    /** OV580 firmware doesn't have gain, exposure ctrl capabilities etc */
-    if (strcmp(get_product(), "USB Camera-OV580") == 0)
-    {
-        gtk_widget_set_sensitive(button_read, 0);
-        gtk_widget_set_sensitive(button_write, 0);
-        gtk_widget_set_sensitive(radio_16bit_addr,0);
-        gtk_widget_set_sensitive(radio_16bit_val,0);
-        gtk_widget_set_sensitive(radio_8bit_addr,0);
-        gtk_widget_set_sensitive(radio_8bit_val,0);
-        gtk_widget_set_sensitive(check_button_just_sensor,0);
-
-    }
-    else if (strcmp(get_product(), "OV580 STEREO") == 0)
-    {
-        gtk_widget_set_sensitive(button_read, 0);
-        gtk_widget_set_sensitive(button_write, 0);
-        gtk_widget_set_sensitive(radio_16bit_addr,0);
-        gtk_widget_set_sensitive(radio_16bit_val,0);
-        gtk_widget_set_sensitive(radio_8bit_addr,0);
-        gtk_widget_set_sensitive(radio_8bit_val,0);
-        gtk_widget_set_sensitive(check_button_just_sensor,0);
-    }
     
     if (gain_max == 13)
         gtk_widget_set_sensitive(hscale_gain, 0);
@@ -972,7 +956,6 @@ void init_grid2_widgets()
     check_button_rgb_ir_color   = gtk_check_button_new();
     check_button_rgb_ir_ir      = gtk_check_button_new();
     check_button_dual_stereo    = gtk_check_button_new();
-    check_button_stream_info    = gtk_check_button_new();
     check_button_abc            = gtk_check_button_new();
 
     button_update_rgb_gain      = gtk_button_new();
@@ -1017,13 +1000,10 @@ void init_grid2_widgets()
  
     hscale_alpha                = gtk_hscale_new(1, ALPHA_MAX);
     hscale_beta                 = gtk_hscale_new(-BETA_MAX, BETA_MAX);
-    gtk_range_set_value(GTK_RANGE(hscale_beta), 0);
+    // gtk_range_set_value(GTK_RANGE(hscale_beta), 0);
     hscale_sharpness            = gtk_hscale_new(1, SHARPNESS_MAX);
     hscale_edge_low_thres       = gtk_hscale_new(0, LOW_THRESHOLD_MAX);
-
-    gtk_widget_set_sensitive(hscale_edge_low_thres,0);      
-    gtk_toggle_button_set_active(
-        GTK_TOGGLE_BUTTON(check_button_stream_info), TRUE);                                        
+    // gtk_widget_set_sensitive(hscale_edge_low_thres,0);                                         
 }
 
 /** def_element hold all gtk type widgets initialization setup */
@@ -1066,33 +1046,16 @@ void iterate_def_elements (
 /** iterate over definition element for grid1 widgets setup */
 void init_grid1_def_elements ()
 {
-    char device_buf[64];
-    char fw_rev_buf[40];
-    if (is_ov580_stereo())
-    {
-        snprintf(device_buf, sizeof(device_buf), "Device: %s",
-                 get_manufacturer_name());
-        snprintf(fw_rev_buf, sizeof(fw_rev_buf), "Product: %s",
-                 get_product());
-    }
-    else
-    {
-        snprintf(device_buf, sizeof(device_buf), "Device: %s - %s",
-             get_manufacturer_name(), get_product());
-        snprintf(fw_rev_buf, sizeof(fw_rev_buf), "Firmware Rev: %d",
-             get_fw_rev());
-    }
-    
-
+ 
     static def_element definitions[] = {
-        {.widget = label_device,      
-         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+        {.widget = check_button_resize_window,
+         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON,
+         .parent = NULL,
+         .label_str = "Resize Window"},
+        {.widget = check_button_stream_info, 
+         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
-         .label_str = device_buf},
-        {.widget = label_fw_rev,      
-         .wid_type = GTK_WIDGET_TYPE_LABEL, 
-         .parent = NULL, 
-         .label_str = fw_rev_buf},
+         .label_str = "Display Stream Info"},
         {.widget = label_exposure,    
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
@@ -1443,10 +1406,6 @@ void init_grid2_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
          .label_str = "Separate Dual Stereo"},
-        {.widget = check_button_stream_info, 
-         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
-         .parent = NULL, 
-         .label_str = "Display Stream Info"},
         {.widget = check_button_abc, 
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
@@ -1497,8 +1456,8 @@ void list_all_grid1_elements(GtkWidget *grid)
     int row;
     int col;
     static grid_elements elements[] = {
-        {.widget = label_device,             .col =col=0, .row =row=0, .width =1},
-        {.widget = label_fw_rev,             .col =++col, .row =row,   .width =1},
+        {.widget = check_button_resize_window,.col=col=0, .row=row=0,  .width =1},
+        {.widget = check_button_stream_info, .col =++col, .row =row,   .width =1},
         {.widget = button_exit_streaming,    .col =++col, .row =row++, .width =1},
         {.widget = seperator_tab1_1,         .col =col=0, .row =row++, .width =2},
         {.widget = label_datatype,           .col =col=0, .row =row,   .width =1},
@@ -1590,14 +1549,13 @@ void list_all_grid2_elements(GtkWidget *grid)
         {.widget = check_button_rgb_ir_color,.col =col=0, .row =row,   .width =1},
         {.widget = check_button_rgb_ir_ir,   .col =++col, .row =row,   .width =1},
         {.widget = check_button_dual_stereo, .col =++col, .row =row,   .width =1},
-        {.widget = check_button_stream_info, .col =++col, .row =row++, .width =1},
+        {.widget = check_button_abc,         .col =++col, .row =row++, .width =1},
         {.widget = label_alpha,              .col =col=0, .row =row++, .width =1},
         {.widget = label_beta,               .col =col,   .row =row++, .width =1},
         {.widget = label_sharpness,          .col =col,   .row =row++, .width =1},
         {.widget = label_edge_low_thres,     .col =col++, .row =row++, .width =1},
-        {.widget = hscale_alpha,             .col =col,   .row =row-=4,.width =2},
-        {.widget = check_button_abc,         .col =col+=2,.row =row,   .width =1},
-        {.widget = hscale_beta,              .col =col-=2,.row =++row, .width =3},
+        {.widget = hscale_alpha,             .col =col,   .row =row-=4,.width =3},
+        {.widget = hscale_beta,              .col =col,   .row =++row, .width =3},
         {.widget = hscale_sharpness,         .col =col,   .row =++row, .width =3},
         {.widget = hscale_edge_low_thres,    .col =col,   .row =++row, .width =3},
     };
@@ -1621,6 +1579,14 @@ void iterate_element_cb(element_callback *callbacks, size_t members)
 void list_all_grid1_element_callbacks()
 {
     static element_callback callbacks[] = {
+        {.widget = check_button_resize_window,
+         .signal = "toggled",
+         .handler = G_CALLBACK(enable_resize_window),
+         .data = NULL},
+        {.widget = check_button_stream_info, 
+         .signal = "toggled", 
+         .handler = G_CALLBACK(enable_display_mat_info), 
+         .data = NULL},
         {.widget = button_exit_streaming, 
          .signal = "clicked", 
          .handler = G_CALLBACK(exit_loop), 
@@ -1781,10 +1747,6 @@ void list_all_grid2_element_callbacks()
          .signal = "toggled", 
          .handler = G_CALLBACK(enable_display_dual_stereo), 
          .data = NULL},
-        {.widget = check_button_stream_info, 
-         .signal = "toggled", 
-         .handler = G_CALLBACK(enable_display_mat_info), 
-         .data = NULL},
         {.widget = hscale_alpha, 
          .signal = "value_changed", 
          .handler = G_CALLBACK(hscale_alpha_up), 
@@ -1831,7 +1793,38 @@ void list_all_window_signals(GtkWidget *window)
     };
     iterate_window_signals(window, signals, SIZE(signals));
 }
+void init_sensitivity()
+{
 
+    /** OV580 firmware doesn't have gain, exposure ctrl capabilities etc */
+    if (strcmp(get_product(), "USB Camera-OV580") == 0)
+    {
+        gtk_widget_set_sensitive(button_read, 0);
+        gtk_widget_set_sensitive(button_write, 0);
+        gtk_widget_set_sensitive(radio_16bit_addr,0);
+        gtk_widget_set_sensitive(radio_16bit_val,0);
+        gtk_widget_set_sensitive(radio_8bit_addr,0);
+        gtk_widget_set_sensitive(radio_8bit_val,0);
+        gtk_widget_set_sensitive(check_button_just_sensor,0);
+
+    }
+    else if (strcmp(get_product(), "OV580 STEREO") == 0)
+    {
+        gtk_widget_set_sensitive(button_read, 0);
+        gtk_widget_set_sensitive(button_write, 0);
+        gtk_widget_set_sensitive(radio_16bit_addr,0);
+        gtk_widget_set_sensitive(radio_16bit_val,0);
+        gtk_widget_set_sensitive(radio_8bit_addr,0);
+        gtk_widget_set_sensitive(radio_8bit_val,0);
+        gtk_widget_set_sensitive(check_button_just_sensor,0);
+    }
+    
+    gtk_toggle_button_set_active(
+       GTK_TOGGLE_BUTTON(check_button_stream_info), TRUE);  
+    gtk_range_set_value(GTK_RANGE(hscale_beta), 0);
+    gtk_widget_set_sensitive(hscale_edge_low_thres,0);    
+
+}
 
 /*****************************************************************************
 **                      	Main GUI
@@ -1877,14 +1870,7 @@ void grid2_setup(GtkWidget *grid)
 }
 void grid3_setup(GtkWidget *grid)
 {
-    check_button_resize_window  = gtk_check_button_new();
-    gtk_button_set_label(GTK_BUTTON(check_button_resize_window), "resize_window");
-    gtk_grid_attach(GTK_GRID(grid), check_button_resize_window, 0, 0, 1, 1);
-    g_signal_connect (
-        check_button_resize_window, 
-        "toggled", 
-        G_CALLBACK(enable_resize_window), 
-        NULL);
+
 }
 
 void notebook_setup(GtkWidget *maintable)
@@ -1898,9 +1884,10 @@ void notebook_setup(GtkWidget *maintable)
     GtkWidget *icon_video = gtk_image_new_from_icon_name(
         "video-display", 
         GTK_ICON_SIZE_LARGE_TOOLBAR);
-    GtkWidget *icon_ctrl  = gtk_image_new_from_icon_name(
-        "media-flash", 
-        GTK_ICON_SIZE_LARGE_TOOLBAR);
+    // GtkWidget *icon_ctrl  = gtk_image_new_from_icon_name(
+    //     "media-flash", 
+    //     GTK_ICON_SIZE_LARGE_TOOLBAR);
+
     // GtkWidget *label1 = gtk_label_new("Camera Control");
     // GtkWidget *label2 = gtk_label_new("ISP Control");
     // GtkWidget *box1 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
@@ -1910,20 +1897,35 @@ void notebook_setup(GtkWidget *maintable)
 
     GtkWidget *grid1 = gtk_grid_new();
     GtkWidget *grid2 = gtk_grid_new();
-    GtkWidget *grid3 = gtk_grid_new();
+    //GtkWidget *grid3 = gtk_grid_new();
 
     grid1_setup(grid1);
     grid2_setup(grid2);
-    grid3_setup(grid3);
+    //grid3_setup(grid3);
 
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid1, icon_image);
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid2, icon_video);
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, icon_ctrl);
-
+    //gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, icon_ctrl);
+    init_sensitivity();
     gtk_container_add(GTK_CONTAINER(maintable), notebook);
 
 }
-
+std::string convert_bpp_to_string(int bpp)
+{
+    switch(bpp)
+    {
+        case 16: 
+            return "YUYV";
+        case 8: 
+            return "RAW8";
+        case 12:    
+            return "RAW12";
+        case 10:    
+            return "RAW10";
+        default: 
+            return "RAW10";
+    }
+}
 void menu_bar_setup(GtkWidget *maintable)
 {
 
@@ -1938,74 +1940,112 @@ void menu_bar_setup(GtkWidget *maintable)
     GtkWidget *fw_update_menu = gtk_menu_new();
     GtkWidget *help_menu = gtk_menu_new();
 
-    /** device items */
+    /** device info items */
     GtkWidget *device_item = 
-        gtk_menu_item_new_with_label("Devices");
+        gtk_menu_item_new_with_label("Devices Info");
     gtk_menu_item_set_submenu(GTK_MENU_ITEM(device_item), device_menu);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), device_item);
-
-    /** config file items */
-    GtkWidget *config_file_item = 
-        gtk_menu_item_new_with_label("Config File");
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(config_file_item), file_menu);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), config_file_item);
-
-    config_file_item = 
-        gtk_menu_item_new_with_label("Load json");
-    menu_item_formater(
-        config_file_item, 
-        file_menu, 
-        G_CALLBACK(open_config_dialog));
     
-    config_file_item = 
-        gtk_menu_item_new_with_label("Load BatchCmd.txt");
-    menu_item_formater(
-        config_file_item, 
-        file_menu, 
-        G_CALLBACK(open_config_dialog));
-
-    config_file_item = 
-        gtk_menu_item_new_with_label("Program Flash");
-    menu_item_formater(
-        config_file_item, 
-        file_menu, 
-        G_CALLBACK(open_config_dialog));
+    std::vector<std::string> device_info;
+    device_info.push_back("Device: " 
+        + std::string(get_dev_name()));
+    device_info.push_back("Manufacturer: " 
+        + std::string(get_manufacturer_name()));
+    device_info.push_back("Product: " 
+        + std::string(get_product()));
     
-    config_file_item = 
-        gtk_menu_item_new_with_label("Program EEPROM");
-    menu_item_formater(
-        config_file_item, 
-        file_menu, 
-        G_CALLBACK(open_config_dialog));
-    // gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
-    // g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
-    
+    if (!is_ov580_stereo())
+    {
+        device_info.push_back("Firmware Rev: " 
+            + std::to_string(get_fw_rev()));
+        char buf[10];
+        snprintf(buf, sizeof(buf), "0%x", get_hw_rev());
+        device_info.push_back("Hardware Rev: " 
+            + std::string(buf));
+        device_info.push_back("Datatype: " 
+            + convert_bpp_to_string(set_bpp(get_li_datatype())));
+    }
 
-    /** firmware update items */
-    GtkWidget *fw_update_item = 
-        gtk_menu_item_new_with_label("FW Update");
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(fw_update_item), fw_update_menu);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), fw_update_item);
+    for (size_t i=0; i < device_info.size(); i++) {
+        device_item = 
+            gtk_menu_item_new_with_label(device_info[i].c_str());
+        gtk_menu_shell_append(GTK_MENU_SHELL(device_menu), device_item);
+    }
 
-    fw_update_item = 
-        gtk_menu_item_new_with_label("Reset Camera");
-    menu_item_formater(
-        fw_update_item,
-        fw_update_menu, 
-        G_CALLBACK(fw_update_clicked));
+    if (!is_ov580_stereo())
+    {
+        /** config file items */
+        GtkWidget *config_file_item = 
+            gtk_menu_item_new_with_label("Config File");
+        gtk_menu_item_set_submenu(
+            GTK_MENU_ITEM(config_file_item), 
+            file_menu);
+        gtk_menu_shell_append(
+            GTK_MENU_SHELL(menu_bar), 
+            config_file_item);
 
-    fw_update_item = 
-        gtk_menu_item_new_with_label("Erase Firmware");
-    menu_item_formater(
-        fw_update_item, 
-        fw_update_menu, 
-        G_CALLBACK(fw_update_clicked));
+        config_file_item = 
+            gtk_menu_item_new_with_label("Load json");
+        menu_item_formater(
+            config_file_item, 
+            file_menu, 
+            G_CALLBACK(open_config_dialog));
 
+        config_file_item = 
+            gtk_menu_item_new_with_label("Load BatchCmd.txt");
+        menu_item_formater(
+            config_file_item, 
+            file_menu, 
+            G_CALLBACK(open_config_dialog));
+
+        config_file_item = 
+            gtk_menu_item_new_with_label("Program Flash");
+        menu_item_formater(
+            config_file_item, 
+            file_menu, 
+            G_CALLBACK(open_config_dialog));
+
+        config_file_item = 
+            gtk_menu_item_new_with_label("Program EEPROM");
+        menu_item_formater(
+            config_file_item, 
+            file_menu, 
+            G_CALLBACK(open_config_dialog));
+        // gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
+        // g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
+
+
+        /** firmware update items */
+        GtkWidget *fw_update_item = 
+            gtk_menu_item_new_with_label("FW Update");
+        gtk_menu_item_set_submenu(
+            GTK_MENU_ITEM(fw_update_item), 
+            fw_update_menu);
+        gtk_menu_shell_append(
+            GTK_MENU_SHELL(menu_bar), 
+            fw_update_item);
+
+        fw_update_item = 
+            gtk_menu_item_new_with_label("Reset Camera");
+        menu_item_formater(
+            fw_update_item,
+            fw_update_menu, 
+            G_CALLBACK(fw_update_clicked));
+
+        fw_update_item = 
+            gtk_menu_item_new_with_label("Erase Firmware");
+        menu_item_formater(
+            fw_update_item, 
+            fw_update_menu, 
+            G_CALLBACK(fw_update_clicked));
+    }
 
     /** help items */
     GtkWidget *help_item = gtk_menu_item_new_with_label("Help");
-    gtk_menu_item_set_submenu(GTK_MENU_ITEM(help_item), help_menu);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu_bar), help_item);
+    gtk_menu_item_set_submenu(
+        GTK_MENU_ITEM(help_item), help_menu);
+    gtk_menu_shell_append(
+        GTK_MENU_SHELL(menu_bar), help_item);
 
     help_item = gtk_menu_item_new_with_label("About");
     menu_item_formater(
@@ -2083,6 +2123,7 @@ void gui_run()
     gtk_widget_set_size_request(window, 500, 100);
     const char* icon1path = "./pic/leopard_cam_tool.jpg";  
     const char* icon2path = "../pic/leopard_cam_tool.jpg"; 
+
     /// whether use Makefile or cmake
     if (g_file_test(icon1path, G_FILE_TEST_EXISTS)) 
         gtk_window_set_default_icon_from_file(icon1path, NULL);

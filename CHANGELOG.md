@@ -2,7 +2,17 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.4.3 - 2019-09-19
+**Added:**  
+- put device information in menu bar
+- move some widgets location
+  
+**Changed:**
+- fix the bug when using options device information listed is not updated
+- fix the bug of leaving dangling udev_device after udev calls
+  
 ## v0.4.2 - 2019-09-16  
+**Added:**
 - add Docker support
 ## v0.4.1 - 2019-09-03  
 **Added:**
@@ -31,7 +41,7 @@ All notable changes to Linux Camera Tool will be documented in this file.
 
 ## v0.3.6 - 2019-08-09
 **Added:**  
-- add OpenCV CUDA build in cmake, 
+- add OpenCV CUDA build in cmake
 - add open camera from device number(used to stream multiple different LI USB3 cameras)
   
 ## v0.3.5 - 2019-08-01  

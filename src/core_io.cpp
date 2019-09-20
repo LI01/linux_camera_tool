@@ -115,7 +115,8 @@ char *get_file_extension(char *filename)
     return extname;
 }
 
-config_file_type config_file_identifier(char *filename)
+config_file_type 
+config_file_identifier(char *filename)
 {
     char *file_type = get_file_extension(filename);
     if (strcmp(file_type, "bin") == 0)

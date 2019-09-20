@@ -84,6 +84,8 @@ typedef enum
 /*****************************************************************************
 **                      	Helper functions
 *****************************************************************************/
+void init_sensitivity();
+
 int hex_or_dec_interpreter_c_string(
   char *in_string);
 

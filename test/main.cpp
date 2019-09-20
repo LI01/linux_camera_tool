@@ -31,11 +31,11 @@
 int v4l2_dev; /** global variable, file descriptor for camera device */
 
 static struct option opts[] = {
-	{"nbufs", 			1, 0, 'n'},
-	{"size", 			1, 0, 's'},
-	{"time-per-frame", 	1, 0, 't'},
-	{"device", 			1, 0, 'd'},
-	{"help", 			0, 0, 'h'},
+	{"nbufs", 			required_argument, 0, 'n'},
+	{"size", 			required_argument, 0, 's'},
+	{"time-per-frame", 	required_argument, 0, 't'},
+	{"device", 			required_argument, 0, 'd'},
+	{"help", 			no_argument, 	   0, 'h'},
 	{0, 				0, 0,  0}
 };
 
@@ -70,17 +70,15 @@ int main(int argc, char **argv)
 {
 	struct device dev;
 	dev.nbufs = V4L_BUFFERS_DEFAULT;
-
 	// assign 20 bytes in case user input jibberish
 	char dev_name[20] = "/dev/video0";
-	enum_v4l2_device(dev_name);
 	int do_set_format = 0;
 	int do_set_time_per_frame = 0;
 	uint32_t time_per_frame  = 15;
 	int choice;
-	
 	{
 		Timer timer;
+		enum_v4l2_device(dev_name);
 		printf("********************Camera Tool Usages***********************\n");
 		while ((choice = getopt_long(argc, argv, "n:s:t:d:h", opts, NULL)) != -1)
 		{
@@ -138,6 +136,7 @@ int main(int argc, char **argv)
 						strcpy(dev_name, dev_number);
 						printf("ret dev name = %s\r\n", dev_name);
 					}
+					update_dev_info(dev_name);
 					break;
 				}
 				case 'h':
@@ -151,14 +150,13 @@ int main(int argc, char **argv)
 					usage(argv[0]);
 					printf("Run %s -h for help.\n", argv[0]);
 					/// refer to cat /usr/includes/sysexits.h for exit code
-					exit(128);
+					exit(EXIT_FAILURE);
 				}
 			}
 		}
-
+		
 		if (optind >= argc)
 			usage(argv[0]);
-		
 		
 		v4l2_dev = open_v4l2_device(dev_name, &dev);
 
@@ -167,17 +165,16 @@ int main(int argc, char **argv)
 			printf("open camera %s failed,err code:%d\n\r", dev_name, v4l2_dev);
 			return -1;
 		}
-		
+	
 		printf("********************List Available Resolutions***************\n");
 		/** 
 	 	 * list all the resolutions 
 	 	 * run a v4l2-ctl --list-formats-ext 
 	 	 * to see the resolution and available frame rate 
 	 	 */
-		std::string _dev_name(dev_name);
 		std::cout << get_stdout_from_cmd(
 			"v4l2-ctl --device=" 
-			+ _dev_name 
+			+ std::string(dev_name) 
 			+" --list-formats-ext | grep Size | "
 			"awk '{print $1 $3}'| sed 's/Size/Resolution/g'");
 
@@ -230,11 +227,11 @@ int main(int argc, char **argv)
 		pid_t pid;
 		pid = fork();
 		if (pid == 0)
-		{ /** child process */
+		{ 	/** child process */
 			ctrl_gui_main();
 		}
 		else if (pid > 0)
-		{ /** parent process */
+		{ 	/** parent process */
 			streaming_loop(&dev);
 		}
 		else

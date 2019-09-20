@@ -162,8 +162,12 @@ void txt_file_parser(int fd, char *buf, long length)
                     return;
                 }
 
-                generic_I2C_read(fd, (GENERIC_REG_READ_FLG | (reg_addr_width / 8)),
-                                 read_count, sub_addr, reg_addr);
+                generic_I2C_read(
+                    fd, 
+                    (GENERIC_REG_READ_FLG | (reg_addr_width / 8)),
+                    read_count, 
+                    sub_addr, 
+                    reg_addr);
                 break;
 
             case eWrite:
@@ -172,8 +176,13 @@ void txt_file_parser(int fd, char *buf, long length)
                 unsigned char buf[2];
                 buf[0] = reg_val & 0xff;
                 buf[1] = (reg_val >> 8) & 0xff;
-                generic_I2C_write(fd, (GENERIC_REG_WRITE_FLG | (reg_addr_width / 8)), 
-                    write_count, sub_addr, reg_addr, buf);
+                generic_I2C_write(
+                    fd, 
+                    (GENERIC_REG_WRITE_FLG | (reg_addr_width / 8)), 
+                    write_count, 
+                    sub_addr, 
+                    reg_addr, 
+                    buf);
                 break;
 
             case eCapture:

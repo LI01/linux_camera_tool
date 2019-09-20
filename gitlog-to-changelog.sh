@@ -1,10 +1,15 @@
 #!/bin/sh
 # ---------CHANGLOG.md auto generator from git log------------------# 
 # How to:                                                           #
-#   1. first run this script to update CHANGELOG_TMP.md             #
+#   1. run this script to update CHANGELOG_TMP.md after commit      #
 #   2. copy, paste the new log in CHANGELOG_TMP.md to CHANGELOG.md  #
 #   3. edit the version number in CHANGELOG.md                      #
 #   4. re-run this script to update the "gitversion" number         #
+#   5. re-compile the program to update version number in software  #
+#   6. commit the change to git with "git commit --amend --no-edit" #
+#   7. if you want to release the lastest commit:                   #
+#           $ git tag -a v0.x.x -m "messages"                       #
+#           $ git push -f --tags                                    #
 # Author: Danyu L                                                   #
 # Last Edit: 2019/09                                                #
 # ------------------------------------------------------------------#
@@ -30,7 +35,7 @@ sed 's/[[:digit:]]\{2\}\:[[:digit:]]\{2\}\:[[:digit:]]\{2\}//g'  |\
 awk '!seen[$0]++'                                                |\
 sed 's/^[a-zA-Z]/- &/g'                                          |\
 sed 's/^- Author:/\n**Added:**/g'                                |\
-sed 's/^[[:digit:]]\{4\}\-[[:digit:]]\{2\}/## v0.0.0 - &/g'  \
+sed 's/^[[:digit:]]\{4\}\-[[:digit:]]\{2\}/## v0.0.0 - &/g'       \
 > CHANGELOG_TMP.md
 
 # put "const char *gitversion = xxxx; " inside the header file
