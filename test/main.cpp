@@ -217,7 +217,18 @@ int main(int argc, char **argv)
 #ifdef IMX334_MONO_MIPI_TESTING
 		imx334_mipi_testing(v4l2_dev);
 #endif
-
+		printf("!!!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
+			ov580_read_system_reg(v4l2_dev, 0x1033));
+		printf("!!!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
+			ov580_read_system_reg(v4l2_dev, 0x1033));
+		printf("!!!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
+			ov580_read_system_reg(v4l2_dev, 0x1033));
+		ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
+		printf("!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
+			ov580_read_system_reg(v4l2_dev, 0x1033));
+		ov580_write_sccb0_reg(v4l2_dev, 0xC0, 0x3508, 0xff);
+		printf("!!!!!!!!!!!!!gain value = 0x%x\r\n", 
+			ov580_read_sccb0_reg(v4l2_dev, 0xc0, 0x1033));		
 		printf("********************Allocate Buffer for Capturing************\n");
 		video_alloc_buffers(&dev, dev.nbufs);
 

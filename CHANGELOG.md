@@ -2,6 +2,10 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.4.4 - 2019-09-27  
+**Added:**  
+- add ov580 cbs api ctrls in the 3rd tab
+
 ## v0.4.3 - 2019-09-19
 **Added:**  
 - put device information in menu bar

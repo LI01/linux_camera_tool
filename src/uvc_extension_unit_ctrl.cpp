@@ -123,8 +123,11 @@ void read_from_UVC_extension(int fd, int property_id,
 		error_handle_extension_unit();
 }
 
-/**--------------------------------------------------------------------------- */
 
+//////////////////////////////////////////////////////////////////////////////
+//		LEOPARD FX3 USB FIRMWARE EXTENSION UNIT API				    		//
+// 		Used in most control widgets in the first tab in GUI	   			//		
+//////////////////////////////////////////////////////////////////////////////
 /**
  * set sensor mode
  * most cameras don't support it in the driver
@@ -743,12 +746,18 @@ int generic_I2C_read(int fd, int rw_flag, int bufCnt,
 	buf16[3] = LOWBYTE(slaveAddr);
 	buf16[4] = HIGHBYTE(regAddr);
 	buf16[5] = LOWBYTE(regAddr);
-	write_to_UVC_extension(fd, LI_XU_GENERIC_I2C_RW,
-						   LI_XU_GENERIC_I2C_RW_SIZE, buf16);
+	write_to_UVC_extension(
+		fd, 
+		LI_XU_GENERIC_I2C_RW,
+		LI_XU_GENERIC_I2C_RW_SIZE, 
+		buf16);
 	buf16[6] = 0;
 	buf16[7] = 0;
-	read_from_UVC_extension(fd, LI_XU_GENERIC_I2C_RW,
-							LI_XU_GENERIC_I2C_RW_SIZE, buf16);
+	read_from_UVC_extension(
+		fd, 
+		LI_XU_GENERIC_I2C_RW,
+		LI_XU_GENERIC_I2C_RW_SIZE, 
+		buf16);
 	if (bufCnt == 1)
 	{
 		regVal = buf16[6];
@@ -794,6 +803,98 @@ void read_cam_defect_pixel_table(int fd, unsigned char *r_buf)
 	printf("V4L2_CORE: Read Camera Defect Pixel Table: %s\r\n", buf17);
 }
 
+#ifdef FOR_FPGA_UPDATE
+//TODO: hasn't tested yet...
+int eeprom_page_write(int fd)
+{
+	sensor_reg_write(fd, HEADER_EEPROM_PAGE_PROG, 0);
+	return eeprom_process_done(fd, 10); // max 10ms
+}
+int eeprom_bulk_erase(int fd)
+{
+	sensor_reg_write(fd, HEADER_EEPROM_BULK_ERASE, 0);
+	return eeprom_process_done(fd, 100 * 1000); // max 100s
+}
+int eeprom_process_done(int fd, int total_time)
+{
+	int reg_val = 1;
+
+	// try 100 times
+	for (int i = 0; i < total_time; i++)
+	{
+		sensor_reg_write(fd, HEADER_EEPROM_RDSR, 0);
+
+		reg_val = sensor_reg_read(fd, HEADER_EEPROM_RDSR);
+		if ((reg_val & 0x01) == 0x0)
+			return 0; // true
+	}
+	return 1; //false
+}
+int eeprom_verify_page(int fd)
+{
+	int reg_val = 1;
+	sensor_reg_write(fd, HEADER_EEPROM_VERIFY, 0);
+	reg_val = sensor_reg_read(fd, HEADER_EEPROM_VERIFY);
+	if ((reg_val & 0xff) == 0x0)
+		return 0; //true
+	return 1;	 // false
+}
+// set 3-byte address
+void eeprom_set_page_addr(int fd, int page_addr)
+{
+	sensor_reg_write(fd, HEADER_EEPROM_UPDATE_ADDR, (page_addr >> 16) & 0xff);
+	sensor_reg_write(fd, HEADER_EEPROM_UPDATE_ADDR, ((page_addr >> 8) & 0xff) | 0x0100);
+	sensor_reg_write(fd, HEADER_EEPROM_UPDATE_ADDR, ((page_addr)&0xff) | 0x0200);
+}
+
+// fill 256-byte buffer in FX3
+// for AR01335_ICP3:
+// buf17[0] = 0xaa; // flag to trigger EEPROM reflash
+void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
+{
+	unsigned char buf17[LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE] = {0};
+	CLEAR(buf17);
+	int addr = 0;
+#ifdef AR1335_ICP3
+	int remain_length = len;
+	int position = 0;
+
+	while (remain_length > 0)
+	{
+		printf("..");
+		fflush(stdout);
+		for (int i = 0; i < LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE; i++)
+			buf17[i] = 0;
+		buf17[0] = 0xaa;
+
+		memcpy(&buf17[1], buf + position, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE - 1);
+		write_cam_defect_pixel_table(fd, buf17);
+
+		usleep(2000);
+		remain_length -= 32;
+		position += 32;
+	}
+#endif
+
+	for (addr = 0; addr < len; addr += 32)
+	{
+		buf17[0] = 0x0;
+		memcpy(&buf17[1], buf, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE - 1);
+		write_cam_defect_pixel_table(fd, buf17);
+	}
+	if (addr != len)
+	{
+		for (int i = 0; i < 256; i++)
+			buf17[i] = 0xff;
+		buf17[0] = (unsigned char)addr;
+		memcpy(&buf17[1], buf + addr, len - addr);
+	}
+}
+#endif
+//////////////////////////////////////////////////////////////////////////////
+//			AR0231 AP0200 HOST COMMAND API									//		
+// 			FOR FLASHING AR0231 AP0200 BINARY ON THE FLY					//      	
+//////////////////////////////////////////////////////////////////////////////
 // s_buf[0] : type : 0: soft reset, 1: read data, 2,3: write command
 // s_buf[1] : count ( including address & data)
 // s_buf[2:3] : address{addrH, addrL}
@@ -985,95 +1086,204 @@ void ap020x_program_flash_eeprom(int fd, unsigned char *bin_buf, int bin_size)
 	usleep(50);
 }
 
-#ifdef FOR_FPGA_UPDATE
-//TODO: hasn't tested yet...
-int eeprom_page_write(int fd)
+//////////////////////////////////////////////////////////////////////////////
+//			OV580 HOST COMMAND API						        			//		
+// 			FOR CTRLS OF OV580                          					//      	
+//////////////////////////////////////////////////////////////////////////////
+/**
+ * helper function to communicate with OV580 UVC defined extension unit
+ * args:
+ * 		fd 			- file descriptor
+ * 		buffer		- pointer for buffer data
+ *  
+ */
+void ov580_write_to_UVC_extension(
+	int fd, 
+	unsigned char *buffer)
 {
-	sensor_reg_write(fd, HEADER_EEPROM_PAGE_PROG, 0);
-	return eeprom_process_done(fd, 10); // max 10ms
+	struct uvc_xu_control_query xu_query;
+	CLEAR(xu_query);
+	xu_query.unit =  OV580_XU_UNIT;			 
+	xu_query.query = UVC_SET_CUR;
+	xu_query.size = OV580_PACKET_SIZE;
+	xu_query.selector = OV580_XU_SELECTOR;
+	xu_query.data = buffer; 
+
+	if ((ioctl(fd, UVCIOC_CTRL_QUERY, &xu_query)) != 0)
+		error_handle_extension_unit();
 }
-int eeprom_bulk_erase(int fd)
+/**
+ * helper function to communicate with OV580 UVC defined extension unit
+ * args:
+ * 		fd 			- file descriptor
+ * 		buffer		- pointer for buffer data
+ *  
+ */
+void ov580_read_from_UVC_extension(
+	int fd, 
+	unsigned char *buffer)
 {
-	sensor_reg_write(fd, HEADER_EEPROM_BULK_ERASE, 0);
-	return eeprom_process_done(fd, 100 * 1000); // max 100s
+	struct uvc_xu_control_query xu_query;
+	CLEAR(xu_query);
+	xu_query.unit = OV580_XU_UNIT;			  
+	xu_query.query = UVC_GET_CUR; 
+	xu_query.size = OV580_PACKET_SIZE;
+	xu_query.selector = OV580_XU_SELECTOR;
+	xu_query.data = buffer; 
+
+	if (ioctl(fd, UVCIOC_CTRL_QUERY, &xu_query) != 0)
+		error_handle_extension_unit();
 }
-int eeprom_process_done(int fd, int total_time)
+
+void ov580_write_system_reg(
+	int fd, 
+	int reg_addr, 
+	unsigned char reg_val)
 {
-	int reg_val = 1;
-
-	// try 100 times
-	for (int i = 0; i < total_time; i++)
-	{
-		sensor_reg_write(fd, HEADER_EEPROM_RDSR, 0);
-
-		reg_val = sensor_reg_read(fd, HEADER_EEPROM_RDSR);
-		if ((reg_val & 0x01) == 0x0)
-			return 0; // true
-	}
-	return 1; //false
+	unsigned char w_buf[OV580_PACKET_SIZE] = {0};
+	CLEAR(w_buf);
+	w_buf[0] = OV580_WRITE_CMD_ID;
+	w_buf[1] = OV580_SYSTEM_REG;
+	w_buf[3] = 0x4; 					// address width = 4 bytes
+	w_buf[4] = 0x1; 					// data width = 1 byte
+	w_buf[5] = 0x80; 					// reg addr, big endian, 0x8018xxxx
+	w_buf[6] = 0x18;
+	w_buf[7] = HIGHBYTE(reg_addr);
+	w_buf[8] = LOWBYTE(reg_addr);
+	w_buf[9] = 0x00; 					// reg number(big endian) = 1 byte
+	w_buf[10] = 0x01;
+	w_buf[16] = reg_val;
+	
+	ov580_write_to_UVC_extension(fd, w_buf); 
+	//printf("ov580_write_system_reg: regAddr=0x%x, regVal=0x%x\r\n", reg_addr, reg_val);
 }
-int eeprom_verify_page(int fd)
+
+unsigned char ov580_read_system_reg(
+	int fd,
+	int reg_addr)
 {
-	int reg_val = 1;
-	sensor_reg_write(fd, HEADER_EEPROM_VERIFY, 0);
-	reg_val = sensor_reg_read(fd, HEADER_EEPROM_VERIFY);
-	if ((reg_val & 0xff) == 0x0)
-		return 0; //true
-	return 1;	 // false
+	unsigned char w_buf[OV580_PACKET_SIZE] = {0};
+	CLEAR(w_buf);
+	w_buf[0] = OV580_READ_CMD_ID;
+	w_buf[1] = OV580_SYSTEM_REG;
+	w_buf[3] = 0x04; 					// address width = 4 bytes
+	w_buf[4] = 0x01; 					// data width = 1 byte
+	w_buf[5] = 0x80; 					// reg addr, big endian, 0x8018xxxx
+	w_buf[6] = 0x18;
+	w_buf[7] = HIGHBYTE(reg_addr);
+	w_buf[8] = LOWBYTE(reg_addr);
+	w_buf[9] = 0x00; 					// reg number(big endian) = 1 byte
+	w_buf[10] = 0x01;
+
+	ov580_read_from_UVC_extension(
+		fd, 
+		w_buf); 
+	unsigned char reg_val = w_buf[16];
+	printf("ov580_read_system_reg: regAddr=0x%x, regVal=0x%x\r\n", 
+		reg_addr, w_buf[16]);
+	return reg_val;
 }
-// set 3-byte address
-void eeprom_set_page_addr(int fd, int page_addr)
+
+void ov580_write_sccb0_reg(
+	int fd, 
+	unsigned char slave_addr,
+	int reg_addr, 
+	unsigned char reg_val)
 {
-	sensor_reg_write(fd, HEADER_EEPROM_UPATE_ADDR, (page_addr >> 16) & 0xff);
-	sensor_reg_write(fd, HEADER_EEPROM_UPATE_ADDR, ((page_addr >> 8) & 0xff) | 0x0100);
-	sensor_reg_write(fd, HEADER_EEPROM_UPATE_ADDR, ((page_addr)&0xff) | 0x0200);
+	unsigned char w_buf[OV580_PACKET_SIZE] = {0};
+	CLEAR(w_buf);
+	w_buf[0] = OV580_WRITE_CMD_ID;
+	w_buf[1] = OV580_SENSOR_SCCB0_REG;
+	w_buf[2] = slave_addr;
+	w_buf[3] = 2; 					// address width, 1->8-bit, 2->16-bit
+	w_buf[4] = 1; 					// data width = 1 byte
+	w_buf[7] = HIGHBYTE(reg_addr);	// reg addr, big endian, 0xXXXX
+	w_buf[8] = LOWBYTE(reg_addr);
+	w_buf[9] = 0x00; 				// reg number(big endian) = 1 byte
+	w_buf[10] = 0x01;
+	w_buf[16] = reg_val;
+	
+	ov580_write_to_UVC_extension(
+		fd, 
+		w_buf); 
 }
 
-// fill 256-byte buffer in FX3
-// for AR01335_ICP3:
-// buf17[0] = 0xaa; // flag to trigger EEPROM reflash
-void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
+unsigned char ov580_read_sccb0_reg(
+	int fd,
+	unsigned char slave_addr,
+	int reg_addr)
 {
-	unsigned char buf17[LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE] = {0};
-	CLEAR(buf17);
-	int addr = 0;
-#ifdef AR1335_ICP3
-	int remain_length = len;
-	int position = 0;
+	unsigned char w_buf[OV580_PACKET_SIZE] = {0};
+	CLEAR(w_buf);
+	w_buf[0] = OV580_READ_CMD_ID;
+	w_buf[1] = OV580_SENSOR_SCCB0_REG;
+	w_buf[2] = slave_addr;
+	w_buf[3] = 2; 					// address width = 2 bytes
+	w_buf[4] = 1; 					// data width = 1 byte
+	w_buf[7] = HIGHBYTE(reg_addr);
+	w_buf[8] = LOWBYTE(reg_addr);
+	w_buf[9] = 0x00; 				// reg number(big endian) = 1 byte
+	w_buf[10] = 0x01;
 
-	while (remain_length > 0)
-	{
-		printf("..");
-		fflush(stdout);
-		for (int i = 0; i < LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE; i++)
-			buf17[i] = 0;
-		buf17[0] = 0xaa;
-
-		memcpy(&buf17[1], buf + position, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE - 1);
-		write_cam_defect_pixel_table(fd, buf17);
-
-		usleep(2000);
-		remain_length -= 32;
-		position += 32;
-	}
-#endif
-
-	for (addr = 0; addr < len; addr += 32)
-	{
-		buf17[0] = 0x0;
-		memcpy(&buf17[1], buf, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE - 1);
-		write_cam_defect_pixel_table(fd, buf17);
-	}
-	if (addr != len)
-	{
-		for (int i = 0; i < 256; i++)
-			buf17[i] = 0xff;
-		buf17[0] = (unsigned char)addr;
-		memcpy(&buf17[1], buf + addr, len - addr);
-	}
+	ov580_read_from_UVC_extension(
+		fd, 
+		w_buf); 
+	printf("ov580_read_slave_reg: slaveAddr=0x%x, regAddr=0x%x, regVal=0x%x\r\n", 
+		slave_addr, reg_addr, w_buf[16]);
+	return w_buf[16];
 }
-#endif
 
+void ov580_write_sccb1_reg(
+	int fd, 
+	unsigned char slave_addr,
+	int reg_addr, 
+	unsigned char reg_val)
+{
+	unsigned char w_buf[OV580_PACKET_SIZE] = {0};
+	CLEAR(w_buf);
+	w_buf[0] = OV580_WRITE_CMD_ID;
+	w_buf[1] = OV580_SENSOR_SCCB1_REG;
+	w_buf[2] = slave_addr;
+	w_buf[3] = 2; 					// address width, 1->8-bit, 2->16-bit
+	w_buf[4] = 1; 					// data width = 1 byte
+	w_buf[7] = HIGHBYTE(reg_addr);	// reg addr, big endian, 0xXXXX
+	w_buf[8] = LOWBYTE(reg_addr);
+	w_buf[9] = 0x00; 				// reg number(big endian) = 1 byte
+	w_buf[10] = 0x01;
+	w_buf[16] = reg_val;
+	
+	ov580_write_to_UVC_extension(
+		fd, 
+		w_buf); 
+}
+
+unsigned char ov580_read_sccb1_reg(
+	int fd,
+	unsigned char slave_addr,
+	int reg_addr)
+{
+	unsigned char w_buf[OV580_PACKET_SIZE] = {0};
+	CLEAR(w_buf);
+	w_buf[0] = OV580_READ_CMD_ID;
+	w_buf[1] = OV580_SENSOR_SCCB1_REG;
+	w_buf[2] = slave_addr;
+	w_buf[3] = 4; 					// address width = 4 bytes
+	w_buf[4] = 1; 					// data width = 1 byte
+	w_buf[7] = HIGHBYTE(reg_addr);
+	w_buf[8] = LOWBYTE(reg_addr);
+	w_buf[9] = 0x00; 				// reg number(big endian) = 1 byte
+	w_buf[10] = 0x01;
+
+	ov580_read_from_UVC_extension(
+		fd, 
+		w_buf); 
+	return w_buf[16];
+}
+//////////////////////////////////////////////////////////////////////////////
+//			TESTING MACROS													//
+//			Some macros for testing different sensor XU features			//
+//			Enabling them in ../includes/hardware.h							//			
+//////////////////////////////////////////////////////////////////////////////
 #ifdef AP0202_WRITE_REG_ON_THE_FLY
 void ap0202_write_reg_on_the_fly(int fd)
 {

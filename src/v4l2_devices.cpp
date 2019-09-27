@@ -80,18 +80,29 @@ char *get_dev_name()
 /**
  * a wrapper function for get vendor id 
  */
-const char* get_dev_vendor(
+int get_dev_vid(
     struct udev_device *dev)
 {
-    return udev_device_get_sysattr_value(dev, "idVendor");
+    /// convert const char* to hex int
+    int vid = strtol(
+        udev_device_get_sysattr_value(dev, "idVendor"), 
+        NULL, 
+        16);
+    return vid;
+
 }
 /**
  * a wrapper function for get product id 
  */
-const char* get_dev_product(
+int get_dev_pid(
     struct udev_device *dev)
 {
-    return udev_device_get_sysattr_value(dev, "idProduct");
+    /// convert const char* to hex int
+    int pid = strtol(
+        udev_device_get_sysattr_value(dev, "idProduct"), 
+        NULL, 
+        16);
+    return pid;
 }
 /**
  * if it is OV580 stereo, don't read hw, fw rev etc
@@ -102,28 +113,32 @@ int is_ov580_stereo()
 }
 /**
  * 05a9:0581 is LI-USB Camera-OV9282-OV580, Camera-OV7251-OV580
+ * 05a9:0583 is LI-USB Camera-OG01A1B-OV580
  * 2b03:0580 is LI-USB Camera-OV4689-OV580
  */
 int is_ov580_stereo(struct udev_device *dev)
 {
    
-    int is_ov580 = 
-        (strcmp(OV580_ST_VID, get_dev_vendor(dev)) == 0);
-    int is_ov4689_ov580 = 
-        ((strcmp(OV580_OV4689_VID, get_dev_vendor(dev)) == 0) 
-      && (strcmp(OV580_OV4689_PID, get_dev_product(dev)) == 0));
-    info->is_ov580_st = is_ov580 || is_ov4689_ov580;
+    info->is_ov580_st =
+        (OV580_ST_VID == get_dev_vid(dev)) 
+       || (OV580_OV4689_VID == get_dev_vid(dev) 
+       && (OV580_OV4689_PID == get_dev_pid(dev)));
     return info->is_ov580_st;
 }
 /**
  * 2a0b is leopard manufacurer id
  */
-int is_leopard_usb3(
+int is_fx3_usb3(
     struct udev_device *dev)
 {
-    int is_li_usb3 = (strcmp(LI_USB3_VID, get_dev_vendor(dev)) == 0);
-    info->is_ov580_st = !is_li_usb3;
-    return is_li_usb3;
+    int is_fx3_usb3 = 
+      (FX3_USB3_VID == get_dev_vid(dev))
+    || (UNKNOWN_LI_VID1 == get_dev_vid(dev))
+    || (UNKNOWN_LI_VID2 == get_dev_vid(dev))
+    || (UNKNOWN_LI_VID3 == get_dev_vid(dev))        
+    || (UNKNOWN_LI_VID4 == get_dev_vid(dev));
+    
+    return is_fx3_usb3;
 }
 
 
@@ -144,9 +159,9 @@ void fill_dev_info(
 	 * encoded, but the strings returned from
 	 * udev_device_get_sysattr_value() are UTF-8 encoded. 
      */
-    printf("  VID/PID: %s %s\n",
-           get_dev_vendor(dev),
-           get_dev_product(dev));
+    printf("  VID/PID: %04x %04x\n",
+           get_dev_vid(dev),
+           get_dev_pid(dev));
     /// use strcpy will cause buffer overflow...
     memcpy(
         info->manufacturer, 
@@ -212,9 +227,9 @@ void update_dev_info(
                 free_device_vars();
                 exit(2);
             }
-            int is_li_usb3 = is_leopard_usb3(dev);
+            int is_li_fx3_usb3 = is_fx3_usb3(dev);
             int is_li_ov580_stereo = is_ov580_stereo(dev);
-            if (is_li_usb3 || is_li_ov580_stereo)
+            if (is_li_fx3_usb3 || is_li_ov580_stereo)
             { 
                 is_li_dev = 1;
                 fill_dev_info(dev, dev_name);
@@ -252,7 +267,7 @@ void enum_v4l2_device(char *dev_name)
     int is_li_dev = 1;
     /** put these variables on heap so it doesn't get buffer overflow */
     info = (dev_info*)malloc(sizeof(dev_info));
-
+    //CLEAR(info);
     printf("********************Udev Device Start************************\n");
     struct udev *udev;
     struct udev_enumerate *enumerate;
@@ -307,18 +322,18 @@ void enum_v4l2_device(char *dev_name)
             "usb_device");
         if (!dev)
         {
-            printf("Unable to find parent usb device.");
+            printf("Unable to find parent usb device.\r\n");
             free_device_vars();
             exit(2);
         }
-        int is_li_usb3 = is_leopard_usb3(dev);
+        int is_li_fx3_usb3 = is_fx3_usb3(dev);
         int is_li_ov580_stereo = is_ov580_stereo(dev);
         
         /// just break out of for loop if find a leopard USB camera
-        if (is_li_usb3 || is_li_ov580_stereo)
+        if (is_li_fx3_usb3 || is_li_ov580_stereo)
         { 
             is_li_dev = 1;
-            if (is_li_usb3)
+            if (is_li_fx3_usb3)
                 printf("Find leopard USB3 camera at %s\n", dev_name);
             else if (is_li_ov580_stereo)
                 printf("Find Omnivision Stereo USB3 camera at %s\n", dev_name);

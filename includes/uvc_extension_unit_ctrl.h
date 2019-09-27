@@ -69,8 +69,7 @@ typedef enum
 #define LI_XU_GENERIC_I2C_RW_SIZE                   (262)
 #define LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE        (33)
 
-
-#define SERIAL_NUMBER_WR_FLG (0xA5)
+#define SERIAL_NUMBER_WR_FLG                        (0xA5)
 
 /** --- for LI_XU_SENSOR_REG_RW  --- */
 typedef struct reg_seq
@@ -106,6 +105,7 @@ typedef enum
 #define REBOOT_CAM_FLG          (0x9b)
 #define SET_SPI_PORT_SELECT(x)  (0xa0 | (x & 0x0f))
 
+////////////////////////////////////////////////////////////////////////
 /** --- For AP020x firmware update --- */
 /* Once a command has been written through the HCI, it will be 
  * executed by on-chip firmware. The results are reported back.
@@ -120,7 +120,6 @@ typedef enum
     IMG_SENSOR_UPDATE_DPT_DATA_WR_FLG   = 3,
 } ap0202_dpt_flag;
 
-#define CMD_START_POS (2)
 
 //AP020X HOST COMMAND INTERFACE(HCI) REG
 #define AP020X_HOST_CMD_PARAM_POOL  (0xFC00)
@@ -154,6 +153,42 @@ typedef enum
 
 } AP0200_CMD;
 
+/////////////////////////////////////////////////////////////////////
+// for USB3.0 packet size
+#define OV580_PACKET_SIZE     (384)
+#define CMD_START_POS         (2)
+#define OV580_XU_UNIT         (4)
+#define OV580_XU_SELECTOR     (2)
+     
+#define SCCB_ADDR_9782        (0x20)
+#define SCCB_ADDR_928x        (0xC0)
+#define SCCB_ADDR_7251        (0xC0)
+#define SCCB_ADDR_OG01A1B     (0xC0)
+
+/* OV580 host command API */
+typedef enum
+{
+    OV580_SYSTEM_REG            = 0xA2,
+    OV580_SENSOR_SCCB0_REG      = 0xA3,
+    OV580_SENSOR_SCCB1_REG      = 0xA5,
+    OV580_SLAVE_SCCB2_REG       = 0xAB,
+    OV580_SPI_FLASH             = 0xA1,
+    OV580_GPIO_DIRECTION        = 0x10,
+    OV580_GPIO_INTERRPUT_ENA    = 0X11,
+    OV580_SET_GPIO_VAL          = 0x12,
+    OV580_GET_GPIO_VAL          = 0x13,
+    OV580_IC_REV_RO             = 0x01,
+    OV580_FW_REV_RO             = 0x02
+}OV580_HOST_CMD;
+
+typedef enum
+{
+    OV580_WRITE_CMD_ID          = 0x50,
+    OV580_READ_CMD_ID           = 0x51
+}OV580_RW_CMD_ID;
+
+
+////////////////////////////////////////////////////////////////////
 /** --- test registers on the fly --- */
 #ifdef AP0202_WRITE_REG_ON_THE_FLY
 // TODO: used in helper function, modify it for different camera
@@ -244,6 +279,10 @@ void read_from_UVC_extension(
  * these functions down below are the API you want to look at(paste) if you 
  * try to implement some functionalities on your current software 
  */
+//////////////////////////////////////////////////////////////////////////////
+//		LEOPARD FX3 USB FIRMWARE EXTENSION UNIT API				    		//
+// 		Used in most control widgets in the first tab in GUI	   			//		
+//////////////////////////////////////////////////////////////////////////////
 void set_sensor_mode(int fd, int mode);
 
 void set_pos(int fd, int start_x, int start_y);
@@ -322,12 +361,65 @@ void write_cam_defect_pixel_table(
 void read_cam_defect_pixel_table(
     int fd, 
     unsigned char *r_buf);
-
-void ap020x_send_command(int fd, AP0200_CMD cmd, int time_out);
-void ap020x_soft_reset(int fd);
-void ap020x_read_data(int fd, int reg_addr, int count);
-void ap020x_write_data(int fd, int buf_size, int pos, unsigned char *buf);
-void ap020x_program_flash_eeprom(int fd, const unsigned char *bin_buf, int bin_size);
-
 //void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len);
+//////////////////////////////////////////////////////////////////////////////
+//			AR0231 AP0200 HOST COMMAND API									//		
+// 			FOR FLASHING AR0231 AP0200 BINARY ON THE FLY					//      	
+//////////////////////////////////////////////////////////////////////////////
+void ap020x_send_command(
+    int fd, 
+    AP0200_CMD cmd, 
+    int time_out);
+void ap020x_soft_reset(int fd);
+void ap020x_read_data(
+    int fd, 
+    int reg_addr, 
+    int count);
+void ap020x_write_data(
+    int fd, 
+    int buf_size, 
+    int pos, 
+    unsigned char *buf);
+void ap020x_program_flash_eeprom(
+    int fd, 
+    const unsigned char *bin_buf, 
+    int bin_size);
+//////////////////////////////////////////////////////////////////////////////
+//			OV580 HOST COMMAND API						        			//		
+// 			FOR CTRLS OF OV580                          					//      	
+//////////////////////////////////////////////////////////////////////////////
+void ov580_write_to_UVC_extension(
+	int fd, 
+	unsigned char *buffer);
+void ov580_read_from_UVC_extension(
+	int fd, 
+	unsigned char *buffer);
+
+void ov580_write_system_reg(
+	int fd, 
+	int reg_addr, 
+	unsigned char reg_val);
+unsigned char ov580_read_system_reg(
+	int fd,
+	int reg_addr);
+void ov580_write_sccb0_reg(
+	int fd, 
+    unsigned char slave_addr,
+	int reg_addr, 
+	unsigned char reg_val);
+unsigned char ov580_read_sccb0_reg(
+	int fd,
+	unsigned char slave_addr,
+	int reg_addr);
+void ov580_write_sccb1_reg(
+	int fd, 
+    unsigned char slave_addr,
+	int reg_addr, 
+	unsigned char reg_val);
+unsigned char ov580_read_sccb1_reg(
+	int fd,
+    unsigned char slave_addr,
+	int reg_addr);
+
+
 

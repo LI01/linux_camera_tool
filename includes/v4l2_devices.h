@@ -44,15 +44,15 @@ char* get_manufacturer_name();
 char* get_product();
 //char *get_serial();
 char *get_dev_name();
-const char* get_dev_vendor(
+int get_dev_vid(
     struct udev_device *dev);
-const char* get_dev_product(
+int get_dev_pid(
     struct udev_device *dev);
 
 int is_ov580_stereo();
 int is_ov580_stereo(
   struct udev_device *dev);
-int is_leopard_usb3(
+int is_fx3_usb3(
   struct udev_device *dev);
 
 void fill_dev_info(

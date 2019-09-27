@@ -47,11 +47,31 @@
  * OpenCV text scale 
  */
 #define TEXT_SCALE_BASE       (50)
-
+/**
+ * ISP control range
+ */
 #define ALPHA_MAX             (5)
 #define BETA_MAX              (125)
 #define SHARPNESS_MAX         (20)
 #define LOW_THRESHOLD_MAX     (100)
+
+/**
+ * Default VID for Leopard Imaging USB3 camera 
+ * used for udev loop through for recognizing Leopard device
+ */ 
+#define FX3_USB3_VID              (0x2a0b)
+#define OV580_ST_VID              (0x05a9)
+#define OV580_OV4689_VID          (0x2b03)     
+#define UNKNOWN_LI_VID1           (0x29ab)
+#define UNKNOWN_LI_VID2           (0x1e4e)
+#define UNKNOWN_LI_VID3           (0x0568)
+#define UNKNOWN_LI_VID4           (0x05a3)
+
+#define OV580_OV9271_PID          (0x0581)
+#define OV580_OV7251_PID          (0x0581)
+#define OV580_OG01A1B_PID         (0x0583)
+#define OV580_OV4689_PID          (0x0580)
+
 /**
  * --------------------------camera specific test functions-------------------
  * The following macros are for specific cameras testing function. 
@@ -135,20 +155,6 @@
  */
 #define V4L_BUFFERS_DEFAULT	    (2) 
 #define V4L_BUFFERS_MAX	        (32)
-
-
-/**
- * FYI: default VID for Leopard Imaging USB3 camera in case you 
- * want to add your own udev rules for USB video device
- */ 
-#define LI_USB3_VID               "2a0b"
-#define OV580_ST_VID              "05a9"
-#define OV580_OV9271_PID          "0581"
-#define OV580_OV7251_PID          "0581"
-#define OV580_OG01A_PID           "0583"
-
-#define OV580_OV4689_VID          "2b03"     
-#define OV580_OV4689_PID          "0580"
 
 
 /** --- for LI_XU_GENERIC_I2C_RW --- */

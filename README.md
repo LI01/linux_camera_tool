@@ -18,7 +18,7 @@ Table of Contents
     - [Hardware Prerequisites](#hardware-prerequisites)
     - [Dependencies](#dependencies)
       - [OpenCV Prerequisites](#opencv-prerequisites)
-      - [OpenCV CUDA support](#opencv-cuda-support)
+      - [OpenCV CUDA Support](#opencv-cuda-support)
     - [Build Camera Tool](#build-camera-tool)
     - [Install leopard_cam](#install-leopard_cam)
     - [Uninstall leopard_cam](#uninstall-leopard_cam)
@@ -28,8 +28,8 @@ Table of Contents
     - [Exit Linux Camera Tool](#exit-linux-camera-tool)
     - [Kill Linux Camera Tool Zombie Process](#kill-linux-camera-tool-zombie-process)
   - [Examples](#examples)
-    - [Test on RAW sensor 12 Megapixel sensor IMX477](#test-on-raw-sensor-12-megapixel-sensor-imx477)
-    - [Test on RAW sensor 5 Megapixel sensor OS05A20](#test-on-raw-sensor-5-megapixel-sensor-os05a20)
+    - [Test on RAW sensor 12 Megapixel Sensor IMX477](#test-on-raw-sensor-12-megapixel-sensor-imx477)
+    - [Test on RAW sensor 5 Megapixel Sensor OS05A20](#test-on-raw-sensor-5-megapixel-sensor-os05a20)
     - [Test on OV4689-OV580 stereo YUV422 2 Megapixel Cam](#test-on-ov4689-ov580-stereo-yuv422-2-megapixel-cam)
   - [Code Structure](#code-structure)
   - [Declarations](#declarations)
@@ -69,7 +69,7 @@ The non-OpenCV CUDA support part has been tested and verified on the following O
   - Do a `lsusb` and found your Leopard USB3.0 camera device after connection: VID of our USB device is usually `2a0b` (for more hardware information like OV580-STEREO, please refer to [hardware.h](includes/hardware.h)).
   - Do a `ls /dev/vi*` and make sure there is video device listed. 
   - Once you know which `/dev/videoX` the camera is at, use `./leopard_cam -d X` when you run your camera
-- __USB3.0, USB2.0 connectivity__: 
+- __USB3.0, USB2.0 Connectivity__: 
   If you plug in your USB camera device slow enough to a USB3.0 port, your host PC might still recognize the USB3.0 device as USB2.0. 
   To be able to tell if your host PC has been recognized this USB3.0 camera truly as a USB3.0 device, do a `v4l2-ctl --device=/dev/videoX --all`, where `X` is the device number that being recognized by your PC. And check if its resolution, frame rate listed is the right one, (USB2.0 camera will have much lower bandwidth, so usually small resolution and frame rate).
 ```console
@@ -137,7 +137,7 @@ $ sudo make install -j6
 $ sudo sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf'
 $ sudo ldconfig
 ```
-#### OpenCV CUDA support
+#### OpenCV CUDA Support
 To build __OpenCV CUDA__ support, please refer to [INSTALL_OPENCV_CUDA.md](INSTALL_OPENCV_CUDA.md) 
 
 ### Build Camera Tool
@@ -232,7 +232,7 @@ $ killall -9 leopard_cam
 ---
 
 ## Examples
-### Test on RAW sensor 12 Megapixel sensor IMX477
+### Test on RAW sensor 12 Megapixel Sensor IMX477
 __Original streaming after debayer for IMX477:__ 
 > image is dark and blue
 > <img src="pic/imx477Orig.jpg" width="1000">
@@ -244,7 +244,7 @@ __Modified streaming for IMX477:__
 > enable awb, auto brightness & contrast, sharpness control with _OpenCV CUDA support_
 > <img src="pic/imx477Cuda.jpg" width="1000">
 
-### Test on RAW sensor 5 Megapixel sensor OS05A20
+### Test on RAW sensor 5 Megapixel Sensor OS05A20
 __Modified streaming for OS05A20 full resolution__
 > change bayer pattern to GRBG
 > enable software AWB, gamma correction

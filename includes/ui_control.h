@@ -80,6 +80,12 @@ typedef enum
   _16BIT_FLG = 2
 }reg_addr_val_width_flag;
 
+typedef enum 
+{
+  _OV580_FLG = 0,
+  _SCCB0_FLG,
+  _SCCB1_FLG
+}ov580_flag;
 
 /*****************************************************************************
 **                      	Helper functions
@@ -101,10 +107,9 @@ void enable_flg_formater(
     const char* str, 
     void(*func)(int));
 
+int ov580_dev_formater(char* data);
 int toggle_length_formater(
   char* data);
-
-
 
 void hscale_formater(
     GtkRange *range,
@@ -148,6 +153,7 @@ void toggled_val_length(
   GtkWidget *widget, 
   gpointer data);
 
+
 void hscale_exposure_up(
   GtkRange *widget);
 void hscale_gain_up(
@@ -161,6 +167,7 @@ void enable_clahe(
   GtkToggleButton *toggle_button);
 void enable_trig(
   GtkToggleButton *toggle_button);
+
 
 void register_write();
 void register_read();
@@ -203,6 +210,12 @@ void hscale_sharpness_up(
   GtkRange *widget);
 void hscale_edge_thres_up(
   GtkRange *widget);
+/**-------------------------grid3 callbacks-------------------------------*/
+void update_ov580_dev(
+  GtkWidget *widget, 
+  gpointer data);
+void ov580_register_write();
+void ov580_register_read();
 /**-------------------------micellanous callbacks---------------------------*/
 void exit_loop(GtkWidget *widget);
 gboolean check_escape(
@@ -215,6 +228,7 @@ gboolean check_escape(
 *****************************************************************************/
 void init_grid1_widgets();
 void init_grid2_widgets();
+void init_grid3_widgets();
 
 void iterate_def_elements(
   def_element *definitions, 
@@ -222,6 +236,7 @@ void iterate_def_elements(
 
 void init_grid1_def_elements();
 void init_grid2_def_elements();
+void init_grid3_def_elements();
 
 void iterate_grid_elements(
   GtkWidget *grid,
@@ -232,12 +247,15 @@ void list_all_grid1_elements(
   GtkWidget *grid);
 void list_all_grid2_elements(
   GtkWidget *grid);
+void list_all_grid3_elements(
+  GtkWidget *grid);
 
 void iterate_element_cb(
   element_callback *callbacks,
   size_t members);
 void list_all_grid1_element_callbacks();
 void list_all_grid2_element_callbacks();
+void list_all_grid3_element_callbacks();
 
 void iterate_window_signals(
   GtkWidget *widget,
@@ -259,6 +277,7 @@ void grid3_setup(GtkWidget *grid);
 void menu_bar_setup(GtkWidget *maintable);
 void notebook_setup(GtkWidget *maintable);
 void statusbar_setup(GtkWidget *maintable);
+
 void css_setup();
 
 void gui_run();

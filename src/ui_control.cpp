@@ -11,7 +11,7 @@
 *                                                                            *
 *  You should have received a copy of the GNU General Public License along   *
 *  with this program; if not, write to the Free Software Foundation, Inc.,   *
-*                                    s                                        *
+*                                                                            *
 *  This is the sample code for Leopard USB3.0 camera, mainly for camera tool *
 *  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you* 
 *  have problem running Gtk3 with your current compiled openCV, please refer * 
@@ -79,8 +79,15 @@ static GtkWidget *label_alpha, *label_beta, *label_sharpness;
 static GtkWidget *check_button_abc;
 static GtkWidget *hscale_alpha, *hscale_beta, *hscale_sharpness;
 static GtkWidget *label_edge_low_thres, *hscale_edge_low_thres;
+/// grid3 elements
+static GtkWidget *label_ov580_device, *hbox_ov580_device;
+static GtkWidget *radio_ov580, *radio_sccb0, *radio_sccb1; 
+static GtkWidget *label_ov580_i2c_addr, *entry_ov580_i2c_addr;
+static GtkWidget *label_ov580_reg_addr, *entry_ov580_reg_addr;
+static GtkWidget *label_ov580_reg_val, *entry_ov580_reg_val;
+static GtkWidget *button_ov580_read, *button_ov580_write;
 
-
+static int ov580_dev_flag;
 static int address_width_flag;
 static int value_width_flag;
 
@@ -103,6 +110,7 @@ int hex_or_dec_interpreter_c_string(
     return out_val;
     
 }
+
 /**
  * format the entry input between hex and decimal input
  * print a warning message if it is out of a set range,
@@ -136,6 +144,7 @@ int entry_formater(
     }
     return set_limit(val, max, min);
 }
+
 /** 
  * a toggle button enable/disable wrapper
  * args:
@@ -159,6 +168,7 @@ void enable_flg_formater(
          func(0);
      }
 }
+
 /** a wapper for set address and value length */
 int toggle_length_formater(char* data)
 {
@@ -190,6 +200,7 @@ GtkWidget* gtk_hscale_new(
     return widget;
                     
 }
+
 /** a menu_item formater to save some typing */
 void menu_item_formater(
     GtkWidget *item,
@@ -200,6 +211,7 @@ void menu_item_formater(
     g_signal_connect(item, "activate", handler, window);
 }
 
+/** add radio button in their corresponding group */
 GtkWidget* gtk_radio_button_new_with_group(
     GtkWidget* group)
 {
@@ -208,19 +220,20 @@ GtkWidget* gtk_radio_button_new_with_group(
     (GTK_RADIO_BUTTON(group)));
   return new_widget;
 }
-
+/** OV580 device flag */
+int ov580_dev_formater(char* data)
+{
+    if (strcmp(data, "0") == 0)
+        return _OV580_FLG;
+    if (strcmp(data, "1") == 0)
+        return _SCCB0_FLG;
+    if (strcmp(data, "2") == 0)
+        return _SCCB1_FLG;
+    return _OV580_FLG;
+}
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-/** callback for enabling/disabling resize window in grid3 */
-void enable_resize_window(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "resize window", 
-        &resize_window_enable);
-}
-
 /**-------------------------menu bar callbacks------------------------------*/
 /** callback for find and load config files */
 void open_config_dialog(GtkWidget *widget, gpointer window)
@@ -296,7 +309,27 @@ void exit_from_help(GtkWidget *widget)
 {
     exit_loop(widget);
 }
+
 /**-------------------------grid1 callbacks---------------------------------*/
+/** callback for enabling/disabling resize window in grid3 */
+void enable_resize_window(GtkToggleButton *toggle_button)
+{
+    enable_flg_formater(
+        toggle_button, 
+        "resize window", 
+        &resize_window_enable);
+}
+
+/** callback for enabling/disabling display camera info */
+void enable_display_mat_info(GtkToggleButton *toggle_button)
+{
+    enable_flg_formater(
+        toggle_button, 
+        "Stream info display enable", 
+        &display_info_enable);
+
+}
+
 /** callback for sensor datatype updates*/
 void radio_datatype(GtkWidget *widget, gpointer data)
 {
@@ -378,7 +411,6 @@ void enable_awb(GtkToggleButton *toggle_button)
         &awb_enable);
 }
 
-
 /** callback for enabling/disabling CLAHE optimization */
 void enable_clahe(GtkToggleButton *toggle_button)
 {
@@ -387,7 +419,6 @@ void enable_clahe(GtkToggleButton *toggle_button)
         "contrast limited adaptive histogram equalization", 
         &clahe_enable);
 }
-
 
 /** callback for updating register address length 8/16 bits */
 void toggled_addr_length(GtkWidget *widget, gpointer data)
@@ -403,8 +434,6 @@ void toggled_val_length(GtkWidget *widget, gpointer data)
     (void)widget;
     value_width_flag = toggle_length_formater((char *)data);
 }
-
-
 
 /** callback for register write */
 void register_write()
@@ -444,7 +473,7 @@ void register_write()
             "slave address", 
             'x', 
             0xff, 
-            0x0);
+            0x1);
         int regAddr = entry_formater(
             entry_reg_addr, 
             "register address", 
@@ -505,7 +534,7 @@ void register_read()
             "slave address", 
             'x', 
             0xff, 
-            0x0);
+            0x1);
         int regAddr = entry_formater(
             entry_reg_addr, 
             "register address", 
@@ -654,7 +683,6 @@ void set_rgb_gain_offset()
         disable_rgb_gain_offset(); 
 }
 
-
 /**
  *  callback for update rgb2rgb color matrix
  *  limit the input on MAX/MIN_RGB macros
@@ -765,15 +793,7 @@ void enable_display_dual_stereo(GtkToggleButton *toggle_button)
         "Separate display dual stereo cam", 
         &separate_dual_enable);
 }
-/** callback for enabling/disabling display camera info */
-void enable_display_mat_info(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "Stream info display enable", 
-        &display_info_enable);
 
-}
 /** callback for enabling/disabling auto white balance */
 void enable_abc(GtkToggleButton *toggle_button)
 {
@@ -802,6 +822,119 @@ void hscale_sharpness_up(GtkRange *widget)
 void hscale_edge_thres_up(GtkRange *widget)
 {
     hscale_formater(widget, &add_edge_thres_val);
+}
+
+/**-------------------------grid3 callbacks-------------------------------*/
+void update_ov580_dev(GtkWidget *widget, gpointer data)
+{
+    (void)widget;
+    ov580_dev_flag = ov580_dev_formater((char *)data);
+    if (ov580_dev_flag == _OV580_FLG)
+        gtk_widget_set_sensitive(entry_ov580_i2c_addr, 0); 
+    else
+        gtk_widget_set_sensitive(entry_ov580_i2c_addr, 1); 
+}
+
+/** callback for ov580 register write */
+void ov580_register_write()
+{
+    if ((ov580_dev_flag) == _OV580_FLG)
+    {
+        int regAddr = entry_formater(
+            entry_ov580_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
+        unsigned char regVal = entry_formater(
+            entry_ov580_reg_val, 
+            "register value", 
+            'x', 
+            0xff, 
+            0x0);
+        ov580_write_system_reg(v4l2_dev, regAddr, regVal);
+        // g_print("ov580_write_system_reg: regAddr=0x%x, regVal=0x%x\r\n", 
+        //     regAddr, 
+        //     regVal);
+    }
+     
+    else 
+    {
+        unsigned char slaveAddr = entry_formater(
+            entry_ov580_i2c_addr, 
+            "slave address", 
+            'x', 
+            0xff, 
+            0x1);
+        int regAddr = entry_formater(
+            entry_ov580_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
+        unsigned char regVal = entry_formater(
+            entry_ov580_reg_val, 
+            "register value", 
+            'x', 
+            0xff, 
+            0x00);
+     
+        if ((ov580_dev_flag) == _SCCB0_FLG)
+            ov580_write_sccb0_reg(v4l2_dev, slaveAddr, regAddr, regVal);
+        else if ((ov580_dev_flag) == _SCCB1_FLG)
+            ov580_write_sccb1_reg(v4l2_dev, slaveAddr, regAddr, regVal);
+
+    }
+}
+/** callback for ov580 register read */
+void ov580_register_read()
+{
+
+    if ((ov580_dev_flag) == _OV580_FLG)
+    {
+        int regAddr = entry_formater(
+            entry_ov580_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
+        ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
+        //unsigned char regVal = ov580_read_system_reg(v4l2_dev, regAddr);
+        unsigned char regVal = ov580_read_system_reg(v4l2_dev, 0x1033);
+        //ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
+	    printf("!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
+			regVal);
+        char buf[10];
+        snprintf(buf, sizeof(buf), "0x%x", regVal);
+        gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_val), buf);
+    }
+    else
+    {
+        
+        unsigned char slaveAddr = entry_formater(
+            entry_ov580_i2c_addr, 
+            "slave address", 
+            'x', 
+            0xff, 
+            0x1);
+        int regAddr = entry_formater(
+            entry_ov580_reg_addr, 
+            "register address", 
+            'x', 
+            0xffff, 
+            0x0);
+        unsigned char regVal;
+        if ((ov580_dev_flag) == _SCCB0_FLG)
+            regVal = ov580_read_sccb0_reg(v4l2_dev, 0xC0, 0x3508);
+            //regVal = ov580_read_sccb0_reg(v4l2_dev, slaveAddr, regAddr);
+        else 
+            regVal = ov580_read_sccb1_reg(v4l2_dev, 0xC0, 0x3508);
+            //regVal = ov580_read_sccb1_reg(v4l2_dev, slaveAddr, regAddr);
+        g_print("read register 0x%x = 0x%x\r\n", regAddr, regVal);
+        char buf[10];
+        snprintf(buf, sizeof(buf), "0x%x", regVal);
+        gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_val), buf);
+    }
 }
 /**-------------------------micellanous callbacks---------------------------*/
 /** exit streaming loop */
@@ -1005,6 +1138,31 @@ void init_grid2_widgets()
     hscale_edge_low_thres       = gtk_hscale_new(0, LOW_THRESHOLD_MAX);
     // gtk_widget_set_sensitive(hscale_edge_low_thres,0);                                         
 }
+/** 
+ * init and declare all the grid3 widgets here
+ * since you couldn‘t declare inside switch, sequence doesn't matter
+ */
+void init_grid3_widgets()
+{
+    label_ov580_device   = gtk_label_new(NULL);
+    label_ov580_i2c_addr = gtk_label_new(NULL);
+    label_ov580_reg_addr = gtk_label_new(NULL);
+    label_ov580_reg_val  = gtk_label_new(NULL);
+    
+    hbox_ov580_device    = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
+    radio_ov580          = gtk_radio_button_new(NULL);
+    radio_sccb0          = gtk_radio_button_new_with_group(radio_ov580);
+    radio_sccb1          = gtk_radio_button_new_with_group(radio_ov580);
+
+    button_ov580_read             = gtk_button_new();
+    button_ov580_write            = gtk_button_new();
+
+    entry_ov580_i2c_addr = gtk_entry_new();
+    entry_ov580_reg_addr = gtk_entry_new();
+    entry_ov580_reg_val  = gtk_entry_new();
+
+    gtk_widget_set_sensitive(entry_ov580_i2c_addr, 0); 
+}
 
 /** def_element hold all gtk type widgets initialization setup */
 void iterate_def_elements (
@@ -1043,6 +1201,7 @@ void iterate_def_elements (
        } 
     }
 }
+
 /** iterate over definition element for grid1 widgets setup */
 void init_grid1_def_elements ()
 {
@@ -1430,6 +1589,65 @@ void init_grid2_def_elements ()
     iterate_def_elements(definitions, SIZE(definitions));
 }
 
+/** iterate over definition element for grid1 widgets setup */
+void init_grid3_def_elements ()
+{
+    static def_element definitions[] = {
+        {.widget = label_ov580_device,
+         .wid_type = GTK_WIDGET_TYPE_LABEL,
+         .parent = NULL,
+         .label_str = "Device: "},
+        {.widget = radio_ov580, 
+         .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
+         .parent = hbox_ov580_device,
+         .label_str = "OV580"},
+        {.widget = radio_sccb0, 
+         .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
+         .parent = hbox_ov580_device,
+         .label_str = "SENSOR 0"},
+        {.widget = radio_sccb1, 
+         .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
+         .parent = hbox_ov580_device,
+         .label_str = "SENSOR 1"},
+        
+        {.widget = label_ov580_i2c_addr,    
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Slave Addr:"},
+        {.widget = label_ov580_reg_addr,    
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Reg Addr:"},
+        {.widget = label_ov580_reg_val,    
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Reg Val:"},
+        
+        {.widget = button_ov580_write,          
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Write"}, 
+        {.widget = button_ov580_read,           
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Read"}, 
+
+        {.widget = entry_ov580_i2c_addr,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "0x"},
+        {.widget = entry_ov580_reg_addr,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "0x"},
+        {.widget = entry_ov580_reg_val,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "0x"},
+    };
+    iterate_def_elements(definitions, SIZE(definitions));
+}
+
 /** iterate over grid element for GUI layout */
 void iterate_grid_elements(
     GtkWidget *grid,
@@ -1485,6 +1703,9 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = label_reg_val,            .col =col=0, .row =row,   .width =1},
         {.widget = entry_reg_val,            .col =++col, .row =row,   .width =1},
         {.widget = button_write,             .col =++col, .row =row++, .width =1},
+        {.widget = label_trig,               .col =col=0, .row =row,   .width =1},
+        {.widget = check_button_trig_en,     .col =++col, .row =row,   .width =1},
+        {.widget = button_trig,              .col =++col, .row =row++, .width =1},
         {.widget = seperator_tab1_3,         .col =col=0, .row =row++, .width =3},
         {.widget = label_capture,            .col =col=0, .row =row,   .width =1},
         {.widget = button_capture_bmp,       .col =++col, .row =row,   .width =1},
@@ -1492,9 +1713,6 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = label_gamma,              .col =col=0, .row =row,   .width =1},
         {.widget = entry_gamma,              .col =++col, .row =row,   .width =1},
         {.widget = button_apply_gamma,       .col =++col, .row =row++, .width =1},
-        {.widget = label_trig,               .col =col=0, .row =row,   .width =1},
-        {.widget = check_button_trig_en,     .col =++col, .row =row,   .width =1},
-        {.widget = button_trig,              .col =++col, .row =row++, .width =1},
         {.widget = label_blc,                .col =col=0, .row =row,   .width =1},
         {.widget = entry_blc,                .col =++col, .row =row,   .width =1},
         {.widget = button_apply_blc,         .col =++col, .row =row++, .width =1},
@@ -1562,6 +1780,28 @@ void list_all_grid2_elements(GtkWidget *grid)
     iterate_grid_elements(grid, elements, SIZE(elements));
 }
 
+/** grid_elements to hold all grid3 elements layout info */
+void list_all_grid3_elements(GtkWidget *grid)
+{
+    int row;
+    int col;
+    static grid_elements elements[] = { 
+        {.widget = label_ov580_device,   .col=col=0, .row=row=0, .width =1},
+        {.widget = hbox_ov580_device,    .col=++col, .row=row=0, .width =2},
+
+        {.widget = label_ov580_i2c_addr, .col=col=0, .row=++row, .width =1},
+        {.widget = label_ov580_reg_addr, .col=++col, .row=row,   .width =1},
+        {.widget = label_ov580_reg_val,  .col=++col, .row=row,   .width =1},
+        {.widget = button_ov580_write,   .col=++col, .row=row,   .width =1},
+
+        {.widget = entry_ov580_i2c_addr, .col=col=0, .row=++row, .width =1},
+        {.widget = entry_ov580_reg_addr, .col=++col, .row=row,   .width =1},
+        {.widget = entry_ov580_reg_val,  .col=++col, .row=row,   .width =1},
+        {.widget = button_ov580_read,    .col=++col, .row=row,   .width =1},
+    };
+    iterate_grid_elements(grid, elements, SIZE(elements));
+}
+
 /** iterate over element callbacks */
 void iterate_element_cb(element_callback *callbacks, size_t members)
 {
@@ -1575,6 +1815,7 @@ void iterate_element_cb(element_callback *callbacks, size_t members)
             cb->data);
     }
 }
+
 /** element_callback to hold all grid1 elements callback info */
 void list_all_grid1_element_callbacks()
 {
@@ -1770,7 +2011,34 @@ void list_all_grid2_element_callbacks()
     };
     iterate_element_cb(callbacks, SIZE(callbacks));
 }
+/** element_callback to hold all grid3 elements callback info */
+void list_all_grid3_element_callbacks()
+{
+    static element_callback callbacks[] = {
+        {.widget = radio_ov580,       
+         .signal = "toggled", 
+         .handler = G_CALLBACK(update_ov580_dev), 
+         .data = (gpointer)"0"},
+        {.widget = radio_sccb0,       
+         .signal = "toggled", 
+         .handler = G_CALLBACK(update_ov580_dev), 
+         .data = (gpointer)"1"},
+        {.widget = radio_sccb1,        
+         .signal = "toggled", 
+         .handler = G_CALLBACK(update_ov580_dev), 
+         .data = (gpointer)"2"},
 
+        {.widget = button_ov580_write,       
+         .signal = "clicked", 
+         .handler = G_CALLBACK(ov580_register_write),      
+         .data = NULL},
+        {.widget = button_ov580_read,        
+         .signal = "clicked", 
+         .handler = G_CALLBACK(ov580_register_read),       
+         .data = NULL},
+    };
+    iterate_element_cb(callbacks, SIZE(callbacks));
+}
 /** iterate over windows signals */
 void iterate_window_signals(GtkWidget *widget,
                     window_signal *signals, size_t members)
@@ -1868,8 +2136,14 @@ void grid2_setup(GtkWidget *grid)
     list_all_grid2_element_callbacks();
     grid_layout_setup(grid);
 }
+
 void grid3_setup(GtkWidget *grid)
 {
+    init_grid3_widgets();
+    init_grid3_def_elements();
+    list_all_grid3_elements(grid);
+    list_all_grid3_element_callbacks();
+    grid_layout_setup(grid);
 
 }
 
@@ -1884,32 +2158,26 @@ void notebook_setup(GtkWidget *maintable)
     GtkWidget *icon_video = gtk_image_new_from_icon_name(
         "video-display", 
         GTK_ICON_SIZE_LARGE_TOOLBAR);
-    // GtkWidget *icon_ctrl  = gtk_image_new_from_icon_name(
-    //     "media-flash", 
-    //     GTK_ICON_SIZE_LARGE_TOOLBAR);
-
-    // GtkWidget *label1 = gtk_label_new("Camera Control");
-    // GtkWidget *label2 = gtk_label_new("ISP Control");
-    // GtkWidget *box1 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
-    // GtkWidget *box2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
-    // gtk_container_add(GTK_CONTAINER(box1), icon_image);
-    // gtk_container_add(GTK_CONTAINER(box1), label1);
+    GtkWidget *icon_ctrl  = gtk_image_new_from_icon_name(
+        "media-flash", 
+        GTK_ICON_SIZE_LARGE_TOOLBAR);
 
     GtkWidget *grid1 = gtk_grid_new();
     GtkWidget *grid2 = gtk_grid_new();
-    //GtkWidget *grid3 = gtk_grid_new();
+    GtkWidget *grid3 = gtk_grid_new();
 
     grid1_setup(grid1);
     grid2_setup(grid2);
-    //grid3_setup(grid3);
+    grid3_setup(grid3);
 
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid1, icon_image);
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid2, icon_video);
-    //gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, icon_ctrl);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, icon_ctrl);
     init_sensitivity();
     gtk_container_add(GTK_CONTAINER(maintable), notebook);
 
 }
+
 std::string convert_bpp_to_string(int bpp)
 {
     switch(bpp)
@@ -1926,6 +2194,7 @@ std::string convert_bpp_to_string(int bpp)
             return "RAW10";
     }
 }
+
 void menu_bar_setup(GtkWidget *maintable)
 {
 
