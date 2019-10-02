@@ -43,7 +43,8 @@
 #include "../includes/extend_cam_ctrl.h"
 #include "../includes/isp_lib.h"
 #include "../includes/utility.h"
-
+#include "../includes/fd_socket.h"
+#include "../includes/uvc_extension_unit_ctrl.h"
 #include <omp.h> /**for openmp */
 
 /*****************************************************************************
@@ -488,7 +489,8 @@ void initialize_shared_memory_var()
 {
 	*gamma_val = 1.0;
 	*blc = 0;
-	if (strcmp(get_product(), "USB Camera-OV580") == 0)
+	if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
+	|| (strcmp(get_product(), "USB Cam-OV580-OG01A") == 0))
 		*bpp = RAW8_FLG;
 	else if (strcmp(get_product(), "OV580 STEREO") == 0)
 		*bpp = YUYV_FLG;
@@ -644,6 +646,45 @@ void video_set_format(
 		   fmt.fmt.pix.sizeimage);
 	return;
 }
+/**
+ * video set format - Leopard camera format is YUYV
+ * need to do a v4l2-ctl --list-formats-ext to see the resolution
+ * args: 
+ * 		struct device *dev 	- device infomation 
+ */
+void video_set_format(
+	struct device *dev)
+{
+	struct v4l2_format fmt;
+	int ret;
+
+	fmt.fmt.pix.width =dev->width;
+	//dev->width = width;
+	fmt.fmt.pix.height = dev->height;
+	//dev->height = height;
+	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+	ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt);
+	if (ret < 0)
+	{
+		printf("Unable to set format: %s (%d).\n", strerror(errno),
+			   errno);
+		return;
+	}
+	printf("Get Video Format: %c%c%c%c (%08x) %ux%u\n"
+		   "byte per line:%d\nsize image:%u\n",
+		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
+		   (fmt.fmt.pix.pixelformat >> 8) & 0xff,
+		   (fmt.fmt.pix.pixelformat >> 16) & 0xff,
+		   (fmt.fmt.pix.pixelformat >> 24) & 0xff,
+		   fmt.fmt.pix.pixelformat,
+		   fmt.fmt.pix.width,
+		   fmt.fmt.pix.height,
+		   fmt.fmt.pix.bytesperline,
+		   fmt.fmt.pix.sizeimage);
+	return;
+}
 
 /**
  * video get format - Leopard camera format is YUYV
@@ -701,15 +742,23 @@ void video_get_format(struct device *dev)
  * args: 
  * 		struct device *dev - every infomation for camera
 */
-void streaming_loop(struct device *dev)
+//void streaming_loop(struct device *dev)
+void streaming_loop(struct device *dev, int socket)
 {
+
+	send_fd(socket, dev->fd);
 	cv::namedWindow(window_name, cv::WINDOW_NORMAL);
 
 	image_count = 0;
 	*loop = 1;
 	while (*loop)
 		get_a_frame(dev);
-	unmap_variables();
+	
+	int v4l2_dev = dev->fd;
+	unmap_variables();	
+	stop_Camera(dev); 			/// stream off
+	video_free_buffers(dev); 	/// free buffer
+	close(v4l2_dev);			/// close device
 }
 
 /** 
@@ -1632,14 +1681,12 @@ void display_rgbir_ir_channel(
  * 
  * args: 
  * 		struct device *dev - put buffers in
- * 		nbufs - number of buffer request, map
  * returns: 
  * 		errno 
  * 
  */
 int video_alloc_buffers(
-	struct device *dev, 
-	int nbufs)
+	struct device *dev)
 {
 	struct buffer *buffers;
 
@@ -1649,8 +1696,8 @@ int video_alloc_buffers(
 	CLEAR(bufrequest);
 	bufrequest.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	bufrequest.memory = V4L2_MEMORY_MMAP;
-	bufrequest.count = nbufs;
-	dev->nbufs = nbufs;
+	bufrequest.count = dev->nbufs;
+	dev->nbufs = dev->nbufs;
 	dev->memtype = V4L2_MEMORY_MMAP;
 	dev->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 

@@ -216,6 +216,8 @@ void update_ov580_dev(
   gpointer data);
 void ov580_register_write();
 void ov580_register_read();
+// void ov580_register_write(GtkWidget *widget, gpointer data);
+// void ov580_register_read(GtkWidget *widget, gpointer data);
 /**-------------------------micellanous callbacks---------------------------*/
 void exit_loop(GtkWidget *widget);
 gboolean check_escape(
@@ -281,4 +283,5 @@ void statusbar_setup(GtkWidget *maintable);
 void css_setup();
 
 void gui_run();
-void ctrl_gui_main();
+void ctrl_gui_main(int socket);
+//void ctrl_gui_main();

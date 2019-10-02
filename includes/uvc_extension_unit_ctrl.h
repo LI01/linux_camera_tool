@@ -34,7 +34,8 @@ typedef enum
     LI_XU_SENSOR_WINDOW_REPOSITION      = 0x02,
     LI_XU_LED_MODES                     = 0x03,
     LI_XU_SENSOR_GAIN_CONTROL_RGB       = 0x04,
-    LI_XU_SENSOR_GAIN_CONTROL_A         = 0x05,
+  /*  LI_XU_SENSOR_GAIN_CONTROL_A         = 0x05, */
+    LI_XU_SENSOR_NO_REG_I2C_RW          = 0x05,////////////////////
     LI_XU_SENSOR_UUID_HWFW_REV          = 0x07,
     LI_XU_PTS_QUERY                     = 0x08,
     LI_XU_SOFT_TRIGGER                  = 0x09,
@@ -56,8 +57,8 @@ typedef enum
 #define LI_XU_SENSOR_WINDOW_REPOSITION_SIZE         (8)
 #define LI_XU_LED_MODES_SIZE                        (1)
 #define LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE          (8)
-#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE            (2)
-
+/*#define LI_XU_SENSOR_GAIN_CONTROL_A_SIZE            (2) */
+#define LI_XU_SENSOR_NO_REG_I2C_RW_SIZE             (259)
 #define LI_XU_SENSOR_UUID_HWFW_REV_SIZE             (49)
 #define LI_XU_PTS_QUERY_SIZE                        (4)
 #define LI_XU_SOFT_TRIGGER_SIZE                     (2)
@@ -105,6 +106,18 @@ typedef enum
 #define REBOOT_CAM_FLG          (0x9b)
 #define SET_SPI_PORT_SELECT(x)  (0xa0 | (x & 0x0f))
 
+/* test for no registry I2C slave*/
+#define DS28C36_I2C_SLAVE_ADDR   (0x36) 
+
+#define WRITE_MEM_CMD            (0x96)
+#define WRITE_READBACK_BYTE1      (0x1)
+#define WRITE_READBACK_BYTE2     (0xAA)
+#define WRITE_TX_BYTE_COUNT      (0x21) // 33 bytes
+
+#define READ_MEM_CMD             (0x69)
+#define READ_READBACK_BYTE1      (0x33)
+#define READ_READBACK_BYTE2      (0xAA)
+#define READ_RX_BYTE_COUNT       (0x22) //34 bytes
 ////////////////////////////////////////////////////////////////////////
 /** --- For AP020x firmware update --- */
 /* Once a command has been written through the HCI, it will be 
@@ -301,6 +314,19 @@ void set_sensor_gain_rgb(
     unsigned int grGain,
     unsigned int gbGain,
     unsigned int bGain);
+
+// can used for other no registry I2C slave but I only tested on SD28C36
+void DS28C36_I2C_write(
+    int fd, 
+    int slaveAddr, 
+    int length,
+    int cmd,
+    unsigned char *i2c_data);
+
+void DS28C36_I2C_read(
+    int fd, 
+    int slaveAddr,
+    int length);
 
 int get_hw_rev();
 int get_li_datatype();

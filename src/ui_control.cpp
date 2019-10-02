@@ -29,6 +29,7 @@
 #include "../includes/json_parser.h"
 #include "../includes/core_io.h"
 #include "../includes/gitversion.h"
+#include "../includes/fd_socket.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -91,7 +92,7 @@ static int ov580_dev_flag;
 static int address_width_flag;
 static int value_width_flag;
 
-extern int v4l2_dev;/** global variable, file descriptor for camera device */
+int v4l2_dev; /** global variable, file descriptor for camera device */
 /*****************************************************************************
 **                      	Helper functions
 *****************************************************************************/
@@ -252,7 +253,7 @@ void open_config_dialog(GtkWidget *widget, gpointer window)
     gtk_window_set_transient_for(GTK_WINDOW(file_dialog), GTK_WINDOW(window));
     gtk_widget_show(file_dialog);
     gint resp = gtk_dialog_run(GTK_DIALOG(file_dialog));
-    //gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(file_dialog), "/");
+    // gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(file_dialog), "/");
     // gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(file_dialog), 
     // g_get_home_dir());
 
@@ -384,6 +385,10 @@ void hscale_gain_up(GtkRange *widget)
 {
     int gain = (int)gtk_range_get_value(widget);
     set_gain(v4l2_dev, gain);
+    //ov580_write_system_reg(v4l2_dev, 0x1033, 0x02);
+    unsigned char regVal = ov580_read_system_reg(v4l2_dev, 0x1033);
+    printf("!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
+		 	regVal);
     g_print("gain is %d\n", get_gain(v4l2_dev));
 }
 
@@ -460,7 +465,7 @@ void register_write()
             0x00);
         if ((value_width_flag) == _8BIT_FLG)
             regVal = regVal & 0xff;
-        
+       
         sensor_reg_write(v4l2_dev, regAddr, regVal);
     }
 
@@ -836,8 +841,13 @@ void update_ov580_dev(GtkWidget *widget, gpointer data)
 }
 
 /** callback for ov580 register write */
+//void ov580_register_write(GtkWidget *widget, gpointer data)
 void ov580_register_write()
 {
+    //(void)widget;
+    //gint v4l2_dev2 = *((gint*)data);
+    // printf("My process ID : %d\n", getpid());
+    // printf("My parent's ID: %d\n", getppid());
     if ((ov580_dev_flag) == _OV580_FLG)
     {
         int regAddr = entry_formater(
@@ -851,7 +861,9 @@ void ov580_register_write()
             "register value", 
             'x', 
             0xff, 
-            0x0);
+            0x0); 
+        //printf("v4l2 dev = %d\r\n", v4l2_dev);
+        //ov580_write_system_reg(v4l2_dev2, 0x1033, 0x02);
         ov580_write_system_reg(v4l2_dev, regAddr, regVal);
         // g_print("ov580_write_system_reg: regAddr=0x%x, regVal=0x%x\r\n", 
         //     regAddr, 
@@ -886,10 +898,13 @@ void ov580_register_write()
 
     }
 }
+
 /** callback for ov580 register read */
+//void ov580_register_read(GtkWidget *widget, gpointer data)
 void ov580_register_read()
 {
-
+//    (void)widget;
+//     gint v4l2_dev2 = *((gint*)data);
     if ((ov580_dev_flag) == _OV580_FLG)
     {
         int regAddr = entry_formater(
@@ -898,12 +913,13 @@ void ov580_register_read()
             'x', 
             0xffff, 
             0x0);
-        ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
-        //unsigned char regVal = ov580_read_system_reg(v4l2_dev, regAddr);
-        unsigned char regVal = ov580_read_system_reg(v4l2_dev, 0x1033);
+        //printf("v4l2 dev = %d\r\n", v4l2_dev);
         //ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
-	    printf("!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
-			regVal);
+        unsigned char regVal = ov580_read_system_reg(v4l2_dev, regAddr);
+        //unsigned char regVal = ov580_read_system_reg(v4l2_dev, 0x1033);
+        //ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
+	    // printf("!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
+		// 	regVal);
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_val), buf);
@@ -925,11 +941,9 @@ void ov580_register_read()
             0x0);
         unsigned char regVal;
         if ((ov580_dev_flag) == _SCCB0_FLG)
-            regVal = ov580_read_sccb0_reg(v4l2_dev, 0xC0, 0x3508);
-            //regVal = ov580_read_sccb0_reg(v4l2_dev, slaveAddr, regAddr);
+            regVal = ov580_read_sccb0_reg(v4l2_dev, slaveAddr, regAddr);
         else 
-            regVal = ov580_read_sccb1_reg(v4l2_dev, 0xC0, 0x3508);
-            //regVal = ov580_read_sccb1_reg(v4l2_dev, slaveAddr, regAddr);
+            regVal = ov580_read_sccb1_reg(v4l2_dev, slaveAddr, regAddr);
         g_print("read register 0x%x = 0x%x\r\n", regAddr, regVal);
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
@@ -2037,7 +2051,18 @@ void list_all_grid3_element_callbacks()
          .handler = G_CALLBACK(ov580_register_read),       
          .data = NULL},
     };
+    // printf("My process ID : %d\n", getpid());
+    // printf("My parent's ID: %d\n", getppid());
+    // printf("v4l2 dev=%d\r\n", v4l2_dev);
+    // ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
+	// printf("ae default value = 0x%x\r\n", 
+	// 		ov580_read_system_reg(v4l2_dev, 0x1033));
+    // ov580_write_sccb0_reg(v4l2_dev, 0xC0, 0x3508, 0xff);
+	// printf("gain value = 0x%x\r\n", 
+	// 	ov580_read_sccb0_reg(v4l2_dev, 0xc0, 0x3508));
+    
     iterate_element_cb(callbacks, SIZE(callbacks));
+
 }
 /** iterate over windows signals */
 void iterate_window_signals(GtkWidget *widget,
@@ -2064,8 +2089,10 @@ void list_all_window_signals(GtkWidget *window)
 void init_sensitivity()
 {
 
-    /** OV580 firmware doesn't have gain, exposure ctrl capabilities etc */
-    if (strcmp(get_product(), "USB Camera-OV580") == 0)
+    /** OV580 firmware doesn't have a bunch of fx3 extension unit capabilities */
+    if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
+    ||(strcmp(get_product(), "USB Cam-OV580-OG01A") == 0)
+    ||(strcmp(get_product(), "OV580 STEREO") == 0))
     {
         gtk_widget_set_sensitive(button_read, 0);
         gtk_widget_set_sensitive(button_write, 0);
@@ -2074,19 +2101,11 @@ void init_sensitivity()
         gtk_widget_set_sensitive(radio_8bit_addr,0);
         gtk_widget_set_sensitive(radio_8bit_val,0);
         gtk_widget_set_sensitive(check_button_just_sensor,0);
+        gtk_widget_set_sensitive(check_button_trig_en, 0);
+        gtk_widget_set_sensitive(button_trig, 0);
 
     }
-    else if (strcmp(get_product(), "OV580 STEREO") == 0)
-    {
-        gtk_widget_set_sensitive(button_read, 0);
-        gtk_widget_set_sensitive(button_write, 0);
-        gtk_widget_set_sensitive(radio_16bit_addr,0);
-        gtk_widget_set_sensitive(radio_16bit_val,0);
-        gtk_widget_set_sensitive(radio_8bit_addr,0);
-        gtk_widget_set_sensitive(radio_8bit_val,0);
-        gtk_widget_set_sensitive(check_button_just_sensor,0);
-    }
-    
+
     gtk_toggle_button_set_active(
        GTK_TOGGLE_BUTTON(check_button_stream_info), TRUE);  
     gtk_range_set_value(GTK_RANGE(hscale_beta), 0);
@@ -2234,7 +2253,17 @@ void menu_bar_setup(GtkWidget *maintable)
         device_info.push_back("Datatype: " 
             + convert_bpp_to_string(set_bpp(get_li_datatype())));
     }
-
+    else 
+    {
+	    int bpp;
+        if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
+	    || (strcmp(get_product(), "USB Cam-OV580-OG01A") == 0))
+            bpp = RAW8_FLG;
+        else if (strcmp(get_product(), "OV580 STEREO") == 0)
+            bpp = YUYV_FLG;
+        device_info.push_back("Datatype: " 
+            + convert_bpp_to_string(bpp));
+    }
     for (size_t i=0; i < device_info.size(); i++) {
         device_item = 
             gtk_menu_item_new_with_label(device_info[i].c_str());
@@ -2408,7 +2437,7 @@ void gui_run()
     
     list_all_window_signals(window);
     gtk_widget_show_all(window);
-    
+
     gtk_main();
 }
 
@@ -2420,8 +2449,10 @@ void gui_run()
  * 
  * int init_control_gui(int argc, char *argv[])
  */
-void ctrl_gui_main()
+void ctrl_gui_main(int socket)
+//void ctrl_gui_main()
 {
+    v4l2_dev = recv_fd(socket);
     gui_init();
     css_setup();
     gui_run();

@@ -160,3 +160,9 @@
 /** --- for LI_XU_GENERIC_I2C_RW --- */
 #define GENERIC_REG_WRITE_FLG   (0x80)
 #define GENERIC_REG_READ_FLG    (0x00)
+
+typedef enum
+{
+   CROPPED_WIDTH = 1280,
+   CROPPED_HEIGHT = 720
+} cropped_resolution;

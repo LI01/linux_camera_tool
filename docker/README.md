@@ -1,6 +1,6 @@
 # Running Linux Camera Tool in Docker
 Docker is a popular container system. It is a way to containerize the application to put everything that the application need(`ubuntu 16.04, OpenCV 3.4.2, GTK3` etc in our case) into a small image that can be run on __any computer that also has docker on it__. 
-Unlike virtual machines, containers do not bundle a full operating system - only libraries and settings required to make the software work are needed. This makes for efficient, lightweight, self-contained systems and guarantees that software will always run the same, regardless if where it is deployed.[^note1]
+Unlike virtual machines, containers do not bundle a full operating system - only libraries and settings required to make the software work are needed. This makes for efficient, lightweight, self-contained systems and guarantees that software will always run the same, regardless if where it is deployed.<sup>1</sup>
 
 Running Linux Camera Tool in Docker eliminates the problem when people having difficulty setting up their work environment. It will be beneficial for user that are: 
 1. Not willing to rebuild their `OpenCV` due to system consistency, thinking rebuild OpenCV takes a long time etc
@@ -24,14 +24,15 @@ sudo docker pull danyu9394/linux_camera_tool:linux_camera_tool
 ```
 
 ## Usage
-This is an example of running a Leopard USB3 that currently listed as `/dev/video2` in your host machine onto docker container, assuming you use the image downloaded from docker hub. For more information, please refer to [^note2]
+This is an example of running a Leopard USB3 that currently listed as `/dev/video2` in your host machine onto docker container, assuming you use the image downloaded from docker hub. For more information, please refer to <sup>2</sup>
 ```sh
+sudo xhost +local:root      # allow display something on your screen
 sudo docker run -it \
     --env="DISPLAY" --env=DISPLAY:$DISPLAY \
     --device=/dev/video2:/dev/video0 \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -p 5000:5000 \
-    danyu9394/linux_camera_tool:linux_camera_tool
+    danyu9394/linux_camera_tool
 ```
 where, 
 - `-it` is to start an interactive session
@@ -41,7 +42,7 @@ where,
     - `/dev/video0` is the video device that has exposed to container and will be used in the container
 - `-v /tmp/.X11-unix:/tmp/.X11-unix` helps in X11 forwarding so that we can use functions like `cv::imshow()`
 - `-p` set up a port forward. This example map port `5000` in the container to port `5000` on the host
-- `danyu9394/linux_camera_tool:linux_camera_tool` is the container image you want to run
+- `danyu9394/linux_camera_tool` is the container image you want to run
   
 Once you get inside the container, go to the program directory to run the program
 ```sh
@@ -52,5 +53,5 @@ cd ~/linux_camera_tool/linux_camera_tool
 <img src="../pic/docker.jpg" width="1000">
 
 ## References
-[^note1]: https://www.docker.com/resources/what-container
-[^note2]: http://wiki.ros.org/docker/Tutorials/GUI
+<sup>1</sup>: https://www.docker.com/resources/what-container
+<sup>2</sup>: http://wiki.ros.org/docker/Tutorials/GUI

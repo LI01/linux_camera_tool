@@ -257,6 +257,111 @@ void set_sensor_gain_rgb(int fd, unsigned int rGain,
 						   LI_XU_SENSOR_GAIN_CONTROL_RGB_SIZE, buf4);
 }
 
+void DS28C36_I2C_write(
+    int fd, 
+    int slaveAddr, 
+    int length,
+    int cmd,
+    unsigned char *i2c_data)
+{
+    unsigned char buf[LI_XU_SENSOR_NO_REG_I2C_RW_SIZE] = {0};
+    CLEAR(buf);
+    buf[0] = 0x80;              //indicate read/write
+	buf[1] = slaveAddr&0xff;    // slave addr
+	buf[2] = (length+2) & 0xff;        // TX byte len
+	buf[3] = cmd & 0xff;     // cmd
+    buf[4] = (length)& 0xff; // length padding
+    buf[5] = 0x00; 
+    // TX data - 32 bytes
+    if (length > 1)
+    {
+        printf("write in data [");
+        for (int i=1; i < length; i++) 
+        {
+            buf[5+i] = *(i2c_data+i-1); 
+            //printf("0x%x ", *(i2c_data+i));
+        }
+        for (int i=0; i< length+4; i++)
+        {
+            printf("0x%x ", buf[i]);
+        }
+        printf("] write finished\r\n");
+    }
+    write_to_UVC_extension(
+        fd, LI_XU_SENSOR_NO_REG_I2C_RW,
+		LI_XU_SENSOR_NO_REG_I2C_RW_SIZE, buf);
+
+}
+
+//unsigned char * 
+void DS28C36_I2C_read(
+    int fd, 
+    int slaveAddr, 
+    int length)
+{
+    unsigned char buf[LI_XU_SENSOR_NO_REG_I2C_RW_SIZE] = {0};
+    CLEAR(buf);
+    buf[0] = 0x00;              // indicate for read
+	buf[1] = slaveAddr &0xff;   // slave addr
+	buf[2] = length & 0xff;     // RX data length
+	
+    write_to_UVC_extension(
+        fd, LI_XU_SENSOR_NO_REG_I2C_RW,
+		LI_XU_SENSOR_NO_REG_I2C_RW_SIZE, buf);
+    //unsigned char *i2c_data;
+    read_from_UVC_extension(
+		fd, LI_XU_SENSOR_NO_REG_I2C_RW,
+		LI_XU_SENSOR_NO_REG_I2C_RW_SIZE, buf);
+    printf("received data [");
+    // for (int i=0; i < length; i++) 
+    // {
+    //     //*(i2c_data+i) = buf[5+i];
+    //     printf("0x%x ", buf[5+i]); 
+    // }
+    for (int i=0; i < length+3; i++) 
+    {
+        //*(i2c_data+i) = buf[5+i];
+        printf("0x%x ", buf[i]); 
+    }
+    printf("] read finished\r\n");
+    //return i2c_data;
+}
+
+/* test */
+void DS28C36_test(int fd)
+{  /** write memory */
+    unsigned char write_buf[WRITE_TX_BYTE_COUNT];
+    for (int i=0; i<WRITE_TX_BYTE_COUNT; i++) {
+        write_buf[i] = i+1;
+    }
+    DS28C36_I2C_write(
+        fd,
+        DS28C36_I2C_SLAVE_ADDR, 
+        WRITE_TX_BYTE_COUNT,
+        WRITE_MEM_CMD,
+        write_buf);
+    usleep(50); // delay 500ms
+    DS28C36_I2C_read(
+        fd,
+        DS28C36_I2C_SLAVE_ADDR, 
+        2);
+    usleep(50); // delay 50ms
+    /** read memory */
+    unsigned char read_buf[READ_RX_BYTE_COUNT] = {0};
+    DS28C36_I2C_write(
+        fd,
+        DS28C36_I2C_SLAVE_ADDR, 
+        1,
+        READ_MEM_CMD,
+        read_buf);
+    usleep(50); // delay 50ms
+    DS28C36_I2C_read(
+        fd,
+        DS28C36_I2C_SLAVE_ADDR, 
+        READ_RX_BYTE_COUNT);
+
+}
+
 /**
  * Getter for hardware revision
  * Most likely 0x0102
@@ -1144,6 +1249,7 @@ void ov580_write_system_reg(
 	CLEAR(w_buf);
 	w_buf[0] = OV580_WRITE_CMD_ID;
 	w_buf[1] = OV580_SYSTEM_REG;
+	w_buf[2] = 0x20;
 	w_buf[3] = 0x4; 					// address width = 4 bytes
 	w_buf[4] = 0x1; 					// data width = 1 byte
 	w_buf[5] = 0x80; 					// reg addr, big endian, 0x8018xxxx
@@ -1152,10 +1258,13 @@ void ov580_write_system_reg(
 	w_buf[8] = LOWBYTE(reg_addr);
 	w_buf[9] = 0x00; 					// reg number(big endian) = 1 byte
 	w_buf[10] = 0x01;
+	w_buf[11] = 0x00;
+	w_buf[12] = 0x01;
 	w_buf[16] = reg_val;
 	
 	ov580_write_to_UVC_extension(fd, w_buf); 
-	//printf("ov580_write_system_reg: regAddr=0x%x, regVal=0x%x\r\n", reg_addr, reg_val);
+	printf("ov580_write_system_reg: regAddr=0x%x, regVal=0x%x\r\n", 
+		reg_addr, reg_val);
 }
 
 unsigned char ov580_read_system_reg(
@@ -1166,6 +1275,7 @@ unsigned char ov580_read_system_reg(
 	CLEAR(w_buf);
 	w_buf[0] = OV580_READ_CMD_ID;
 	w_buf[1] = OV580_SYSTEM_REG;
+	w_buf[2] = 0x20;
 	w_buf[3] = 0x04; 					// address width = 4 bytes
 	w_buf[4] = 0x01; 					// data width = 1 byte
 	w_buf[5] = 0x80; 					// reg addr, big endian, 0x8018xxxx
@@ -1174,13 +1284,20 @@ unsigned char ov580_read_system_reg(
 	w_buf[8] = LOWBYTE(reg_addr);
 	w_buf[9] = 0x00; 					// reg number(big endian) = 1 byte
 	w_buf[10] = 0x01;
-
+	w_buf[11] = 0x00;
+	w_buf[12] = 0x01;
 	ov580_read_from_UVC_extension(
 		fd, 
 		w_buf); 
 	unsigned char reg_val = w_buf[16];
 	printf("ov580_read_system_reg: regAddr=0x%x, regVal=0x%x\r\n", 
 		reg_addr, w_buf[16]);
+	// printf("buf[0]=0x%x, buf[1]=0x%x, buf[2]=0x%x, buf[3]=0x%x, buf[4]=0x%x,"
+	// 	"buf[5]=0x%x, buf[6]=0x%x, buf[7]=0x%x, buf[8]=0x%x,buf[9]=0x%x," 
+	// 	"buf[10]=0x%x, buf[11]=0x%x, buf[12]=0x%x, buf[13]=0x%x, buf[16]=0x%x\r\n", 
+	// 	w_buf[0], w_buf[1], w_buf[2], w_buf[3], w_buf[4],
+	// 	w_buf[5], w_buf[6], w_buf[7], w_buf[8], w_buf[9],
+	// 	w_buf[10], w_buf[11], w_buf[12], w_buf[13], w_buf[16]);
 	return reg_val;
 }
 

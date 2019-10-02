@@ -51,6 +51,20 @@ typedef enum { FALSE, TRUE } BOOL;
 #define LOWBYTE(x)          ((unsigned char) (x))
 #define HIGHBYTE(x)         ((unsigned char) (((unsigned int) (x)) >> 8))
 #define BYTES_PER_BPP(bpp)  ((bpp -1)/8 + 1)
+/** Converts an unaligned four-byte little-endian integer into an int32 */
+#define DW_TO_INT(p) ((p)[0] | ((p)[1] << 8) | ((p)[2] << 16) | ((p)[3] << 24))
+/** Converts an unaligned two-byte little-endian integer into an int16 */
+#define SW_TO_SHORT(p) ((p)[0] | ((p)[1] << 8))
+/** Converts an int16 into an unaligned two-byte little-endian integer */
+#define SHORT_TO_SW(s, p) \
+(p)[0] = (s); \
+(p)[1] = (s) >> 8;
+    /** Converts an int32 into an unaligned four-byte little-endian integer */
+#define INT_TO_DW(i, p) \
+(p)[0] = (i); \
+(p)[1] = (i) >> 8; \
+(p)[2] = (i) >> 16; \
+(p)[3] = (i) >> 24;
 /*****************************************************************************
 **                      	           Arrays
 *****************************************************************************/
@@ -146,6 +160,9 @@ typedef enum { FALSE, TRUE } BOOL;
 #define _SPACE_KEY_ASCII     (32)
 #define _Q_LETTER            (114)
 
+// #define LOGD(...) do { printf(__VA_ARGS__); printf("\n"); } while(0)
+// #define LOGE(...) do { printf(__VA_ARGS__); printf("\n"); } while(0)
+// #define LOGW(...) do { printf(__VA_ARGS__); printf("\n"); } while(0)
 
 struct device
 {

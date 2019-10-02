@@ -70,14 +70,6 @@ typedef enum
 } li_datatype_fw_flag;
 
 
-typedef enum
-{
-   CROPPED_WIDTH = 1280,
-   CROPPED_HEIGHT = 720
-} cropped_resolution;
-
-
-
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
@@ -124,9 +116,10 @@ void stop_Camera(struct device *dev);
 
 void video_set_format(struct device *dev, int width,
                       int height, int pixelformat);
+void video_set_format(struct device *dev);
 void video_get_format(struct device *dev);
 
-void streaming_loop(struct device *dev);
+void streaming_loop(struct device *dev, int socket);
 
 void get_a_frame(struct device *dev);
 
@@ -161,9 +154,13 @@ void flip_enable(int enable);
 void mirror_enable(int enable);
 void canny_filter_enable(int enable);
 void rgb_ir_correction_enable(int enable);
-void apply_color_correction_rgb_ir(struct device *dev, const void *p);
+void apply_color_correction_rgb_ir(
+   struct device *dev, 
+   const void *p);
 void rgb_ir_ir_display_enable(int enable);
-void display_rgbir_ir_channel(struct device *dev, const void *p);
+void display_rgbir_ir_channel(
+   struct device *dev, 
+   const void *p);
 void separate_dual_enable(int enable);
 void display_info_enable(int enable);
 void add_alpha_val(int alpha_val_from_gui);
@@ -177,7 +174,7 @@ void decode_process_a_frame(
    const void *p,
    double *cur_time);
 
-int video_alloc_buffers(struct device *dev, int nbufs);
+int video_alloc_buffers(struct device *dev);
 int video_free_buffers(struct device *dev);
 
 void set_loop(int exit);

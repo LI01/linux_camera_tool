@@ -49,9 +49,11 @@ Table of Contents
 ### Support OS Platforms
 This application uses `v4l2`(video for linux) API for linux. The related system calls are also UNIX based, e.g. `open()`, `close()`, `fork()` etc. It doesn't support running on Mac OS and Windows. For Windows Camera Tool for your Leopard USB3 camera, please contact [leopard support](mailto:support@leopardimaging.com) for application/source code.
 Docker hasn't supported USB video device pass through on Windows. So even running docker, it is suggested you have a linux operating system workstation there.
+- `5.0.0-29-generic #31~18.04.1-Ubuntu SMP`
 - `4.18.0-17-generic #18~18.04.1-Ubuntu SMP` 
-- `4.15.0-32-generic #35~16.04.1-Ubuntu`
 - `4.15.0-20-generic #21~Ubuntu 18.04.1 LTS`
+- `4.15.0-32-generic #35~16.04.1-Ubuntu`
+
 
 ### Support OpenCV Versions
 Due to OpenCV CUDA support hasn't been updated to 4.0.X, it is suggested to install `3.4.3` for OpenCV CUDA support. 
@@ -64,8 +66,11 @@ The non-OpenCV CUDA support part has been tested and verified on the following O
 ### Hardware Prerequisites
 - __Camera__: any Leopard USB3.0/2.0 cameras
 - __Host PC__: with USB3.0 port connectivity 
+  
   Some boards like `OV580-STEREO` has more strict voltage requirements toward USB3.0 port. It is highly suggested to use a __USB3.0 powered hub__ to regulate the voltage out from PC's USB3.0 port if a `OV580-STEREO` USB3 device is used. 
-  The underlying issue is that different host PCs/USB3 PCIe manufacturers have different USB3 controllers. Some of the USB3 cameras are not able to handle transient voltage droop from the USB3 port from PC. So a __USB3.0 powered hub__ is highly recommended if this issue is repeatable with direct USB3 connection on your host PC. (Any serdes USB3 camera which have an external 12V power supply will be immune to this as you assumed :D)
+
+  The underlying issue is that different host PCs/USB3 PCIe manufacturers have different USB3 controllers. Some of the USB3 cameras are not able to handle transient voltage droop from the USB3 port from PC. So a __USB3.0 powered hub__ is highly recommended if this issue is repeatable with direct USB3 connection on your host PC. 
+  (Any serdes USB3 camera which have an external 12V power supply will be immune to this as you assumed :D)
   - Do a `lsusb` and found your Leopard USB3.0 camera device after connection: VID of our USB device is usually `2a0b` (for more hardware information like OV580-STEREO, please refer to [hardware.h](includes/hardware.h)).
   - Do a `ls /dev/vi*` and make sure there is video device listed. 
   - Once you know which `/dev/videoX` the camera is at, use `./leopard_cam -d X` when you run your camera
@@ -292,27 +297,29 @@ $ linux_camera_tool .
 |
 ├── includes
 │   ├── shortcuts.h                       # common used macro functions  
-│   ├── hardware.h                        # for specific hardware feature support
+│   ├── hardware.h                        # specific hardware feature support
 │   ├── gitversion.h                      # auto-generated header file for revision
 │   ├── utility.h                         # timer for benchmark
 │   ├── cam_property.h
 │   ├── extend_cam_ctrl.h
+|   ├── isp_lib.h
 │   ├── core_io.h
+│   ├── fd_socket.h
 |   ├── json_parser.h
 │   ├── batch_cmd_parser.h
 │   ├── ui_control.h
-|   ├── isp_lib.h
 │   ├── uvc_extension_unit_ctrl.h
 │   └── v4l2_devices.h
 │
 ├── src
 │   ├── cam_property.cpp                  # gain, exposure, ptz ctrl etc
 │   ├── extend_cam_ctrl.cpp               # camera stream, capture ctrl etc
-|   ├── isp_lib.cpp                       # image signal processing using OpenCV
+|   ├── isp_lib.cpp                       # ISP using OpenCV
 |   ├── core_io.cpp                       # string manipulation for parser
+|   ├── fd_socket.cpp                     # file descriptor socket for IPC
 |   ├── json_parser.cpp                   # json parser
 |   ├── batch_cmd_parser.cpp              # BatchCmd.txt parser
-|   ├── ui_control.cpp                    # control GUI
+|   ├── ui_control.cpp                    # all GUI related
 │   ├── uvc_extension_unit_ctrl.cpp       # all uvc extension unit ctrl
 │   └── v4l2_device.cpp                   # udev ctrl
 │   
@@ -325,21 +332,21 @@ $ linux_camera_tool .
 Most of the image processing jobs in Linux Camera Tool([code for ISP](src/isp_lib.cpp)) are done by using OpenCV. Since there are histogram matrix calculations and many other heavy image processing involved, enabling these features will slow down the streaming a lot. If you build Linux Camera Tool with __OpenCV CUDA support__, these feature speed won't be compromised a lot. Detailed benchmark result is listed below.
 
 #### Benchmark Results
-Benchmark test is performed on a _12M pixel RAW12 bayer_ camera (IMX477).
+Benchmark test is performed on a _12M pixel RAW12 bayer_ camera (IMX477) with host PC OpenCV build TBB on.
 
-| Functions| Non-CUDA OpenCV Support | Latency | CUDA OpenCV Support | Latency |
-|----------|-------------------------|---------|---------------------|---------|
-| `Auto White Balance`   | Yes                                | 55ms   | Yes                            | 3700us  |
-| `CLAHE`                | Yes                                | 40ms    | Yes                            | 7700us  |
-| `Gamma Correction`     | Yes                                | 2.7ms   | Yes                            | 1100us  |
-| `Sharpness`            | Yes                                | 200ms   | Yes                            | 20ms    |
-| `Show Edge`            | Yes                                | 20ms    | Yes                            | 16ms    |
-| `Color Correction Matrix` | Yes                             | 18ms    | No                             | N/A     |
-| `Perform Shift`        | No                                 | 13ms    | No                             | N/A     |
-| `Separate Display`     | Yes                                | 9000us  | No                             | N/A     |
-| `Brightness`           | Yes                                | 7ms   | Yes                            | 400us   |
-| `Contrast`             | Yes                                | 7ms   | Yes                            | 400us   |
-| `Auto Brightness & Contrast` | Yes                                | 14ms    | Yes                            | 1180us  |
+| Functions                     | Non-CUDA OpenCV Support | Latency | CUDA OpenCV Support | Latency |
+|-------------------------------|-------------------------|---------|---------------------|---------|
+| `Auto White Balance`          | Yes                     | 55ms    | Yes                 | 3700us  |
+| `CLAHE`                       | Yes                     | 40ms    | Yes                 | 7700us  |
+| `Gamma Correction`            | Yes                     | 2.7ms   | Yes                 | 1100us  |
+| `Sharpness`                   | Yes                     | 200ms   | Yes                 | 20ms    |
+| `Show Edge`                   | Yes                     | 20ms    | Yes                 | 16ms    |
+| `Color Correction Matrix`     | Yes                     | 18ms    | No                  | N/A     |
+| `Perform Shift`               | No                      | 13ms    | No                  | N/A     |
+| `Separate Display`            | Yes                     | 9000us  | No                  | N/A     |
+| `Brightness`                  | Yes                     | 7ms     | Yes                 | 400us   |
+| `Contrast`                    | Yes                     | 7ms     | Yes                 | 400us   |
+| `Auto Brightness & Contrast`  | Yes                     | 14ms    | Yes                 | 1180us  |
 
 #### Datatype Definition for Data Stream
 <img src="pic/datatypeExp.jpg" width="7000">
@@ -376,6 +383,7 @@ For updating driver from manual DMA to auto DMA, you need to ensure:
 When use triggering mode instead of master free running mode for USB3 SerDes camera, the very first frame received will be bad and should be tossed away. It is recommended to use an external function generator or a dedicated triggering signal for triggering the cameras for the purpose of syncing different SerDes cameras. 
 
 The included `shot 1 trigger` function is only a demonstration on generating one pulse and let camera output one frame after `shot 1 trigger` is clicked once. User should not fully rely on this software generated trigger but use a hardware trigger for sync the camera streaming.
+
 
 ---
 ## Reporting Bugs
