@@ -62,6 +62,7 @@ The non-OpenCV CUDA support part has been tested and verified on the following O
 - `3.4.3` 
 - `4.0.1`
 - `4.1.1`
+- `4.1.2`
   
 ### Hardware Prerequisites
 - __Camera__: any Leopard USB3.0/2.0 cameras
@@ -112,7 +113,7 @@ foo@bar:~$ ls /dev//vi* ## list all the video device in your host PC
 ### Dependencies
 Make sure the libraries have installed. Run [configure.sh](configure.sh) in current directory for completing installing all the required dependencies.
 ```sh
-$ chmod +X configure.sh
+$ chmod +x configure.sh
 $ ./configure.sh
 ```
 
