@@ -32,6 +32,14 @@
 #define MAX_RGB_OFFSET        (255)
 #define MIN_RGB_OFFSET        (-255)
 
+
+#define MAX_RGB_MATRIX        (5000)
+#define MIN_RGB_MATRIX        (-5000)
+#define DEF_RGB_MATRIX_EDGE   (0)
+#define DEF_RGB_MATRIX_DIAG   (256)
+
+#define GAIN_FACTOR           (256)
+
 /**
  * software AE limits
  * you can adjust these values to better fit your sensor

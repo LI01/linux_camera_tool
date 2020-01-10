@@ -18,9 +18,10 @@
 *  to README.md guide to rebuild your OpenCV for supporting Gtk3.            *
 *                                                                            *
 *  Author: Danyu L                                                           *
-*  Last edit: 2019/08                                                        *
+*  Last edit: 2020/01                                                        *
 *****************************************************************************/
 #include "../includes/shortcuts.h"
+#include "../includes/gui_callbacks.h"
 #include "../includes/ui_control.h"
 #include "../includes/v4l2_devices.h"
 #include "../includes/uvc_extension_unit_ctrl.h"
@@ -37,11 +38,13 @@
 **                      	Global data 
 *****************************************************************************/
 static GtkWidget *window;
-/// grid1 elements
+/// top grid elements
 static GtkWidget *check_button_resize_window, *button_exit_streaming;
 static GtkWidget *check_button_stream_info;
+static GtkWidget *separator_top_tab;
+/// grid 1 elements
 static GtkWidget *label_datatype, *hbox_datatype;
-static GtkWidget *radio_raw10, *radio_raw12, *radio_yuyv, *radio_raw8;
+static GtkWidget *radio_raw10, *radio_raw12, *radio_yuyv, *radio_raw8, *radio_mjpeg;
 static GtkWidget *label_bayer, *hbox_bayer;
 static GtkWidget *radio_bg, *radio_gb, *radio_rg, *radio_gr, *radio_mono;
 static GtkWidget *check_button_auto_exp, *check_button_awb, *check_button_clahe;
@@ -58,14 +61,14 @@ static GtkWidget *label_capture, *button_capture_bmp, *button_capture_raw;
 static GtkWidget *label_gamma, *entry_gamma, *button_apply_gamma;
 static GtkWidget *label_trig, *check_button_trig_en, *button_trig;
 static GtkWidget *label_blc, *entry_blc, *button_apply_blc;
-static GtkWidget *seperator_tab1_1, *seperator_tab1_2, *seperator_tab1_3;
+static GtkWidget *separator_tab1_1, *separator_tab1_2;
 /// grid2 elements
 static GtkWidget *check_button_rgb_gain, *button_update_rgb_gain;
 static GtkWidget *label_red_gain, *label_green_gain, *label_blue_gain;
 static GtkWidget *entry_red_gain, *entry_green_gain, *entry_blue_gain;
 static GtkWidget *label_red_offset, *label_green_offset, *label_blue_offset;
 static GtkWidget *entry_red_offset, *entry_green_offset, *entry_blue_offset;
-static GtkWidget *seperator_tab2_1, *seperator_tab2_2;
+static GtkWidget *separator_tab2_1, *separator_tab2_2;
 static GtkWidget *check_button_rgb_matrix, *button_update_rgb_matrix;
 static GtkWidget *label_red_hor, *label_green_hor, *label_blue_hor;
 static GtkWidget *label_red_ver, *label_green_ver, *label_blue_ver;
@@ -74,7 +77,7 @@ static GtkWidget *entry_gr, *entry_gg, *entry_gb;
 static GtkWidget *entry_br, *entry_bg, *entry_bb; 
 static GtkWidget *check_button_soft_ae , *check_button_flip;
 static GtkWidget *check_button_edge, *check_button_mirror;
-static GtkWidget *check_button_rgb_ir_color, *check_button_rgb_ir_ir;
+static GtkWidget *check_button_histogram, *check_button_motion_detector;
 static GtkWidget *check_button_dual_stereo;
 static GtkWidget *label_alpha, *label_beta, *label_sharpness;
 static GtkWidget *check_button_abc;
@@ -87,6 +90,10 @@ static GtkWidget *label_ov580_i2c_addr, *entry_ov580_i2c_addr;
 static GtkWidget *label_ov580_reg_addr, *entry_ov580_reg_addr;
 static GtkWidget *label_ov580_reg_val, *entry_ov580_reg_val;
 static GtkWidget *button_ov580_read, *button_ov580_write;
+static GtkWidget *separator_tab3_1;
+static GtkWidget *check_button_rgb_ir_color, *check_button_rgb_ir_ir;
+static GtkWidget *label_resolution, *combo_box_resolution;
+static GtkWidget *label_frame_rate, *combo_box_frame_rate;
 
 static int ov580_dev_flag;
 static int address_width_flag;
@@ -96,112 +103,6 @@ int v4l2_dev; /** global variable, file descriptor for camera device */
 /*****************************************************************************
 **                      	Helper functions
 *****************************************************************************/
-/** interpret c string for both hex and decimal */
-int hex_or_dec_interpreter_c_string(
-    char *in_string)
-{
-    int out_val;
-    char *hex_prefix = (char*)"0x";
-
-    char *pch =strstr(in_string, hex_prefix);
-    if (pch)
-        out_val = strtol(in_string, NULL, 16);
-    else
-        out_val = strtol(in_string, NULL, 10);
-    return out_val;
-    
-}
-
-/**
- * format the entry input between hex and decimal input
- * print a warning message if it is out of a set range,
- * and set the value to a given max/min value
- * args:    
- *      GtkWidget *entry_val - entry
- *      str - string message that will be added in print out
- *      type - tell the function whether it is hex or decimal
- *      max, min - max, min value for that entry range
- */
-int entry_formater(
-    GtkWidget *entry_val, 
-    const char* str,
-    const char type,
-    int max, 
-    int min)
-{
-    int val = hex_or_dec_interpreter_c_string((char *) \
-            gtk_entry_get_text(GTK_ENTRY(entry_val)));
-    if (type == 'x' && (val > max || val < min)) // hex
-    {
-        g_print("Please enter a valid number for %-20s,"
-            " within range (0x%x,0x%x)\r\n", 
-            str, min, max);
-    }
-    else if (type == 'd' && (val > max || val < min))// int
-    {
-        g_print("Please enter a valid number for %-12s,"
-            " within range (%d,%d)\r\n", 
-            str, min, max);
-    }
-    return set_limit(val, max, min);
-}
-
-/** 
- * a toggle button enable/disable wrapper
- * args:
- *      GtkToggleButton *toggle_button - toggle_button,
- *      str - string message that will be added in print out
- *      *func - function pointer for that enable/disable function
- */
-void enable_flg_formater(
-    GtkToggleButton *toggle_button, 
-    const char* str, 
-    void(*func)(int))
-{
-     if (gtk_toggle_button_get_active(toggle_button))
-     {
-         g_print("%s enable\r\n", str);
-         func(1);
-     }
-     else 
-     {
-         g_print("%s disable\r\n", str);
-         func(0);
-     }
-}
-
-/** a wapper for set address and value length */
-int toggle_length_formater(char* data)
-{
-    if (strcmp(data, "1") == 0)
-        return _8BIT_FLG;
-    if (strcmp(data, "2") == 0)
-        return _16BIT_FLG;
-    return _8BIT_FLG;
-}
-/** a hscale wrapper to save some type */
-void hscale_formater(
-    GtkRange *range,
-    void(*func)(int))
-{
-    func((int)gtk_range_get_value(range));
-}
-
-/** a wrapper for a horizontal scale initialization */
-GtkWidget* gtk_hscale_new(
-    int range_low, 
-    int range_max)
-{
-    GtkWidget* widget = 
-        gtk_scale_new_with_range(
-            GTK_ORIENTATION_HORIZONTAL,
-            (double)range_low, 
-            (double)range_max, 
-            1.0);
-    return widget;
-                    
-}
-
 /** a menu_item formater to save some typing */
 void menu_item_formater(
     GtkWidget *item,
@@ -212,26 +113,7 @@ void menu_item_formater(
     g_signal_connect(item, "activate", handler, window);
 }
 
-/** add radio button in their corresponding group */
-GtkWidget* gtk_radio_button_new_with_group(
-    GtkWidget* group)
-{
-  GtkWidget* new_widget = 
-    gtk_radio_button_new(gtk_radio_button_get_group
-    (GTK_RADIO_BUTTON(group)));
-  return new_widget;
-}
-/** OV580 device flag */
-int ov580_dev_formater(char* data)
-{
-    if (strcmp(data, "0") == 0)
-        return _OV580_FLG;
-    if (strcmp(data, "1") == 0)
-        return _SCCB0_FLG;
-    if (strcmp(data, "2") == 0)
-        return _SCCB1_FLG;
-    return _OV580_FLG;
-}
+
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
@@ -312,32 +194,15 @@ void exit_from_help(GtkWidget *widget)
 }
 
 /**-------------------------grid1 callbacks---------------------------------*/
-/** callback for enabling/disabling resize window in grid3 */
-void enable_resize_window(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "resize window", 
-        &resize_window_enable);
-}
-
-/** callback for enabling/disabling display camera info */
-void enable_display_mat_info(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "Stream info display enable", 
-        &display_info_enable);
-
-}
 
 /** callback for sensor datatype updates*/
 void radio_datatype(GtkWidget *widget, gpointer data)
 {
     (void)widget;
-    /// disable a bunch of function if it is YUV camera
-    if (strcmp((char *)data, "3") == 0)
+    /// disable a bunch of function if it is YUV,MJPEG camera
+    if (strcmp((char *)data, "3") == 0 || strcmp((char *)data, "5") == 0)
     {
+        //printf("datatype = %c\r\n", (char *)data);
         gtk_widget_set_sensitive(radio_rg,0);
         gtk_widget_set_sensitive(radio_gr,0);
         gtk_widget_set_sensitive(radio_gb,0);
@@ -365,13 +230,6 @@ void radio_datatype(GtkWidget *widget, gpointer data)
     change_datatype(data);
 }
 
-/** callback for bayer pattern choice updates*/
-void radio_bayerpattern(GtkWidget *widget, gpointer data)
-{
-    (void)widget;
-    change_bayerpattern(data);
-}
-
 /** callback for updating exposure time line */
 void hscale_exposure_up(GtkRange *widget)
 {
@@ -385,10 +243,6 @@ void hscale_gain_up(GtkRange *widget)
 {
     int gain = (int)gtk_range_get_value(widget);
     set_gain(v4l2_dev, gain);
-    //ov580_write_system_reg(v4l2_dev, 0x1033, 0x02);
-    unsigned char regVal = ov580_read_system_reg(v4l2_dev, 0x1033);
-    printf("!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
-		 	regVal);
     g_print("gain is %d\n", get_gain(v4l2_dev));
 }
 
@@ -405,24 +259,6 @@ void enable_ae(GtkToggleButton *toggle_button)
         gtk_widget_set_sensitive(hscale_exposure, 1);
         gtk_widget_set_sensitive(hscale_gain, 1);
     }
-}
-
-/** callback for enabling/disabling auto white balance */
-void enable_awb(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "awb", 
-        &awb_enable);
-}
-
-/** callback for enabling/disabling CLAHE optimization */
-void enable_clahe(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "contrast limited adaptive histogram equalization", 
-        &clahe_enable);
 }
 
 /** callback for updating register address length 8/16 bits */
@@ -444,7 +280,8 @@ void toggled_val_length(GtkWidget *widget, gpointer data)
 void register_write()
 {
     /** sensor write */
-    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
+    if (gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
         gtk_widget_set_sensitive(entry_i2c_addr,0);
         
@@ -514,7 +351,8 @@ void register_write()
 void register_read()
 {
     /** sensor read */
-    if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_button_just_sensor)))
+    if (gtk_toggle_button_get_active(
+        GTK_TOGGLE_BUTTON(check_button_just_sensor)))
     {
         int regAddr = entry_formater(
             entry_reg_addr, 
@@ -560,18 +398,6 @@ void register_read()
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_reg_val), buf);
     }
-}
-
-/** callback for capturing bmp */
-void capture_bmp()
-{
-    video_capture_save_bmp();
-}
-
-/** callback for capturing raw */
-void capture_raw()
-{
-    video_capture_save_raw();
 }
 
 /** callback for gamma correction */
@@ -695,17 +521,26 @@ void set_rgb_gain_offset()
  *  http://www.imatest.com/docs/colormatrix/
  */
 void set_rgb_matrix()
-{
-    
-    int red_red     = entry_formater(entry_rr,    "red red", 'd', 512, -512);
-    int red_green   = entry_formater(entry_rg,  "red green", 'd', 512, -512);
-    int red_blue    = entry_formater(entry_rb,   "red blue", 'd', 512, -512);
-    int green_red   = entry_formater(entry_gr,  "green red", 'd', 512, -512);
-    int green_green = entry_formater(entry_gg,"green green", 'd', 512, -512);
-    int green_blue  = entry_formater(entry_gb, "green blue", 'd', 512, -512);
-    int blue_red    = entry_formater(entry_br,   "blue red", 'd', 512, -512);
-    int blue_green  = entry_formater(entry_bg, "blue green", 'd', 512, -512);
-    int blue_blue   = entry_formater(entry_bb,  "blue blue", 'd', 512, -512);
+{    
+
+    int red_red     = entry_formater(entry_rr,    "red red", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int red_green   = entry_formater(entry_rg,  "red green", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int red_blue    = entry_formater(entry_rb,   "red blue", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int green_red   = entry_formater(entry_gr,  "green red", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int green_green = entry_formater(entry_gg,"green green", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int green_blue  = entry_formater(entry_gb, "green blue", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int blue_red    = entry_formater(entry_br,   "blue red", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int blue_green  = entry_formater(entry_bg, "blue green", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
+    int blue_blue   = entry_formater(entry_bb,  "blue blue", 'd', 
+    MAX_RGB_MATRIX, MIN_RGB_MATRIX);
 
     if (gtk_toggle_button_get_active(
         GTK_TOGGLE_BUTTON(check_button_rgb_matrix))) {
@@ -741,22 +576,7 @@ void enable_soft_ae(GtkToggleButton *toggle_button)
         gtk_widget_set_sensitive(hscale_gain,1);    
     }
 }
-/** callback for enabling/disabling image flip */
-void enable_flip(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "Flip", 
-        &flip_enable);
-}
-/** callback for enabling/disabling image mirror */
-void enable_mirror(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "Mirror", 
-        &mirror_enable);
-}
+
 /** callback for enabling/disabling show image edge */
 void enable_show_edge(GtkToggleButton *toggle_button)
 {
@@ -770,70 +590,23 @@ void enable_show_edge(GtkToggleButton *toggle_button)
         gtk_widget_set_sensitive(hscale_edge_low_thres,0);
 
 }
-/** 
- * callback for enabling/disabling displaying RGB IR color
- * channel after color correction
- */
-void enable_rgb_ir_color(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "RGB-IR color correction", 
-        &rgb_ir_correction_enable);
-}
-/** allback for enabling/disabling displaying RGB IR IR channel */
-void enable_rgb_ir_ir(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "RGB-IR IR display", 
-        &rgb_ir_ir_display_enable);
-}
-
-/** callback for enabling/disabling separate show dual stereo cam */
-void enable_display_dual_stereo(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "Separate display dual stereo cam", 
-        &separate_dual_enable);
-}
-
-/** callback for enabling/disabling auto white balance */
-void enable_abc(GtkToggleButton *toggle_button)
-{
-    enable_flg_formater(
-        toggle_button, 
-        "Auto brightness and contrast enable", 
-        &abc_enable);
-}
-
-/** callback for update alpha value */
-void hscale_alpha_up(GtkRange *widget)
-{
-    hscale_formater(widget, &add_alpha_val);
-}
-/** callback for update beta value */
-void hscale_beta_up(GtkRange *widget)
-{
-    hscale_formater(widget, &add_beta_val);
-}
-/** callback for update sharpness value */
-void hscale_sharpness_up(GtkRange *widget)
-{
-    hscale_formater(widget, &add_sharpness_val);
-}
-/** callback for update edge threashold value */
-void hscale_edge_thres_up(GtkRange *widget)
-{
-    hscale_formater(widget, &add_edge_thres_val);
-}
-
 /**-------------------------grid3 callbacks-------------------------------*/
+/** 
+ * callback for updating the ov580 device flag 
+ * it changes device, clears the entries 
+ */
 void update_ov580_dev(GtkWidget *widget, gpointer data)
 {
     (void)widget;
+    static int last_flg = _OV580_FLG;
     ov580_dev_flag = ov580_dev_formater((char *)data);
+    if (last_flg != ov580_dev_flag)
+    {
+        last_flg = ov580_dev_flag;
+        gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_val), "0x");
+        gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_addr), "0x");
+        gtk_entry_set_text(GTK_ENTRY(entry_ov580_i2c_addr), "0x");
+    }
     if (ov580_dev_flag == _OV580_FLG)
         gtk_widget_set_sensitive(entry_ov580_i2c_addr, 0); 
     else
@@ -841,13 +614,8 @@ void update_ov580_dev(GtkWidget *widget, gpointer data)
 }
 
 /** callback for ov580 register write */
-//void ov580_register_write(GtkWidget *widget, gpointer data)
 void ov580_register_write()
 {
-    //(void)widget;
-    //gint v4l2_dev2 = *((gint*)data);
-    // printf("My process ID : %d\n", getpid());
-    // printf("My parent's ID: %d\n", getppid());
     if ((ov580_dev_flag) == _OV580_FLG)
     {
         int regAddr = entry_formater(
@@ -862,16 +630,10 @@ void ov580_register_write()
             'x', 
             0xff, 
             0x0); 
-        //printf("v4l2 dev = %d\r\n", v4l2_dev);
-        //ov580_write_system_reg(v4l2_dev2, 0x1033, 0x02);
+  
         ov580_write_system_reg(v4l2_dev, regAddr, regVal);
-        // g_print("ov580_write_system_reg: regAddr=0x%x, regVal=0x%x\r\n", 
-        //     regAddr, 
-        //     regVal);
-    }
-     
-    else 
-    {
+
+    } else {
         unsigned char slaveAddr = entry_formater(
             entry_ov580_i2c_addr, 
             "slave address", 
@@ -900,11 +662,8 @@ void ov580_register_write()
 }
 
 /** callback for ov580 register read */
-//void ov580_register_read(GtkWidget *widget, gpointer data)
 void ov580_register_read()
 {
-//    (void)widget;
-//     gint v4l2_dev2 = *((gint*)data);
     if ((ov580_dev_flag) == _OV580_FLG)
     {
         int regAddr = entry_formater(
@@ -913,20 +672,12 @@ void ov580_register_read()
             'x', 
             0xffff, 
             0x0);
-        //printf("v4l2 dev = %d\r\n", v4l2_dev);
-        //ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
+        printf("reg addr = 0x%x\r\n", regAddr);
         unsigned char regVal = ov580_read_system_reg(v4l2_dev, regAddr);
-        //unsigned char regVal = ov580_read_system_reg(v4l2_dev, 0x1033);
-        //ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
-	    // printf("!!!!!!!!!!!!!ae default value = 0x%x\r\n", 
-		// 	regVal);
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_val), buf);
-    }
-    else
-    {
-        
+    } else {
         unsigned char slaveAddr = entry_formater(
             entry_ov580_i2c_addr, 
             "slave address", 
@@ -940,16 +691,18 @@ void ov580_register_read()
             0xffff, 
             0x0);
         unsigned char regVal;
+        printf("reg addr = 0x%x\r\n", regAddr);
         if ((ov580_dev_flag) == _SCCB0_FLG)
             regVal = ov580_read_sccb0_reg(v4l2_dev, slaveAddr, regAddr);
         else 
             regVal = ov580_read_sccb1_reg(v4l2_dev, slaveAddr, regAddr);
-        g_print("read register 0x%x = 0x%x\r\n", regAddr, regVal);
+        //g_print("read register 0x%x = 0x%x\r\n", regAddr, regVal);
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_val), buf);
     }
 }
+
 /**-------------------------micellanous callbacks---------------------------*/
 /** exit streaming loop */
 void exit_loop(GtkWidget *widget)
@@ -973,7 +726,6 @@ gboolean check_escape(
     }
     return FALSE;
 }
-
 
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE
@@ -1024,8 +776,7 @@ void init_grid1_widgets()
     label_gamma      = gtk_label_new(NULL);
     label_trig       = gtk_label_new(NULL);
     label_blc        = gtk_label_new(NULL);
-  
-    button_exit_streaming   = gtk_button_new();
+
     button_read             = gtk_button_new();
     button_write            = gtk_button_new();
     button_apply_gamma      = gtk_button_new();
@@ -1034,8 +785,6 @@ void init_grid1_widgets()
     button_capture_raw      = gtk_button_new();
     button_apply_blc        = gtk_button_new();
 
-    check_button_stream_info    = gtk_check_button_new();
-    check_button_resize_window  = gtk_check_button_new();
     check_button_auto_exp       = gtk_check_button_new();
     check_button_awb            = gtk_check_button_new();
     check_button_clahe          = gtk_check_button_new();    
@@ -1062,7 +811,7 @@ void init_grid1_widgets()
     radio_raw12 = gtk_radio_button_new_with_group(radio_raw10);
     radio_yuyv  = gtk_radio_button_new_with_group(radio_raw10);
     radio_raw8  = gtk_radio_button_new_with_group(radio_raw10);
-
+    radio_mjpeg  = gtk_radio_button_new_with_group(radio_raw10);
 
     radio_bg    = gtk_radio_button_new(NULL);
     radio_gb    = gtk_radio_button_new_with_group(radio_bg);
@@ -1077,9 +826,9 @@ void init_grid1_widgets()
     radio_16bit_val    = gtk_radio_button_new_with_group(radio_8bit_val);
 
 
-    seperator_tab1_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-    seperator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-    seperator_tab1_3 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+   
+    separator_tab1_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    separator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
 
     
     if (gain_max == 13)
@@ -1100,8 +849,8 @@ void init_grid2_widgets()
     check_button_flip           = gtk_check_button_new();
     check_button_mirror         = gtk_check_button_new();
     check_button_edge           = gtk_check_button_new();
-    check_button_rgb_ir_color   = gtk_check_button_new();
-    check_button_rgb_ir_ir      = gtk_check_button_new();
+    check_button_histogram      = gtk_check_button_new();
+    check_button_motion_detector = gtk_check_button_new();
     check_button_dual_stereo    = gtk_check_button_new();
     check_button_abc            = gtk_check_button_new();
 
@@ -1141,8 +890,8 @@ void init_grid2_widgets()
     entry_bg                    = gtk_entry_new();
     entry_bb                    = gtk_entry_new();
 
-    seperator_tab2_1           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-    seperator_tab2_2           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    separator_tab2_1           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    separator_tab2_2           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     
  
     hscale_alpha                = gtk_hscale_new(1, ALPHA_MAX);
@@ -1162,7 +911,9 @@ void init_grid3_widgets()
     label_ov580_i2c_addr = gtk_label_new(NULL);
     label_ov580_reg_addr = gtk_label_new(NULL);
     label_ov580_reg_val  = gtk_label_new(NULL);
-    
+    label_resolution     = gtk_label_new(NULL);
+    label_frame_rate     = gtk_label_new(NULL);
+
     hbox_ov580_device    = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     radio_ov580          = gtk_radio_button_new(NULL);
     radio_sccb0          = gtk_radio_button_new_with_group(radio_ov580);
@@ -1174,6 +925,18 @@ void init_grid3_widgets()
     entry_ov580_i2c_addr = gtk_entry_new();
     entry_ov580_reg_addr = gtk_entry_new();
     entry_ov580_reg_val  = gtk_entry_new();
+
+    separator_tab3_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+
+    check_button_rgb_ir_color   = gtk_check_button_new();
+    check_button_rgb_ir_ir      = gtk_check_button_new();
+    
+    combo_box_resolution = gtk_combo_box_text_new();
+    combo_box_frame_rate = gtk_combo_box_text_new();
+    gtk_widget_set_halign (combo_box_resolution, GTK_ALIGN_FILL);
+	gtk_widget_set_hexpand (combo_box_resolution, TRUE);
+    gtk_widget_set_halign (combo_box_frame_rate, GTK_ALIGN_FILL);
+	gtk_widget_set_hexpand (combo_box_frame_rate, TRUE);
 
     gtk_widget_set_sensitive(entry_ov580_i2c_addr, 0); 
 }
@@ -1209,6 +972,12 @@ void iterate_def_elements (
             case GTK_WIDGET_TYPE_HSCALE:
                 gtk_widget_set_hexpand(def->widget, TRUE);
                 break;
+            case GTK_WIDGET_TYPE_COMBO_BOX:
+                gtk_combo_box_text_append_text(
+                    GTK_COMBO_BOX_TEXT(def->widget), 
+                    def->label_str);
+                gtk_combo_box_set_active(GTK_COMBO_BOX(def->widget),0);
+                break;
             default:
                 break;
 
@@ -1221,14 +990,6 @@ void init_grid1_def_elements ()
 {
  
     static def_element definitions[] = {
-        {.widget = check_button_resize_window,
-         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON,
-         .parent = NULL,
-         .label_str = "Resize Window"},
-        {.widget = check_button_stream_info, 
-         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
-         .parent = NULL, 
-         .label_str = "Display Stream Info"},
         {.widget = label_exposure,    
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
@@ -1282,10 +1043,6 @@ void init_grid1_def_elements ()
          .parent = NULL, 
          .label_str = "Black Level Correction:"},
 
-        {.widget = button_exit_streaming, 
-         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
-         .parent = NULL, 
-         .label_str = "EXIT"},
         {.widget = button_write,          
          .wid_type = GTK_WIDGET_TYPE_BUTTON, 
          .parent = NULL, 
@@ -1381,7 +1138,11 @@ void init_grid1_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
          .parent = hbox_datatype, 
          .label_str = "RAW8"},
-        
+        {.widget = radio_mjpeg,  
+         .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
+         .parent = hbox_datatype, 
+         .label_str = "MJPEG"},
+
         {.widget = radio_bg,   
          .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
          .parent = hbox_bayer, 
@@ -1567,14 +1328,14 @@ void init_grid2_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
          .label_str = "Show Edge"},
-        {.widget = check_button_rgb_ir_color, 
+        {.widget = check_button_histogram, 
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
-         .label_str = "RGB-IR ColorCorrectEna"},
-        {.widget = check_button_rgb_ir_ir, 
+         .label_str = "Display Histogram"},
+        {.widget = check_button_motion_detector, 
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
-         .label_str = "Display RGB-IR IR"},
+         .label_str = "Motion Detector"},
         {.widget = check_button_dual_stereo, 
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
@@ -1658,6 +1419,34 @@ void init_grid3_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
          .parent = NULL, 
          .label_str = "0x"},
+
+        {.widget = check_button_rgb_ir_color, 
+         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
+         .parent = NULL, 
+         .label_str = "RGB-IR ColorCorrectEna"},
+        {.widget = check_button_rgb_ir_ir, 
+         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Display RGB-IR IR"},
+
+        {.widget = label_resolution,    
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Resolution:"},
+        {.widget = label_frame_rate,        
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Frame Rate:"},   
+
+        {.widget = combo_box_resolution,    
+         .wid_type = GTK_WIDGET_TYPE_COMBO_BOX, 
+         .parent = NULL, 
+         .label_str = "Resolutions"},
+        {.widget = combo_box_frame_rate,        
+         .wid_type = GTK_WIDGET_TYPE_COMBO_BOX, 
+         .parent = NULL, 
+         .label_str = "Frame Rates"},   
+
     };
     iterate_def_elements(definitions, SIZE(definitions));
 }
@@ -1688,11 +1477,7 @@ void list_all_grid1_elements(GtkWidget *grid)
     int row;
     int col;
     static grid_elements elements[] = {
-        {.widget = check_button_resize_window,.col=col=0, .row=row=0,  .width =1},
-        {.widget = check_button_stream_info, .col =++col, .row =row,   .width =1},
-        {.widget = button_exit_streaming,    .col =++col, .row =row++, .width =1},
-        {.widget = seperator_tab1_1,         .col =col=0, .row =row++, .width =2},
-        {.widget = label_datatype,           .col =col=0, .row =row,   .width =1},
+        {.widget = label_datatype,           .col =col=0, .row =row=0,   .width =1},
         {.widget = hbox_datatype,            .col =++col, .row =row++, .width =2},
         {.widget = label_bayer,              .col =col=0, .row =row,   .width =1},
         {.widget = hbox_bayer,               .col =++col, .row =row++, .width =2},
@@ -1703,7 +1488,7 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = hscale_exposure,          .col =++col, .row =row++, .width =2},
         {.widget = label_gain,               .col =col=0, .row =row,   .width =1},
         {.widget = hscale_gain,              .col =++col, .row =row++, .width =2},
-        {.widget = seperator_tab1_2,         .col =col=0, .row =row++, .width =3},
+        {.widget = separator_tab1_1,         .col =col=0, .row =row++, .width =3},
         {.widget = label_i2c_addr,           .col =col=0, .row =row,   .width =1},
         {.widget = entry_i2c_addr,           .col =++col, .row =row,   .width =1},
         {.widget = check_button_just_sensor, .col =++col, .row =row++, .width =1},
@@ -1720,7 +1505,7 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = label_trig,               .col =col=0, .row =row,   .width =1},
         {.widget = check_button_trig_en,     .col =++col, .row =row,   .width =1},
         {.widget = button_trig,              .col =++col, .row =row++, .width =1},
-        {.widget = seperator_tab1_3,         .col =col=0, .row =row++, .width =3},
+        {.widget = separator_tab1_2,         .col =col=0, .row =row++, .width =3},
         {.widget = label_capture,            .col =col=0, .row =row,   .width =1},
         {.widget = button_capture_bmp,       .col =++col, .row =row,   .width =1},
         {.widget = button_capture_raw,       .col =++col, .row =row++, .width =1},
@@ -1754,7 +1539,7 @@ void list_all_grid2_elements(GtkWidget *grid)
         {.widget = entry_red_offset,         .col =col,   .row =row-=2,.width =1},
         {.widget = entry_green_offset,       .col =col,   .row =++row, .width =1},
         {.widget = entry_blue_offset,        .col =col++, .row =++row, .width =1},
-        {.widget = seperator_tab2_1,         .col =col=0, .row =++row, .width =4},
+        {.widget = separator_tab2_1,         .col =col=0, .row =++row, .width =4},
 
         {.widget = check_button_rgb_matrix,  .col =col=0, .row =++row, .width =2},
         {.widget = button_update_rgb_matrix, .col =col=3, .row =row,   .width =1},
@@ -1773,13 +1558,13 @@ void list_all_grid2_elements(GtkWidget *grid)
         {.widget = entry_br,                 .col =col-=2,.row =row,   .width =1},
         {.widget = entry_bg,                 .col =++col, .row =row,   .width =1},
         {.widget = entry_bb,                 .col =++col, .row =row++, .width =1},
-        {.widget = seperator_tab2_2,         .col =col=0, .row =row++, .width =4},
+        {.widget = separator_tab2_2,         .col =col=0, .row =row++, .width =4},
         {.widget = check_button_soft_ae,     .col =col++, .row =row,   .width =1},
         {.widget = check_button_flip,        .col =col++, .row =row,   .width =1},
         {.widget = check_button_mirror,      .col =col++, .row =row,   .width =1},
         {.widget = check_button_edge,        .col =col++, .row =row++, .width =1},
-        {.widget = check_button_rgb_ir_color,.col =col=0, .row =row,   .width =1},
-        {.widget = check_button_rgb_ir_ir,   .col =++col, .row =row,   .width =1},
+        {.widget = check_button_histogram,   .col =col=0, .row =row,   .width =1},
+        {.widget = check_button_motion_detector,.col =++col, .row =row,   .width =1},
         {.widget = check_button_dual_stereo, .col =++col, .row =row,   .width =1},
         {.widget = check_button_abc,         .col =++col, .row =row++, .width =1},
         {.widget = label_alpha,              .col =col=0, .row =row++, .width =1},
@@ -1800,18 +1585,29 @@ void list_all_grid3_elements(GtkWidget *grid)
     int row;
     int col;
     static grid_elements elements[] = { 
-        {.widget = label_ov580_device,   .col=col=0, .row=row=0, .width =1},
-        {.widget = hbox_ov580_device,    .col=++col, .row=row=0, .width =2},
+        {.widget = label_ov580_device,       .col=col=0, .row=row=0, .width =1},
+        {.widget = hbox_ov580_device,        .col=++col, .row=row=0, .width =3},
+       
+        {.widget = label_ov580_i2c_addr,     .col=col=0, .row=++row, .width =1},
+        {.widget = label_ov580_reg_addr,     .col=++col, .row=row,   .width =1},
+        {.widget = label_ov580_reg_val,      .col=++col, .row=row,   .width =1},
+        {.widget = button_ov580_write,       .col=++col, .row=row,   .width =1},
+       
+        {.widget = entry_ov580_i2c_addr,     .col=col=0, .row=++row, .width =1},
+        {.widget = entry_ov580_reg_addr,     .col=++col, .row=row,   .width =1},
+        {.widget = entry_ov580_reg_val,      .col=++col, .row=row,   .width =1},
+        {.widget = button_ov580_read,        .col=++col, .row=row,   .width =1},
+       
+        {.widget = separator_tab3_1,         .col =col=0,.row =++row,.width =4},
+       
+        {.widget = check_button_rgb_ir_color,.col =col=2,.row =++row,.width =1},
+        {.widget = check_button_rgb_ir_ir,   .col =++col,.row =row,  .width =1},
+        
+        {.widget = label_resolution,         .col =col=0,.row =++row,.width =1},
+        {.widget = combo_box_resolution,     .col =++col,.row =row,  .width =1},
 
-        {.widget = label_ov580_i2c_addr, .col=col=0, .row=++row, .width =1},
-        {.widget = label_ov580_reg_addr, .col=++col, .row=row,   .width =1},
-        {.widget = label_ov580_reg_val,  .col=++col, .row=row,   .width =1},
-        {.widget = button_ov580_write,   .col=++col, .row=row,   .width =1},
-
-        {.widget = entry_ov580_i2c_addr, .col=col=0, .row=++row, .width =1},
-        {.widget = entry_ov580_reg_addr, .col=++col, .row=row,   .width =1},
-        {.widget = entry_ov580_reg_val,  .col=++col, .row=row,   .width =1},
-        {.widget = button_ov580_read,    .col=++col, .row=row,   .width =1},
+        {.widget = label_frame_rate,         .col =col=0,.row =++row,.width =1},
+        {.widget = combo_box_frame_rate,     .col =++col,.row =row,  .width =1},
     };
     iterate_grid_elements(grid, elements, SIZE(elements));
 }
@@ -1834,19 +1630,6 @@ void iterate_element_cb(element_callback *callbacks, size_t members)
 void list_all_grid1_element_callbacks()
 {
     static element_callback callbacks[] = {
-        {.widget = check_button_resize_window,
-         .signal = "toggled",
-         .handler = G_CALLBACK(enable_resize_window),
-         .data = NULL},
-        {.widget = check_button_stream_info, 
-         .signal = "toggled", 
-         .handler = G_CALLBACK(enable_display_mat_info), 
-         .data = NULL},
-        {.widget = button_exit_streaming, 
-         .signal = "clicked", 
-         .handler = G_CALLBACK(exit_loop), 
-         .data = NULL},
- 
         {.widget = radio_raw10,       
          .signal = "toggled", 
          .handler = G_CALLBACK(radio_datatype), 
@@ -1863,7 +1646,11 @@ void list_all_grid1_element_callbacks()
          .signal = "toggled", 
          .handler = G_CALLBACK(radio_datatype), 
          .data = (gpointer)"4"},
- 
+        {.widget = radio_mjpeg,        
+         .signal = "toggled", 
+         .handler = G_CALLBACK(radio_datatype), 
+         .data = (gpointer)"5"},
+
         {.widget = radio_bg,          
          .signal = "toggled", 
          .handler = G_CALLBACK(radio_bayerpattern), 
@@ -1990,13 +1777,13 @@ void list_all_grid2_element_callbacks()
          .signal = "toggled", 
          .handler = G_CALLBACK(enable_show_edge), 
          .data = NULL},
-        {.widget = check_button_rgb_ir_color, 
+        {.widget = check_button_histogram, 
          .signal = "toggled", 
-         .handler = G_CALLBACK(enable_rgb_ir_color), 
+         .handler = G_CALLBACK(enable_histogram), 
          .data = NULL},
-        {.widget = check_button_rgb_ir_ir, 
+        {.widget = check_button_motion_detector, 
          .signal = "toggled", 
-         .handler = G_CALLBACK(enable_rgb_ir_ir), 
+         .handler = G_CALLBACK(enable_motion_detector), 
          .data = NULL},
         {.widget = check_button_dual_stereo, 
          .signal = "toggled", 
@@ -2050,16 +1837,16 @@ void list_all_grid3_element_callbacks()
          .signal = "clicked", 
          .handler = G_CALLBACK(ov580_register_read),       
          .data = NULL},
+
+        {.widget = check_button_rgb_ir_color, 
+         .signal = "toggled", 
+         .handler = G_CALLBACK(enable_rgb_ir_color), 
+         .data = NULL},
+        {.widget = check_button_rgb_ir_ir, 
+         .signal = "toggled", 
+         .handler = G_CALLBACK(enable_rgb_ir_ir), 
+         .data = NULL},
     };
-    // printf("My process ID : %d\n", getpid());
-    // printf("My parent's ID: %d\n", getppid());
-    // printf("v4l2 dev=%d\r\n", v4l2_dev);
-    // ov580_write_system_reg(v4l2_dev, 0x1033, 0x2);
-	// printf("ae default value = 0x%x\r\n", 
-	// 		ov580_read_system_reg(v4l2_dev, 0x1033));
-    // ov580_write_sccb0_reg(v4l2_dev, 0xC0, 0x3508, 0xff);
-	// printf("gain value = 0x%x\r\n", 
-	// 	ov580_read_sccb0_reg(v4l2_dev, 0xc0, 0x3508));
     
     iterate_element_cb(callbacks, SIZE(callbacks));
 
@@ -2086,6 +1873,8 @@ void list_all_window_signals(GtkWidget *window)
     };
     iterate_window_signals(window, signals, SIZE(signals));
 }
+
+/** init the sensitivity of GUI widget */ 
 void init_sensitivity()
 {
 
@@ -2116,7 +1905,7 @@ void init_sensitivity()
 /*****************************************************************************
 **                      	Main GUI
 *****************************************************************************/
-
+/** init GUI, do error checking and name the application */
 int gui_init()
 {
     if (!gtk_init_check(NULL, NULL))
@@ -2170,17 +1959,46 @@ void notebook_setup(GtkWidget *maintable)
 {
     GtkWidget *notebook = gtk_notebook_new();
     gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_BOTTOM);
-    
+    /////////////////////////////////////////////////////
     GtkWidget *icon_image = gtk_image_new_from_icon_name(
         "camera-photo", 
         GTK_ICON_SIZE_LARGE_TOOLBAR);
+    gtk_widget_show(icon_image);
+    
+    GtkWidget *label_image = gtk_label_new("General Control");
+    gtk_widget_show(label_image);
+
+    GtkWidget *tab1 = gtk_grid_new();
+    gtk_grid_attach(GTK_GRID(tab1), icon_image, 0,0,1,1);
+    gtk_grid_attach(GTK_GRID(tab1), label_image, 1,0,1,1);
+
+    /////////////////////////////////////////////////////
     GtkWidget *icon_video = gtk_image_new_from_icon_name(
         "video-display", 
         GTK_ICON_SIZE_LARGE_TOOLBAR);
+    gtk_widget_show(icon_video);
+
+    GtkWidget *label_video = gtk_label_new("ISP Control");
+    gtk_widget_show(label_video);
+
+    GtkWidget *tab2 = gtk_grid_new();
+    gtk_grid_attach(GTK_GRID(tab2), icon_video, 0,0,1,1);
+    gtk_grid_attach(GTK_GRID(tab2), label_video, 1,0,1,1);
+
+    //////////////////////////////////////////////////////
     GtkWidget *icon_ctrl  = gtk_image_new_from_icon_name(
         "media-flash", 
         GTK_ICON_SIZE_LARGE_TOOLBAR);
+    gtk_widget_show(icon_ctrl);
 
+    GtkWidget *label_flash = gtk_label_new("Flash Control");
+    gtk_widget_show(label_flash);
+
+    GtkWidget *tab3 = gtk_grid_new();
+    gtk_grid_attach(GTK_GRID(tab3), icon_ctrl, 0,0,1,1);
+    gtk_grid_attach(GTK_GRID(tab3), label_flash, 1,0,1,1);
+
+    /////////////////////////////////////////////////////
     GtkWidget *grid1 = gtk_grid_new();
     GtkWidget *grid2 = gtk_grid_new();
     GtkWidget *grid3 = gtk_grid_new();
@@ -2189,9 +2007,9 @@ void notebook_setup(GtkWidget *maintable)
     grid2_setup(grid2);
     grid3_setup(grid3);
 
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid1, icon_image);
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid2, icon_video);
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, icon_ctrl);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid1, tab1);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid2, tab2);
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), grid3, tab3);
     init_sensitivity();
     gtk_container_add(GTK_CONTAINER(maintable), notebook);
 
@@ -2214,6 +2032,10 @@ std::string convert_bpp_to_string(int bpp)
     }
 }
 
+/**
+ * menu bar setup
+ * the menu bar info will get update depending on the device found
+ */
 void menu_bar_setup(GtkWidget *maintable)
 {
 
@@ -2359,7 +2181,9 @@ void menu_bar_setup(GtkWidget *maintable)
 
     gtk_container_add(GTK_CONTAINER(maintable), menu_bar);
 }
-
+/**
+ * Display the built info(built from OpenCV CUDA) from status bar
+ */
 void statusbar_setup(GtkWidget *maintable)
 {
     GtkWidget* status_bar = gtk_statusbar_new();
@@ -2383,6 +2207,66 @@ void statusbar_setup(GtkWidget *maintable)
     gtk_container_add(GTK_CONTAINER(maintable), status_bar);
 }
 
+void universal_ctrl_setup(GtkWidget *maintable)
+{
+    GtkWidget *top_grid = gtk_grid_new();
+
+    check_button_stream_info    = gtk_check_button_new();
+    check_button_resize_window  = gtk_check_button_new();
+    button_exit_streaming       = gtk_button_new();
+
+    separator_top_tab           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    static def_element definitions[] = {
+        {.widget = check_button_resize_window,
+         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON,
+         .parent = NULL,
+         .label_str = "Resize Window"},
+        {.widget = check_button_stream_info, 
+         .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Display Stream Info"},
+        {.widget = button_exit_streaming, 
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "EXIT"},
+    };
+    iterate_def_elements(definitions, SIZE(definitions));
+
+    int row;
+    int col;
+    static grid_elements elements[] = {
+        {.widget = check_button_resize_window,.col=col=0,   .row=row=0,  .width =1},
+        {.widget = check_button_stream_info,  .col = 1,     .row =row,   .width =1},
+        {.widget = button_exit_streaming,     .col = 2,     .row =row++, .width =1},
+        {.widget = separator_top_tab,         .col = 0,     .row =row++, .width =3},
+    };
+    iterate_grid_elements(top_grid, elements, SIZE(elements));
+
+    static element_callback callbacks[] = {
+        {.widget = check_button_resize_window,
+         .signal = "toggled",
+         .handler = G_CALLBACK(enable_resize_window),
+         .data = NULL},
+        {.widget = check_button_stream_info, 
+         .signal = "toggled", 
+         .handler = G_CALLBACK(enable_display_mat_info), 
+         .data = NULL},
+        {.widget = button_exit_streaming, 
+         .signal = "clicked", 
+         .handler = G_CALLBACK(exit_loop), 
+         .data = NULL},
+    };
+    iterate_element_cb(callbacks, SIZE(callbacks));
+
+
+    gtk_container_add(GTK_CONTAINER(maintable), top_grid);
+    gtk_grid_set_column_homogeneous (GTK_GRID(top_grid), TRUE);
+    gtk_widget_set_hexpand (top_grid, TRUE);
+    gtk_widget_set_halign (top_grid, GTK_ALIGN_FILL);
+    gtk_widget_set_margin_top(GTK_WIDGET(top_grid), 0);
+    gtk_widget_set_margin_bottom(GTK_WIDGET(top_grid), 0);
+}
+/** set up css for GUI look */
 void css_setup()
 {
     GtkCssProvider *provider;
@@ -2414,6 +2298,10 @@ void css_setup()
     g_object_unref(provider);
 }
 
+/** 
+ * main function for GUI, put everything before gtk_main() 
+ * set up menu bar, notebook/grids and status bar
+ */
 void gui_run()
 {
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -2428,8 +2316,9 @@ void gui_run()
     else 
         gtk_window_set_default_icon_from_file(icon2path, NULL);
     
-    GtkWidget *maintable = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    GtkWidget *maintable = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
     menu_bar_setup(maintable);
+    universal_ctrl_setup(maintable);
     notebook_setup(maintable);
     statusbar_setup(maintable);
  

@@ -18,7 +18,7 @@
 *  to README.md guide to rebuild your OpenCV for supporting Gtk3.            *
 *                                                                            *
 *  Author: Danyu L                                                           *
-*  Last edit: 2019/08                                                        *
+*  Last edit: 2020/01                                                        *
 *****************************************************************************/
 #pragma once
 #include <gtk/gtk.h>
@@ -47,6 +47,7 @@ typedef enum
   GTK_WIDGET_TYPE_CHECK_BUTTON,
   GTK_WIDGET_TYPE_HSCALE,
   GTK_WIDGET_TYPE_ENTRY,
+  GTK_WIDGET_TYPE_COMBO_BOX,
 } widget_type;
 
 typedef struct
@@ -74,62 +75,20 @@ typedef struct
   gpointer data;
 } element_callback;
 
-typedef enum 
-{
-  _8BIT_FLG = 1,
-  _16BIT_FLG = 2
-}reg_addr_val_width_flag;
-
-typedef enum 
-{
-  _OV580_FLG = 0,
-  _SCCB0_FLG,
-  _SCCB1_FLG
-}ov580_flag;
 
 /*****************************************************************************
 **                      	Helper functions
 *****************************************************************************/
 void init_sensitivity();
 
-int hex_or_dec_interpreter_c_string(
-  char *in_string);
-
-int entry_formater(
-    GtkWidget *entry_val, 
-    const char* str,
-    const char type,
-    int max, 
-    int min);
-
-void enable_flg_formater(
-    GtkToggleButton *toggle_button, 
-    const char* str, 
-    void(*func)(int));
-
-int ov580_dev_formater(char* data);
-int toggle_length_formater(
-  char* data);
-
-void hscale_formater(
-    GtkRange *range,
-    void(*func)(int));
-GtkWidget* gtk_hscale_new(
-    int range_low, 
-    int range_max);
-
 void menu_item_formater(
     GtkWidget *item,
     GtkWidget *menu,
     GCallback handler);
 
-GtkWidget* gtk_radio_button_new_with_group(
-    GtkWidget* group);
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
-void enable_resize_window(
-  GtkToggleButton *toggle_button);
 /**-------------------------menu bar callbacks------------------------------*/
 void open_config_dialog(
   GtkWidget *widget, 
@@ -143,9 +102,7 @@ void exit_from_help(
 void radio_datatype(
   GtkWidget *widget, 
   gpointer data);
-void radio_bayerpattern(
-  GtkWidget *widget, 
-  gpointer data);
+
 void toggled_addr_length(
   GtkWidget *widget, 
   gpointer data);
@@ -161,19 +118,13 @@ void hscale_gain_up(
 
 void enable_ae(
   GtkToggleButton *toggle_button);
-void enable_awb(
-  GtkToggleButton *toggle_button);
-void enable_clahe(
-  GtkToggleButton *toggle_button);
+
 void enable_trig(
   GtkToggleButton *toggle_button);
 
 
 void register_write();
 void register_read();
-
-void capture_bmp();
-void capture_raw();
 
 void gamma_correction();
 void send_trigger();
@@ -185,39 +136,16 @@ void set_rgb_matrix();
 
 void enable_soft_ae(
   GtkToggleButton *toggle_button);
-void enable_flip(
-  GtkToggleButton *toggle_button);
-void enable_mirror(
-  GtkToggleButton *toggle_button);
+
 void enable_show_edge(
   GtkToggleButton *toggle_button);
-void enable_rgb_ir_color(
-  GtkToggleButton *toggle_button);
-void enable_rgb_ir_ir(
-  GtkToggleButton *toggle_button);
-void enable_display_dual_stereo(
-  GtkToggleButton *toggle_button);
-void enable_display_mat_info(
-  GtkToggleButton *toggle_button);
-void enable_abc(
-  GtkToggleButton *toggle_button);
 
-void hscale_alpha_up(
-  GtkRange *widget);
-void hscale_beta_up(
-  GtkRange *widget);
-void hscale_sharpness_up(
-  GtkRange *widget);
-void hscale_edge_thres_up(
-  GtkRange *widget);
 /**-------------------------grid3 callbacks-------------------------------*/
 void update_ov580_dev(
   GtkWidget *widget, 
   gpointer data);
 void ov580_register_write();
 void ov580_register_read();
-// void ov580_register_write(GtkWidget *widget, gpointer data);
-// void ov580_register_read(GtkWidget *widget, gpointer data);
 /**-------------------------micellanous callbacks---------------------------*/
 void exit_loop(GtkWidget *widget);
 gboolean check_escape(
@@ -258,7 +186,7 @@ void iterate_element_cb(
 void list_all_grid1_element_callbacks();
 void list_all_grid2_element_callbacks();
 void list_all_grid3_element_callbacks();
-
+void universal_ctrl_setup(GtkWidget *maintable);
 void iterate_window_signals(
   GtkWidget *widget,
   window_signal *signals, 

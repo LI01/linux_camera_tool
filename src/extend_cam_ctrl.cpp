@@ -78,11 +78,11 @@ static int *br, *bg, *bb;
 static int *soft_ae_flag; 		  /// flag for software AE
 static int *flip_flag, *mirror_flag;
 static int *show_edge_flag;
-static int *rgb_ir_color, *rgb_ir_ir;
+static int *histogram_ena, *motion_detector_ena;
 static int *separate_dual;
 static int *display_info_ena;
 static int *resize_window_ena;
-
+static int *rgb_ir_color, *rgb_ir_ir;
 static int *alpha, *beta, *sharpness;
 static int *edge_low_thres;
 
@@ -266,6 +266,8 @@ inline int set_shift(int bpp)
 		return 0;
 	case RAW8_FLG:
 		return -1;
+	case MJPEG_FLG:
+		return 0;
 	default:
 		return 2;
 	}
@@ -289,6 +291,8 @@ void change_datatype(void *datatype)
 		*bpp = YUYV_FLG;
 	if (strcmp((char *)datatype, "4") == 0)
 		*bpp = RAW8_FLG;
+	if (strcmp((char *)datatype, "5") == 0)
+		*bpp = MJPEG_FLG;
 }
 
 
@@ -450,8 +454,8 @@ void mmap_variables()
 	flip_flag 			 = (int *)mmap_wrapper(sizeof(int));
 	mirror_flag 		 = (int *)mmap_wrapper(sizeof(int));
 	show_edge_flag 	     = (int *)mmap_wrapper(sizeof(int));
-	rgb_ir_color 		 = (int *)mmap_wrapper(sizeof(int));
-	rgb_ir_ir 			 = (int *)mmap_wrapper(sizeof(int));
+	histogram_ena		 = (int *)mmap_wrapper(sizeof(int));
+	motion_detector_ena  = (int *)mmap_wrapper(sizeof(int));
 	separate_dual 		 = (int *)mmap_wrapper(sizeof(int));
 	display_info_ena 	 = (int *)mmap_wrapper(sizeof(int));
 	alpha 				 = (int *)mmap_wrapper(sizeof(int));
@@ -459,6 +463,8 @@ void mmap_variables()
 	sharpness 			 = (int *)mmap_wrapper(sizeof(int));
 	edge_low_thres 		 = (int *)mmap_wrapper(sizeof(int));
 	resize_window_ena 	 = (int *)mmap_wrapper(sizeof(int));
+	rgb_ir_color 		 = (int *)mmap_wrapper(sizeof(int));
+	rgb_ir_ir 			 = (int *)mmap_wrapper(sizeof(int));
 }
 /** 
  * set bit per pixel of the camera read from uvc extension unit
@@ -548,8 +554,8 @@ void unmap_variables()
 	unmap_wrapper(flip_flag);
 	unmap_wrapper(mirror_flag);
 	unmap_wrapper(show_edge_flag);
-	unmap_wrapper(rgb_ir_color);
-	unmap_wrapper(rgb_ir_ir);
+	unmap_wrapper(histogram_ena);
+	unmap_wrapper(motion_detector_ena);
 	unmap_wrapper(separate_dual);
 	unmap_wrapper(display_info_ena);
 	unmap_wrapper(alpha);
@@ -557,6 +563,8 @@ void unmap_variables()
 	unmap_wrapper(sharpness);
 	unmap_wrapper(edge_low_thres);
 	unmap_wrapper(resize_window_ena);
+	unmap_wrapper(rgb_ir_color);
+	unmap_wrapper(rgb_ir_ir);
 	free_device_vars();
 }
 
@@ -624,6 +632,7 @@ void video_set_format(
 	fmt.fmt.pix.height = height;
 	dev->height = height;
 	fmt.fmt.pix.pixelformat = pixelformat;
+	dev->pixelformat = pixelformat;
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
 	ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt);
@@ -662,7 +671,7 @@ void video_set_format(
 	//dev->width = width;
 	fmt.fmt.pix.height = dev->height;
 	//dev->height = height;
-	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+	//fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
 	ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt);
@@ -713,7 +722,7 @@ void video_get_format(struct device *dev)
 	dev->height = fmt.fmt.pix.height;
 	dev->bytesperline = fmt.fmt.pix.bytesperline;
 	dev->imagesize = fmt.fmt.pix.bytesperline ? fmt.fmt.pix.sizeimage : 0;
-
+	dev->pixelformat = fmt.fmt.pix.pixelformat;
 	printf("\nGet Current Video Format:%c%c%c%c (%08x)%ux%u\n"
 		   "byte per line:%d\nsize image:%u\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
@@ -1295,6 +1304,26 @@ void canny_filter_enable(int enable)
 }
 
 /**
+ * histogram enable flag 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void histogram_enable(int enable)
+{
+	enable_wrapper(histogram_ena, enable);
+}
+
+/**
+ * motion detector enable flag 
+ * args:
+ * 		flag - set/reset the flag when get check button toggle
+ */
+void motion_detector_enable(int enable)
+{
+	enable_wrapper(motion_detector_ena, enable);
+}
+
+/**
  * set separate dual display enable flag 
  * args:
  * 		flag - set/reset the flag when get check button toggle
@@ -1469,11 +1498,25 @@ void decode_process_a_frame(
 	/** --- for yuv camera ---*/
 	else if (shift == 0)
 	{	
-		cv::Mat img(height, width, CV_8UC2, (void *)p);
-		cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
-		if (*bayer_flag == CV_MONO_FLG && img.type() != CV_8UC1)
-			cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
-		share_img = img;
+		
+		if (dev->pixelformat == 0x47504a4d) {
+			
+			cv::Mat inputMat(height, width, CV_8UC3, (void *)p);
+			cv::Mat img;
+			img = cv::imdecode(inputMat, cv::IMREAD_COLOR);
+			if (img.data == NULL)
+			{
+				printf("NULL in mjpeg image\r\n");
+			}
+			share_img = img;
+		}
+		else {
+			cv::Mat img(height, width, CV_8UC2, (void *)p);
+			cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
+			if (*bayer_flag == CV_MONO_FLG && img.type() != CV_8UC1)
+				cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
+			share_img = img;
+		}
 	}
 
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
@@ -1491,6 +1534,14 @@ void decode_process_a_frame(
 	if (*save_bmp)
 		save_frame_image_bmp(share_img);
 
+	if (*histogram_ena) 
+		display_histogram(share_img);
+	else 
+		cv::destroyWindow("histogram");
+
+	if (*motion_detector_ena) 
+		motion_detector(share_img);
+
 	if (*separate_dual) 
 		display_dual_stereo_separately(share_img);
 	else 
@@ -1504,8 +1555,8 @@ void decode_process_a_frame(
 			cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
 	if (*display_info_ena)
 		display_current_mat_stream_info(share_img, cur_time);
-
-	cv::imshow(window_name, share_img);
+	if (share_img.rows > 0 && share_img.cols > 0)
+		cv::imshow(window_name, share_img);
 	switch_on_keys();
 
 }

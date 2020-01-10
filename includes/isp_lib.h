@@ -67,6 +67,12 @@ void canny_filter_control(
 	cv::InputOutputArray& opencvImage,
 	int edge_low_threshold);
 
+void display_histogram(
+	cv::InputOutputArray& opencvImage);
+
+void motion_detector(
+	cv::InputOutputArray& opencvImage);
+	
 void display_dual_stereo_separately(
 	cv::InputOutputArray& opencvImage);
 

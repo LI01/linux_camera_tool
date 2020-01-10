@@ -55,7 +55,8 @@ typedef enum
    RAW10_FLG = 10,
    RAW12_FLG = 12,
    YUYV_FLG = 16,
-   RAW8_FLG = 8
+   RAW8_FLG = 8,
+   MJPEG_FLG = 6
 } bit_per_pixel_flag;
 
 /** --- for LI_XU_SENSOR_UUID_HWFW_REV --- */
@@ -153,6 +154,10 @@ void disable_rgb_matrix();
 void flip_enable(int enable);
 void mirror_enable(int enable);
 void canny_filter_enable(int enable);
+
+void histogram_enable(int enable);
+void motion_detector_enable(int enable);
+
 void rgb_ir_correction_enable(int enable);
 void apply_color_correction_rgb_ir(
    struct device *dev, 

@@ -175,6 +175,7 @@ struct device
     unsigned int height;
     unsigned int bytesperline;
     unsigned int imagesize;
+    u_int32_t pixelformat;
 };
 
 
