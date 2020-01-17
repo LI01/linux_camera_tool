@@ -1,45 +1,51 @@
 /*****************************************************************************
-*  This program is free software; you can redistribute it and/or modify      *
-*  it under the terms of the GNU General Public License as published by      *
-*  the Free Software Foundation; either version 2 of the License, or         *
-*  (at your option) any later version.                                       *
-*                                                                            *
-*  This program is distributed in the hope that it will be useful,           *
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
-*  GNU General Public License for more details.                              *
-*                                                                            *
-*  You should have received a copy of the GNU General Public License along   *
-*  with this program; if not, write to the Free Software Foundation, Inc.,   *
-*                                                                            *
-*  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for *
-*  camera streaming and display.                                             *
-*                                                                            *
-*  Common implementation of a v4l2 application                               *
-*  1. Open a descriptor to the device.                                       *
-*  2. Retrieve and analyse the device's capabilities.                        *
-*  3. Set the capture format(YUV422 etc).                                    *
-*  4. Prepare the device for buffering handling.                             *
-*     When capturing a frame, you have to submit a buffer to the             *
-*     device(queue) and retrieve it once it's been filled with               *
-*     data(dequeue). Before you can do this, you must inform the device      * 
-*     about your buffer(buffer request)                                      *
-*  5. For each buffer you wish to use, you must negotiate characteristics    * 
-*     with the device(buffer size, frame start offset in memory), and        * 
-*     create a new memory mapping for it                                     *
-*  6. Put the device into streaming mode                                     *
-*  7. Once your buffers are ready, all you have to do is keep queueing and   *
-*     dequeueing your buffer repeatedly, and every call will bring you a new *
-*     frame. The delay you set between each frames by putting your program   * 
-*     to sleep is what determines your fps                                   *
-*  8. Turn off streaming mode                                                *
-*  9. Unmap the buffer                                                       *
-* 10. Close your descriptor to the device                                    *
-*                                                                            *
-*  Author: Danyu L                                                           *
-*  Last edit: 2019/08                                                        *
-*****************************************************************************/
+ * This file is part of the Linux Camera Tool 
+ * Copyright (c) 2020 Leopard Imaging Inc.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *                                                                               
+ *  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for 
+ *  camera streaming and display.                                             
+ *                                                                            
+ *  Common implementation of a v4l2 application                               
+ *  1. Open a descriptor to the device.                                       
+ *  2. Retrieve and analyse the device's capabilities.                        
+ *  3. Set the capture format(YUV422 etc).                                    
+ *  4. Prepare the device for buffering handling.                             
+ *     When capturing a frame, you have to submit a buffer to the             
+ *     device(queue) and retrieve it once it's been filled with               
+ *     data(dequeue). Before you can do this, you must inform the device       
+ *     about your buffer(buffer request)                                      
+ *  5. For each buffer you wish to use, you must negotiate characteristics     
+ *     with the device(buffer size, frame start offset in memory), and         
+ *     create a new memory mapping for it                                     
+ *  6. Put the device into streaming mode                                     
+ *  7. Once your buffers are ready, all you have to do is keep queueing and   
+ *     dequeueing your buffer repeatedly, and every call will bring you a new 
+ *     frame. The delay you set between each frames by putting your program    
+ *     to sleep is what determines your fps                                   
+ *  8. Turn off streaming mode                                                
+ *  9. Unmap the buffer                                                       
+ * 10. Close your descriptor to the device                                    
+ *                                                                            
+ *  Author: Danyu L                                                           
+ *  Last edit: 2020/01                                                        
+ *****************************************************************************/
 #pragma once
+#include <string>
+#include <iostream>
+#include <sstream>
+#include <vector>
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -70,10 +76,12 @@ typedef enum
     LI_JPEG_MODE           = 0x6000
 } li_datatype_fw_flag;
 
-
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
+void set_restart_flag(int flag);
+void video_change_res(int resolution_index);
+
 void resize_window_enable(int enable);
 
 void video_capture_save_raw();
@@ -119,6 +127,12 @@ void video_set_format(struct device *dev, int width,
                       int height, int pixelformat);
 void video_set_format(struct device *dev);
 void video_get_format(struct device *dev);
+
+std::vector<std::string> 
+get_resolutions(struct device *dev);
+
+std::vector<int> 
+get_frame_rates(struct device *dev);
 
 void streaming_loop(struct device *dev, int socket);
 

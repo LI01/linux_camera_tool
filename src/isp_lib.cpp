@@ -1,22 +1,24 @@
 /*****************************************************************************
-*  This program is free software; you can redistribute it and/or modify	     *
-*  it under the terms of the GNU General Public License as published by		 *
-*  the Free Software Foundation; either version 2 of the License, or		 *
-*  (at your option) any later version.										 *
-* 																			 *
-*  This program is distributed in the hope that it will be useful,			 *
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of			 *
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the		     *
-*  GNU General Public License for more details.							     *
-* 																			 *
-*  You should have received a copy of the GNU General Public License along	 *
-*  with this program; if not, write to the Free Software Foundation, Inc., 	 *
-*																		     *
-*  This is the sample code for image signal processing library that used     *
-*  in this application.														 *
-*																			 *
-*  Author: Danyu L														     *
-*  Last edit: 2019/08														 *
+ * This file is part of the Linux Camera Tool 
+ * Copyright (c) 2020 Leopard Imaging Inc.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *																		     
+ * This is the sample code for image signal processing library that used     
+ * in this application.														 
+ *																			 
+ * Author: Danyu L														     
+ * Last edit: 2019/08														 
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/isp_lib.h"
@@ -140,18 +142,19 @@ void apply_white_balance(
 	int total = _opencvImage.cols * _opencvImage.rows;
 	/// build cumulative histogram
 	/// method 1: naive pixel access
-	// int hists[3][256];
-	// for (int y = 0; y < _opencvImage.rows; y++)
-	// {
-	// 	uchar *ptr = _opencvImage.ptr<uchar>(y);
-	// 	for (int x = 0; x < _opencvImage.cols; x++) 
-	// 	{
-	// 		for (int j = 0; j < 3; ++j)
-	// 		{
-	// 			hists[j][ptr[x * 3 + j]] += 1;
-	// 		}
-	// 	}
- 	// }
+	int hists[3][256];
+	CLEAR(hists);
+	for (int y = 0; y < _opencvImage.rows; y++)
+	{
+		uchar *ptr = _opencvImage.ptr<uchar>(y);
+		for (int x = 0; x < _opencvImage.cols; x++) 
+		{
+			for (int j = 0; j < 3; ++j)
+			{
+				hists[j][ptr[x * 3 + j]] += 1;
+			}
+		}
+ 	}
 
 	/// method 2: pointer arithmetic 
 	// int hists[3][256];
@@ -165,61 +168,61 @@ void apply_white_balance(
 	// }
 
 	/// method 3: use OpenCV calcHist to accelerate build histogram
-	cv::Mat bgr_planes[3];
-	cv::Mat hist[3];
-	cv::split(_opencvImage, bgr_planes);
-	float range[] = {0.0f,256.0f};
-	const float *histRange = {range};
-	int hist_size = 256;
-	for (int i=0; i<3; i++)
-	{
-		cv::calcHist(
-			&bgr_planes[i],  // src(const Mat*)
-			1, 				 // n_images
-			0, 			     // channels(gray = 0)
-			cv::Mat(), 		 // mask (for ROI)
-			hist[i], 		 // Mat hist
-			1, 				 // dimension
-			&hist_size, 	 // histSize = bins = 256
-			&histRange);     // ranges for pixel
-	}
+	// cv::Mat bgr_planes[3];
+	// cv::Mat hist[3];
+	// cv::split(_opencvImage, bgr_planes);
+	// float range[] = {0.0f,256.0f};
+	// const float *histRange = {range};
+	// int hist_size = 256;
+	// for (int i=0; i<3; i++)
+	// {
+	// 	cv::calcHist(
+	// 		&bgr_planes[i],  // src(const Mat*)
+	// 		1, 				 // n_images
+	// 		0, 			     // channels(gray = 0)
+	// 		cv::Mat(), 		 // mask (for ROI)
+	// 		hist[i], 		 // Mat hist
+	// 		1, 				 // dimension
+	// 		&hist_size, 	 // histSize = bins = 256
+	// 		&histRange);     // ranges for pixel
+	// }
 	
 
 	/// cumulative hist and search for vmin and vmax
 	/// method 1&2: use int hists[3][256] to accumulate and compare
-	// for (int i = 0; i < 3; ++i)
-	// {
-	// 	for (int j = 0; j < 255; ++j)
-	// 	{
-	// 		hists[i][j + 1] += hists[i][j];
-	// 	}
-	// 	vmin[i] = 0;
-	// 	vmax[i] = 255;
-	// 	while (hists[i][vmin[i]] < discard_ratio * total)
-	// 		vmin[i] += 1;
-	// 	while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
-	// 		vmax[i] -= 1;
-	// 	if (vmax[i] < 255 - 1)
-	// 		vmax[i] += 1;
-	// }
-
-	/// method 3: use float accumulator[3][256] to accumulate and compare
-	float accumulator[3][256];
-	for (int i = 0; i < 3; i++) {
-		for (int j=0; j < (hist_size-1); j++)
+	for (int i = 0; i < 3; ++i)
+	{
+		for (int j = 0; j < 255; ++j)
 		{
-			accumulator[i][j+1] = accumulator[i][j] + hist[i].at<float>(j);
+			hists[i][j + 1] += hists[i][j];
 		}
 		vmin[i] = 0;
 		vmax[i] = 255;
-		while (accumulator[i][vmin[i]] < discard_ratio * total)
+		while (hists[i][vmin[i]] < discard_ratio * total)
 			vmin[i] += 1;
-		while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
+		while (hists[i][vmax[i]] > (1 - discard_ratio) * total)
 			vmax[i] -= 1;
 		if (vmax[i] < 255 - 1)
 			vmax[i] += 1;
-		
 	}
+
+	/// method 3: use float accumulator[3][256] to accumulate and compare
+	// float accumulator[3][256];
+	// for (int i = 0; i < 3; i++) {
+	// 	for (int j=0; j < (hist_size-1); j++)
+	// 	{
+	// 		accumulator[i][j+1] = accumulator[i][j] + hist[i].at<float>(j);
+	// 	}
+	// 	vmin[i] = 0;
+	// 	vmax[i] = 255;
+	// 	while (accumulator[i][vmin[i]] < discard_ratio * total)
+	// 		vmin[i] += 1;
+	// 	while (accumulator[i][vmax[i]] > (1 - discard_ratio) * total)
+	// 		vmax[i] -= 1;
+	// 	if (vmax[i] < 255 - 1)
+	// 		vmax[i] += 1;
+		
+	// }
 
 	/// original raw pointer access, slower
 	// for (int y = 0; y < _opencvImage.rows; ++y)
@@ -564,7 +567,7 @@ void sharpness_control(
  * 1. convert the image to monochrome
  * 2. smooth the image using a box filter blur for noise reduction(ksize = 5)
  * 3. compute gradient intensity representations of the image
- * 4. apply threshold with hysterysis
+ * 4. apply threshold with hysteresis
  * args:
  * 		cv::InputOutputArray opencvImage - camera stream buffer array
  * 		that can be modified inside the functions
@@ -701,20 +704,20 @@ void display_dual_stereo_separately(
 	cv::Mat _opencvImage = opencvImage.getMat();
 	/// define region of interest for cropped Mat for dual stereo
 	cv::Rect roi_left(
-		0, 						// start_x
-		0, 						// start_y
-		_opencvImage.cols/2, 	// width
-		_opencvImage.rows);		// height
+		0, 						/// start_x
+		0, 						/// start_y
+		_opencvImage.cols/2, 	/// width
+		_opencvImage.rows);		/// height
 	cv::Mat cropped_ref_left(_opencvImage, roi_left);
 	cv::Mat cropped_left;
 	cropped_ref_left.copyTo(cropped_left);
 	cv::imshow("cam_left", cropped_left);
 
 	cv::Rect roi_right(
-		_opencvImage.cols/2,     // start_x 
-		0, 						// start_y
-		_opencvImage.cols/2, 	// width
-		_opencvImage.rows);		// height
+		_opencvImage.cols/2,     /// start_x 
+		0, 						 /// start_y
+		_opencvImage.cols/2, 	 /// width
+		_opencvImage.rows);		 /// height
 	cv::Mat cropped_ref_right(_opencvImage, roi_right);
 	cv::Mat cropped_right;
 	cropped_ref_right.copyTo(cropped_right);

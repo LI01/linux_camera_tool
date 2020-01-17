@@ -20,7 +20,7 @@ sudo docker build -f Dockerfile .
 ```
 - __Download the pre-built docker image from docker hub__
 ```sh
-sudo docker pull danyu9394/linux_camera_tool:linux_camera_tool
+sudo docker pull danyu9394/linux_camera_tool:v047
 ```
 
 ## Usage
@@ -32,7 +32,7 @@ sudo docker run -it \
     --device=/dev/video2:/dev/video0 \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -p 5000:5000 \
-    danyu9394/linux_camera_tool
+    danyu9394/linux_camera_tool:v047
 ```
 where, 
 - `-it` is to start an interactive session
@@ -48,10 +48,24 @@ Once you get inside the container, go to the program directory to run the progra
 ```sh
 ls /dev/vi*
 cd ~/linux_camera_tool/linux_camera_tool
+make clean  # clean the previous build
+git pull 
+make        # rebuild the latest camera tool
 ./leopard_cam -d 0
 ```
 <img src="../pic/docker.jpg" width="1000">
 
+
+To update the image on docker hub
+```
+# do a docker run and go inside the image
+docker ps -a
+docker commit CONTAINER_ID danyu9394/linux_camera_tool:v0xx #update the version number as tag
+docker push danyu9394/linux_camera_tool:v0xx
+
+#delete all the images
+docker rmi $(docker images -q) -f
+```
 ## References
 <sup>1</sup>: https://www.docker.com/resources/what-container
 <sup>2</sup>: http://wiki.ros.org/docker/Tutorials/GUI

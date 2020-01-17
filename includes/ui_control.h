@@ -1,24 +1,26 @@
 /*****************************************************************************
-*  This program is free software; you can redistribute it and/or modify      *
-*  it under the terms of the GNU General Public License as published by      *
-*  the Free Software Foundation; either version 2 of the License, or         *
-*  (at your option) any later version.                                       *
-*                                                                            *
-*  This program is distributed in the hope that it will be useful,           *
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
-*  GNU General Public License for more details.                              *
-*                                                                            *
-*  You should have received a copy of the GNU General Public License along   *
-*  with this program; if not, write to the Free Software Foundation, Inc.,   *
-*                                                                            *
-*  This is the sample code for Leopard USB3.0 camera, mainly for camera tool *
-*  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you* 
-*  have problem running Gtk3 with your current compiled openCV, please refer * 
-*  to README.md guide to rebuild your OpenCV for supporting Gtk3.            *
-*                                                                            *
-*  Author: Danyu L                                                           *
-*  Last edit: 2020/01                                                        *
+ * This file is part of the Linux Camera Tool 
+ * Copyright (c) 2020 Leopard Imaging Inc.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+*                                                                            
+*  This is the sample code for Leopard USB3.0 camera, mainly for camera tool 
+*  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you
+*  have problem running Gtk3 with your current compiled openCV, please refer 
+*  to README.md guide to rebuild your OpenCV for supporting Gtk3.            
+*                                                                            
+*  Author: Danyu L                                                           
+*  Last edit: 2020/01                                                        
 *****************************************************************************/
 #pragma once
 #include <gtk/gtk.h>
@@ -74,7 +76,8 @@ typedef struct
   GCallback handler;
   gpointer data;
 } element_callback;
-
+void update_frame_rate(GtkWidget *widget);
+void update_resolution(GtkWidget *widget);
 
 /*****************************************************************************
 **                      	Helper functions

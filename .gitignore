@@ -41,3 +41,5 @@
 *.bin
 *.img
 *.lif
+
+/doc/html/*

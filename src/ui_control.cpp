@@ -1,25 +1,28 @@
 /*****************************************************************************
-*  This program is free software; you can redistribute it and/or modify      *
-*  it under the terms of the GNU General Public License as published by      *
-*  the Free Software Foundation; either version 2 of the License, or         *
-*  (at your option) any later version.                                       *
-*                                                                            *
-*  This program is distributed in the hope that it will be useful,           *
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
-*  GNU General Public License for more details.                              *
-*                                                                            *
-*  You should have received a copy of the GNU General Public License along   *
-*  with this program; if not, write to the Free Software Foundation, Inc.,   *
-*                                                                            *
-*  This is the sample code for Leopard USB3.0 camera, mainly for camera tool *
-*  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you* 
-*  have problem running Gtk3 with your current compiled openCV, please refer * 
-*  to README.md guide to rebuild your OpenCV for supporting Gtk3.            *
-*                                                                            *
-*  Author: Danyu L                                                           *
-*  Last edit: 2020/01                                                        *
+ * This file is part of the Linux Camera Tool 
+ * Copyright (c) 2020 Leopard Imaging Inc.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+*                                                                            
+*  This is the sample code for Leopard USB3.0 camera, mainly for camera tool 
+*  control GUI using Gtk3. Gtk3 and Gtk2 don't live together peaceful. If you
+*  have problem running Gtk3 with your current compiled openCV, please refer 
+*  to README.md guide to rebuild your OpenCV for supporting Gtk3.            
+*                                                                            
+*  Author: Danyu L                                                           
+*  Last edit: 2020/01                                                        
 *****************************************************************************/
+
 #include "../includes/shortcuts.h"
 #include "../includes/gui_callbacks.h"
 #include "../includes/ui_control.h"
@@ -31,6 +34,7 @@
 #include "../includes/core_io.h"
 #include "../includes/gitversion.h"
 #include "../includes/fd_socket.h"
+#include "../includes/batch_cmd_parser.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -51,8 +55,10 @@ static GtkWidget *check_button_auto_exp, *check_button_awb, *check_button_clahe;
 static GtkWidget *label_exposure, *label_gain;
 static GtkWidget *hscale_exposure, *hscale_gain;
 static GtkWidget *label_i2c_addr, *entry_i2c_addr;
-static GtkWidget *label_addr_width, *hbox_addr_width, *radio_8bit_addr, *radio_16bit_addr;
-static GtkWidget *label_val_width, *hbox_val_width, *radio_8bit_val, *radio_16bit_val;
+static GtkWidget *label_addr_width, *hbox_addr_width;
+static GtkWidget *radio_8bit_addr, *radio_16bit_addr;
+static GtkWidget *label_val_width, *hbox_val_width;
+static GtkWidget *radio_8bit_val, *radio_16bit_val;
 static GtkWidget *label_reg_addr, *entry_reg_addr;
 static GtkWidget *label_reg_val, *entry_reg_val;
 static GtkWidget *button_read, *button_write;
@@ -77,7 +83,7 @@ static GtkWidget *entry_gr, *entry_gg, *entry_gb;
 static GtkWidget *entry_br, *entry_bg, *entry_bb; 
 static GtkWidget *check_button_soft_ae , *check_button_flip;
 static GtkWidget *check_button_edge, *check_button_mirror;
-static GtkWidget *check_button_histogram, *check_button_motion_detector;
+static GtkWidget *check_button_histogram, *check_button_motion_detect;
 static GtkWidget *check_button_dual_stereo;
 static GtkWidget *label_alpha, *label_beta, *label_sharpness;
 static GtkWidget *check_button_abc;
@@ -100,9 +106,67 @@ static int address_width_flag;
 static int value_width_flag;
 
 int v4l2_dev; /** global variable, file descriptor for camera device */
+extern std::vector<std::string> resolutions;
+extern std::vector<int> cur_frame_rates;
 /*****************************************************************************
 **                      	Helper functions
 *****************************************************************************/
+void update_resolution(GtkWidget *widget)
+{
+    g_print("Update Resolution\n");
+    char cur_fps[10];
+    
+    int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    video_change_res(cmd_index);
+
+    sleep(1);
+    int cur_frame_rate = get_frame_rate(v4l2_dev);
+    snprintf(cur_fps, sizeof(cur_fps), "%d fps", cur_frame_rate);
+   
+    /*disable fps combobox signals*/
+	g_signal_handlers_block_by_func(
+        GTK_COMBO_BOX(combo_box_frame_rate), 
+        (gpointer)(update_frame_rate), NULL);
+	/* clear out the old fps list... */
+	GtkListStore *store = GTK_LIST_STORE(
+        gtk_combo_box_get_model (GTK_COMBO_BOX(combo_box_frame_rate)));
+	gtk_list_store_clear(store);
+
+    gtk_combo_box_text_append_text(
+        GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
+        cur_fps);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(combo_box_frame_rate),0);
+    int cur_fps_size = cur_frame_rates.size();
+    for(int i=0; i<cur_fps_size; i++) {
+        if (cur_frame_rate != cur_frame_rates[i]) {
+            char buf[10];
+            snprintf(buf, sizeof(buf), "%d fps", cur_frame_rates[i]);
+            gtk_combo_box_text_append_text(
+                GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
+                buf);     
+        }
+    }
+  
+}
+void update_frame_rate(GtkWidget *widget)
+{
+    g_print("Update Frame Rate\n");
+    
+    int cur_fps_size = cur_frame_rates.size();
+    int cur_frame_rate = get_frame_rate(v4l2_dev);
+    for(int i=0; i<cur_fps_size; i++) {
+        if (cur_frame_rate != cur_frame_rates[i]) {
+            char buf[10];
+            snprintf(buf, sizeof(buf), "%d fps", cur_frame_rates[i]);
+            gtk_combo_box_text_append_text(
+                GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
+                buf);     
+        }
+    }
+    int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    set_restart_flag(1);
+    set_frame_rate(v4l2_dev, cur_frame_rates[cmd_index]);
+}
 /** a menu_item formater to save some typing */
 void menu_item_formater(
     GtkWidget *item,
@@ -431,6 +495,7 @@ void send_trigger()
     }
 }
 
+
 /** callback for enabling/disalign sensor trigger */
 void enable_trig(GtkToggleButton *toggle_button)
 {
@@ -738,15 +803,15 @@ void init_grid1_widgets()
 {
       
 	/**
-	 *  This part is to get the gain and exposure maximum value defined in firmware
-	 *  and update the range in GUI, if MAX_EXPOSURE_TIME is undefined in firmware, 
-     *  it will put a upper limit for exposure time range so the range won't be as 
-     *  large as 65535 which confuses people
-	 *  If UNSET_MAX_EXPOSURE_LINE, firmware didn't define MAX_EXPOSURE_TIME...
-	 * 	place holder = 3 * vertical_line#, it should be enough for most cases
-	 *  if you adjust exposure to maximum, and image is still dark 
-	 *  try to increase 3 to 4, 5, 6 etc
-	 *  or ask for a firmware update, firmware exposure time mapping might be wrong
+	 * This part is to get the gain and exposure maximum value defined in 
+     * firmware and update the range in GUI, if MAX_EXPOSURE_TIME is undefined
+     * in firmware, it will put a upper limit for exposure time range so the 
+     * range won't be as large as 65535 which confuses people
+	 * If UNSET_MAX_EXPOSURE_LINE, firmware didn't define MAX_EXPOSURE_TIME...
+	 * place holder = 3 * vertical_line#, it should be enough for most cases
+	 * if you adjust exposure to maximum, and image is still dark, try to 
+     * increase 3 to 4, 5, 6 etc, or ask for a firmware update, firmware 
+     * exposure time mapping might be wrong
 	 */
 
     int exposure_max = query_exposure_absolute_max(v4l2_dev);
@@ -830,7 +895,7 @@ void init_grid1_widgets()
     separator_tab1_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     separator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
 
-    
+
     if (gain_max == 13)
         gtk_widget_set_sensitive(hscale_gain, 0);
     if (exposure_max == 999)
@@ -850,7 +915,7 @@ void init_grid2_widgets()
     check_button_mirror         = gtk_check_button_new();
     check_button_edge           = gtk_check_button_new();
     check_button_histogram      = gtk_check_button_new();
-    check_button_motion_detector = gtk_check_button_new();
+    check_button_motion_detect  = gtk_check_button_new();
     check_button_dual_stereo    = gtk_check_button_new();
     check_button_abc            = gtk_check_button_new();
 
@@ -890,8 +955,8 @@ void init_grid2_widgets()
     entry_bg                    = gtk_entry_new();
     entry_bb                    = gtk_entry_new();
 
-    separator_tab2_1           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-    separator_tab2_2           = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    separator_tab2_1         = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    separator_tab2_2         = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     
  
     hscale_alpha                = gtk_hscale_new(1, ALPHA_MAX);
@@ -937,7 +1002,6 @@ void init_grid3_widgets()
 	gtk_widget_set_hexpand (combo_box_resolution, TRUE);
     gtk_widget_set_halign (combo_box_frame_rate, GTK_ALIGN_FILL);
 	gtk_widget_set_hexpand (combo_box_frame_rate, TRUE);
-
     gtk_widget_set_sensitive(entry_ov580_i2c_addr, 0); 
 }
 
@@ -951,23 +1015,36 @@ void iterate_def_elements (
         switch (def->wid_type) 
         {
             case GTK_WIDGET_TYPE_LABEL:
-                gtk_label_set_text(GTK_LABEL(def->widget), def->label_str);
+                gtk_label_set_text(
+                    GTK_LABEL(def->widget), 
+                    def->label_str);
                 break;
             case GTK_WIDGET_TYPE_BUTTON:
-                gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
+                gtk_button_set_label(
+                    GTK_BUTTON(def->widget), 
+                    def->label_str);
                 break;
             case GTK_WIDGET_TYPE_VBOX:
                 break;
             case GTK_WIDGET_TYPE_RADIO_BUTTON:  
-                gtk_box_pack_start(GTK_BOX(def->parent), def->widget, 0, 0, 0);
-                gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
+                gtk_box_pack_start(
+                    GTK_BOX(def->parent), 
+                    def->widget, 0, 0, 0);
+                gtk_button_set_label(
+                    GTK_BUTTON(def->widget), 
+                    def->label_str);
                 break;
             case GTK_WIDGET_TYPE_CHECK_BUTTON:
-                gtk_button_set_label(GTK_BUTTON(def->widget), def->label_str);
+                gtk_button_set_label(
+                    GTK_BUTTON(def->widget), 
+                    def->label_str);
                 break;
             case GTK_WIDGET_TYPE_ENTRY:
-                gtk_entry_set_text(GTK_ENTRY(def->widget), def->label_str);
-                gtk_entry_set_width_chars(GTK_ENTRY(def->widget), -1);
+                gtk_entry_set_text(
+                    GTK_ENTRY(def->widget), 
+                    def->label_str);
+                gtk_entry_set_width_chars(
+                    GTK_ENTRY(def->widget), -1);
                 break;
             case GTK_WIDGET_TYPE_HSCALE:
                 gtk_widget_set_hexpand(def->widget, TRUE);
@@ -976,7 +1053,8 @@ void iterate_def_elements (
                 gtk_combo_box_text_append_text(
                     GTK_COMBO_BOX_TEXT(def->widget), 
                     def->label_str);
-                gtk_combo_box_set_active(GTK_COMBO_BOX(def->widget),0);
+                gtk_combo_box_set_active(
+                    GTK_COMBO_BOX(def->widget),0);
                 break;
             default:
                 break;
@@ -1180,6 +1258,7 @@ void init_grid1_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
          .parent = hbox_val_width, 
          .label_str = "16-bit"},
+        
 
     };
     iterate_def_elements(definitions, SIZE(definitions));
@@ -1332,7 +1411,7 @@ void init_grid2_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
          .label_str = "Display Histogram"},
-        {.widget = check_button_motion_detector, 
+        {.widget = check_button_motion_detect, 
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
          .label_str = "Motion Detector"},
@@ -1367,6 +1446,10 @@ void init_grid2_def_elements ()
 /** iterate over definition element for grid1 widgets setup */
 void init_grid3_def_elements ()
 {
+    int cur_frame_rate = get_frame_rate(v4l2_dev);
+    char fps_buf[10];
+    snprintf(fps_buf, sizeof(fps_buf), "%d fps", cur_frame_rate);
+
     static def_element definitions[] = {
         {.widget = label_ov580_device,
          .wid_type = GTK_WIDGET_TYPE_LABEL,
@@ -1441,15 +1524,54 @@ void init_grid3_def_elements ()
         {.widget = combo_box_resolution,    
          .wid_type = GTK_WIDGET_TYPE_COMBO_BOX, 
          .parent = NULL, 
-         .label_str = "Resolutions"},
+         .label_str = resolutions[0].c_str()},
         {.widget = combo_box_frame_rate,        
          .wid_type = GTK_WIDGET_TYPE_COMBO_BOX, 
          .parent = NULL, 
-         .label_str = "Frame Rates"},   
+         .label_str = fps_buf},   
 
     };
+
     iterate_def_elements(definitions, SIZE(definitions));
+
+    /// append the remaining resolutions
+    int resolution_counts = resolutions.size();
+    for (int i=1;i<resolution_counts;i++) {
+        gtk_combo_box_text_append_text(
+            GTK_COMBO_BOX_TEXT(combo_box_resolution), 
+            resolutions[i].c_str());        
+    }
+    /// append the remaining frame rates
+    int cur_fps_size = cur_frame_rates.size();
+    //printf("cur_fps_size = %d\r\n",cur_fps_size);
+    for(int i=0; i<cur_fps_size; i++) {
+        if (cur_frame_rate != cur_frame_rates[i]) {
+            char buf[10];
+            snprintf(buf, sizeof(buf), "%d fps", cur_frame_rates[i]);
+            gtk_combo_box_text_append_text(
+                GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
+                buf);     
+        }
+    }
+
+    /// set the current resolution as active
+    int res_index;
+    for (res_index=0; res_index< resolution_counts; res_index++) {
+        std::vector<std::string> elem = 
+			split(resolutions[res_index], 'x');
+
+		int height = stoi(elem[1]);
+        if (get_current_height(v4l2_dev) == height) {
+            //printf("res index = %d\r\n", res_index);
+            gtk_combo_box_set_active(
+                GTK_COMBO_BOX(combo_box_resolution),
+                res_index);
+        }
+    }
+
+    
 }
+    
 
 /** iterate over grid element for GUI layout */
 void iterate_grid_elements(
@@ -1515,7 +1637,6 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = label_blc,                .col =col=0, .row =row,   .width =1},
         {.widget = entry_blc,                .col =++col, .row =row,   .width =1},
         {.widget = button_apply_blc,         .col =++col, .row =row++, .width =1},
-     
     };
     iterate_grid_elements(grid, elements, SIZE(elements));
 }
@@ -1564,7 +1685,7 @@ void list_all_grid2_elements(GtkWidget *grid)
         {.widget = check_button_mirror,      .col =col++, .row =row,   .width =1},
         {.widget = check_button_edge,        .col =col++, .row =row++, .width =1},
         {.widget = check_button_histogram,   .col =col=0, .row =row,   .width =1},
-        {.widget = check_button_motion_detector,.col =++col, .row =row,   .width =1},
+        {.widget = check_button_motion_detect,.col =++col, .row =row,   .width =1},
         {.widget = check_button_dual_stereo, .col =++col, .row =row,   .width =1},
         {.widget = check_button_abc,         .col =++col, .row =row++, .width =1},
         {.widget = label_alpha,              .col =col=0, .row =row++, .width =1},
@@ -1606,7 +1727,7 @@ void list_all_grid3_elements(GtkWidget *grid)
         {.widget = label_resolution,         .col =col=0,.row =++row,.width =1},
         {.widget = combo_box_resolution,     .col =++col,.row =row,  .width =1},
 
-        {.widget = label_frame_rate,         .col =col=0,.row =++row,.width =1},
+        {.widget = label_frame_rate,         .col =++col,.row =row,  .width =1},
         {.widget = combo_box_frame_rate,     .col =++col,.row =row,  .width =1},
     };
     iterate_grid_elements(grid, elements, SIZE(elements));
@@ -1744,7 +1865,6 @@ void list_all_grid1_element_callbacks()
          .signal = "clicked", 
          .handler = G_CALLBACK(black_level_correction),   
          .data = NULL},
- 
     };
 
     iterate_element_cb(callbacks, SIZE(callbacks));
@@ -1781,9 +1901,9 @@ void list_all_grid2_element_callbacks()
          .signal = "toggled", 
          .handler = G_CALLBACK(enable_histogram), 
          .data = NULL},
-        {.widget = check_button_motion_detector, 
+        {.widget = check_button_motion_detect, 
          .signal = "toggled", 
-         .handler = G_CALLBACK(enable_motion_detector), 
+         .handler = G_CALLBACK(enable_motion_detect), 
          .data = NULL},
         {.widget = check_button_dual_stereo, 
          .signal = "toggled", 
@@ -1846,6 +1966,15 @@ void list_all_grid3_element_callbacks()
          .signal = "toggled", 
          .handler = G_CALLBACK(enable_rgb_ir_ir), 
          .data = NULL},
+        {.widget = combo_box_resolution,           
+         .signal = "changed", 
+         .handler = G_CALLBACK(update_resolution),             
+         .data = NULL},
+        {.widget = combo_box_frame_rate,           
+         .signal = "changed", 
+         .handler = G_CALLBACK(update_frame_rate),             
+         .data = NULL},
+        
     };
     
     iterate_element_cb(callbacks, SIZE(callbacks));
@@ -2086,6 +2215,7 @@ void menu_bar_setup(GtkWidget *maintable)
         device_info.push_back("Datatype: " 
             + convert_bpp_to_string(bpp));
     }
+
     for (size_t i=0; i < device_info.size(); i++) {
         device_item = 
             gtk_menu_item_new_with_label(device_info[i].c_str());
@@ -2133,7 +2263,6 @@ void menu_bar_setup(GtkWidget *maintable)
             G_CALLBACK(open_config_dialog));
         // gtk_menu_shell_append(GTK_MENU_SHELL(file_menu), config_file_item);
         // g_signal_connect(config_file_item, "activate", G_CALLBACK(open_config_dialog), window);
-
 
         /** firmware update items */
         GtkWidget *fw_update_item = 
@@ -2265,6 +2394,7 @@ void universal_ctrl_setup(GtkWidget *maintable)
     gtk_widget_set_halign (top_grid, GTK_ALIGN_FILL);
     gtk_widget_set_margin_top(GTK_WIDGET(top_grid), 0);
     gtk_widget_set_margin_bottom(GTK_WIDGET(top_grid), 0);
+
 }
 /** set up css for GUI look */
 void css_setup()
@@ -2306,7 +2436,9 @@ void gui_run()
 {
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Camera Control");
+    gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     gtk_widget_set_size_request(window, 500, 100);
+    //gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
     const char* icon1path = "./pic/leopard_cam_tool.jpg";  
     const char* icon2path = "../pic/leopard_cam_tool.jpg"; 
 

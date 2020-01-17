@@ -1,22 +1,24 @@
 /*****************************************************************************
-*  This program is free software; you can redistribute it and/or modify      *
-*  it under the terms of the GNU General Public License as published by      *
-*  the Free Software Foundation; either version 2 of the License, or         *
-*  (at your option) any later version.                                       *
-*                                                                            *
-*  This program is distributed in the hope that it will be useful,           *
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
-*  GNU General Public License for more details.                              *
-*                                                                            *
-*  You should have received a copy of the GNU General Public License along   *
-*  with this program; if not, write to the Free Software Foundation, Inc.,   *
-*                                                                            *
-*  This is the sample code for Leopard USB3.0 camera, mainly for             *
-*  BatchCmd.txt parser. Using some STL functions for string manipulations.   *
-*                                                                            *
-*  Author: Danyu L                                                           *
-*  Last edit: 2019/06                                                        *
+ * This file is part of the Linux Camera Tool 
+ * Copyright (c) 2020 Leopard Imaging Inc.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *                                                                            
+ *  This is the sample code for Leopard USB3.0 camera, mainly for             
+ *  BatchCmd.txt parser. Using some STL functions for string manipulations.   
+ *                                                                            
+ *  Author: Danyu L                                                           
+ *  Last edit: 2019/06                                                        
 *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/batch_cmd_parser.h"
@@ -36,6 +38,30 @@ extern void video_capture_save_bmp();
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
+/**
+ * return the output string for a linux shell command 
+ */
+std::string
+get_stdout_from_cmd(std::string cmd)
+{
+
+	std::string data;
+	FILE *stream;
+	const int max_buffer= 256;
+	char buffer[max_buffer];
+	cmd.append(" 2>&1");
+
+	stream = popen(cmd.c_str(), "r");
+	if (stream)
+	{
+		while (!feof(stream))
+			if (fgets(buffer, max_buffer, stream) != NULL)
+				data.append(buffer);
+		pclose(stream);
+	}
+	return data;
+}
+
 /** 
  *   split the string by a delimiter
  *   this function puts the results in a pre-constructed vector
@@ -62,8 +88,9 @@ split(const std::string &s, char delim)
     split(s, delim, std::back_inserter(elems));
     return elems;
 }
+
 /* 
- * since c/c++ switch can only swtich int/enum, which is really inconvenient. 
+ * since c/c++ switch can only switch int/enum, which is really inconvenient. 
  * Use this helper function to switch over the result of a hash function that
  * uses the string as input, so that the code looks much cleaner 
  * */
@@ -148,10 +175,10 @@ void txt_file_parser(int fd, char *buf, long length)
 
             case eInterFrameDelay:
                 inter_frame_delay_time = hex_or_dec_interpreter(element[1]);
-                printf("set inter frame delay time to = %d ms\r\n", delay_time);
-                while (delay_time > 0)
+                printf("set inter frame delay time to = %d ms\r\n", inter_frame_delay_time);
+                while (inter_frame_delay_time > 0)
                 {
-                    usleep(delay_time);
+                    usleep(inter_frame_delay_time);
                 }
                 break;
             case eRead:

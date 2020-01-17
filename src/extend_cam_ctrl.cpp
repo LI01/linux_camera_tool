@@ -1,50 +1,54 @@
 /*****************************************************************************
-*  This program is free software; you can redistribute it and/or modify      *
-*  it under the terms of the GNU General Public License as published by      *
-*  the Free Software Foundation; either version 2 of the License, or         *
-*  (at your option) any later version.                                       *
-*                                                                            *
-*  This program is distributed in the hope that it will be useful,           *
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of            *
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             *
-*  GNU General Public License for more details.                              *
-*                                                                            *
-*  You should have received a copy of the GNU General Public License along   *
-*  with this program; if not, write to the Free Software Foundation, Inc.,   *
-*                                                                            *
-*  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for *
-*  camera streaming and display.                                             *
-*                                                                            *
-*  Common implementation of a v4l2 application                               *
-*  1. Open a descriptor to the device.                                       *
-*  2. Retrieve and analyse the device's capabilities.                        *
-*  3. Set the capture format(YUV422 etc).                                    *
-*  4. Prepare the device for buffering handling.                             *
-*     When capturing a frame, you have to submit a buffer to the             *
-*     device(queue) and retrieve it once it's been filled with               *
-*     data(dequeue). Before you can do this, you must inform the device      * 
-*     about your buffer(buffer request)                                      *
-*  5. For each buffer you wish to use, you must negotiate characteristics    * 
-*     with the device(buffer size, frame start offset in memory), and        * 
-*     create a new memory mapping for it                                     *
-*  6. Put the device into streaming mode                                     *
-*  7. Once your buffers are ready, all you have to do is keep queueing and   *
-*     dequeueing your buffer repeatedly, and every call will bring you a new *
-*     frame. The delay you set between each frames by putting your program   * 
-*     to sleep is what determines your fps                                   *
-*  8. Turn off streaming mode                                                *
-*  9. Unmap the buffer                                                       *
-* 10. Close your descriptor to the device                                    *
-*                                                                            *
-*  Author: Danyu L                                                           *
-*  Last edit: 2019/08                                                        *
-*****************************************************************************/
+ * This file is part of the Linux Camera Tool 
+ * Copyright (c) 2020 Leopard Imaging Inc.
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *                                                                               
+ *  This is the sample code for Leopard USB3.0 camera use v4l2 and OpenCV for 
+ *  camera streaming and display.                                             
+ *                                                                            
+ *  Common implementation of a v4l2 application                               
+ *  1. Open a descriptor to the device.                                       
+ *  2. Retrieve and analyse the device's capabilities.                        
+ *  3. Set the capture format(YUV422 etc).                                    
+ *  4. Prepare the device for buffering handling.                             
+ *     When capturing a frame, you have to submit a buffer to the             
+ *     device(queue) and retrieve it once it's been filled with               
+ *     data(dequeue). Before you can do this, you must inform the device       
+ *     about your buffer(buffer request)                                      
+ *  5. For each buffer you wish to use, you must negotiate characteristics     
+ *     with the device(buffer size, frame start offset in memory), and         
+ *     create a new memory mapping for it                                     
+ *  6. Put the device into streaming mode                                     
+ *  7. Once your buffers are ready, all you have to do is keep queueing and   
+ *     dequeueing your buffer repeatedly, and every call will bring you a new 
+ *     frame. The delay you set between each frames by putting your program    
+ *     to sleep is what determines your fps                                   
+ *  8. Turn off streaming mode                                                
+ *  9. Unmap the buffer                                                       
+ * 10. Close your descriptor to the device                                    
+ *                                                                            
+ *  Author: Danyu L                                                           
+ *  Last edit: 2020/01                                                        
+ *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/extend_cam_ctrl.h"
 #include "../includes/isp_lib.h"
 #include "../includes/utility.h"
 #include "../includes/fd_socket.h"
 #include "../includes/uvc_extension_unit_ctrl.h"
+#include "../includes/cam_property.h"
+#include "../includes/batch_cmd_parser.h"
 #include <omp.h> /**for openmp */
 
 /*****************************************************************************
@@ -85,14 +89,18 @@ static int *resize_window_ena;
 static int *rgb_ir_color, *rgb_ir_ir;
 static int *alpha, *beta, *sharpness;
 static int *edge_low_thres;
+static int *restart;
+static int *res_index = 0;
+static int image_count;			  /// image count number add to capture name
+static constexpr const char* window_name = "Camera View"; 
 
 int *cur_exposure; 				  /// update current exposure for AE
 int *cur_gain;	 				  /// update current gain for AE
 
-static int image_count;			  /// image count number add to capture name
-		  
 struct v4l2_buffer queuebuffer;   /// queuebuffer for enqueue, dequeue buffer
-static constexpr const char* window_name = "Camera View"; 
+
+extern std::vector<std::string> resolutions;
+extern std::vector<int> cur_frame_rates;
 /*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
@@ -107,6 +115,20 @@ extern void free_device_vars();
 /******************************************************************************
 **                           Function definition
 *****************************************************************************/
+
+
+void set_restart_flag(int flag)
+{
+	*restart = flag;
+}
+
+void video_change_res(int resolution_index)
+{
+
+	*res_index = resolution_index;
+	set_restart_flag(1);
+}
+
 /*
  * flip the flag of one enable/disable switch
  * use *flag for these global shared memory flag
@@ -115,14 +137,14 @@ void enable_wrapper(int *flag, int enable)
 {
 	switch (enable)
 	{
-	case 1: 
-		*flag = TRUE; 
+	case 1:
+		*flag = TRUE;
 		break;
-	case 0: 
-		*flag = FALSE; 
+	case 0:
+		*flag = FALSE;
 		break;
-	default: 
-		*flag = FALSE; 
+	default:
+		*flag = FALSE;
 		break;
 	}
 }
@@ -168,7 +190,7 @@ inline void set_save_raw_flag(int flag)
  * returns: error code
  */
 int v4l2_core_save_data_to_file(
-	const void *data, 
+	const void *data,
 	int size)
 {
 	FILE *fp;
@@ -236,10 +258,10 @@ static int save_frame_image_bmp(
 
 	printf("save one capture bmp\n");
 	cv::imwrite(cv::format(
-		"captures_%s_%d.bmp",
-		get_product(), 
-		image_count),
-		opencvImage);
+					"captures_%s_%d.bmp",
+					get_product(),
+					image_count),
+				opencvImage);
 	image_count++;
 	set_save_bmp_flag(0);
 	return 0;
@@ -391,7 +413,7 @@ void clahe_enable(int enable)
  * 		file descriptor v4l2_dev
  */
 int open_v4l2_device(
-	char *device_name, 
+	char *device_name,
 	struct device *dev)
 {
 	int v4l2_dev;
@@ -412,8 +434,8 @@ int open_v4l2_device(
 /** a mmap wrapper */
 void *mmap_wrapper(int len)
 {
-	void *p = mmap(NULL, len, PROT_READ | PROT_WRITE, 
-		MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+	void *p = mmap(NULL, len, PROT_READ | PROT_WRITE,
+				   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if (p == (void *) -1)
 		perror("mmap shared memory failed\n");
 	return p;
@@ -421,7 +443,7 @@ void *mmap_wrapper(int len)
 /** mmap the variables for processes share */
 void mmap_variables()
 {
-	gamma_val 			= (float *)mmap_wrapper(sizeof(float));
+gamma_val 			= (float *)mmap_wrapper(sizeof(float));
 	save_bmp 			 = (int *)mmap_wrapper(sizeof(int));
 	save_raw 			 = (int *)mmap_wrapper(sizeof(int));
 	bpp 				 = (int *)mmap_wrapper(sizeof(int));
@@ -465,6 +487,9 @@ void mmap_variables()
 	resize_window_ena 	 = (int *)mmap_wrapper(sizeof(int));
 	rgb_ir_color 		 = (int *)mmap_wrapper(sizeof(int));
 	rgb_ir_ir 			 = (int *)mmap_wrapper(sizeof(int));
+	restart 			 = (int *)mmap_wrapper(sizeof(int));
+	res_index 			 = (int *)mmap_wrapper(sizeof(int));
+	//cur_frame_rate 		 = (int *)mmap_wrapper(sizeof(int));
 }
 /** 
  * set bit per pixel of the camera read from uvc extension unit
@@ -474,19 +499,19 @@ int set_bpp(int datatype)
 {
 	switch(datatype)
 	{
-		case LI_RAW_10_MODE:
-			return RAW10_FLG;
-		case LI_RAW_12_MODE:
-			return RAW12_FLG;
-		case LI_RAW_8_MODE:
-		case LI_RAW_8_DUAL_MODE:
-			return RAW8_FLG;
-		case LI_YUY2_MODE:
-			return YUYV_FLG;
-		case LI_JPEG_MODE:
-			return YUYV_FLG;//haven't support yet	
-		default:
-			return RAW10_FLG;
+	case LI_RAW_10_MODE:
+		return RAW10_FLG;
+	case LI_RAW_12_MODE:
+		return RAW12_FLG;
+	case LI_RAW_8_MODE:
+	case LI_RAW_8_DUAL_MODE:
+		return RAW8_FLG;
+	case LI_YUY2_MODE:
+		return YUYV_FLG;
+	case LI_JPEG_MODE:
+		return YUYV_FLG;//haven't support yet	
+	default:
+		return RAW10_FLG;
 	}
 }
 
@@ -495,7 +520,7 @@ void initialize_shared_memory_var()
 {
 	*gamma_val = 1.0;
 	*blc = 0;
-	if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
+		if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
 	|| (strcmp(get_product(), "USB Cam-OV580-OG01A") == 0))
 		*bpp = RAW8_FLG;
 	else if (strcmp(get_product(), "OV580 STEREO") == 0)
@@ -515,7 +540,7 @@ void unmap_wrapper(T *data)
 {
 	int ret = munmap(data, sizeof(T));
 	if (ret < 0)
-		printf("Unable to unmap shared memory (%d)\n", errno);	
+		printf("Unable to unmap shared memory (%d)\n", errno);
 }
 
 /** unmap all the variables after stream ends */
@@ -565,6 +590,9 @@ void unmap_variables()
 	unmap_wrapper(resize_window_ena);
 	unmap_wrapper(rgb_ir_color);
 	unmap_wrapper(rgb_ir_ir);
+	unmap_wrapper(restart);
+	unmap_wrapper(res_index);
+	//unmap_wrapper(cur_frame_rate);
 	free_device_vars();
 }
 
@@ -619,9 +647,9 @@ void stop_Camera(struct device *dev)
  * 
  */
 void video_set_format(
-	struct device *dev, 
+	struct device *dev,
 	int width,
-	int height, 
+	int height,
 	int pixelformat)
 {
 	struct v4l2_format fmt;
@@ -668,9 +696,7 @@ void video_set_format(
 	int ret;
 
 	fmt.fmt.pix.width =dev->width;
-	//dev->width = width;
 	fmt.fmt.pix.height = dev->height;
-	//dev->height = height;
 	//fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
@@ -737,6 +763,80 @@ void video_get_format(struct device *dev)
 	return;
 }
 
+std::vector<std::string> 
+get_resolutions(struct device *dev)
+{
+	struct v4l2_fmtdesc fmtdesc;
+    struct v4l2_frmsizeenum frms;
+	CLEAR(fmtdesc);
+	CLEAR(frms);
+    fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	fmtdesc.index = 0;
+	std::vector<std::string> total_res;
+	while(ioctl (dev->fd, VIDIOC_ENUM_FMT, &fmtdesc) == 0)
+	{
+		fmtdesc.index++;	
+		// internal fourcc definitions are identical with v4l2
+		frms.pixel_format = fmtdesc.pixelformat;
+		for(frms.index = 0; !ioctl(dev->fd, VIDIOC_ENUM_FRAMESIZES, &frms); frms.index++) 
+		{
+			if (frms.type == V4L2_FRMSIZE_TYPE_DISCRETE)
+            {
+				std::string each_line = std::to_string(frms.discrete.width) 
+				+ "x" + std::to_string(frms.discrete.height);
+				total_res.push_back(each_line);
+			}
+		}
+	}
+	return total_res;
+}
+
+std::vector<int> 
+get_frame_rates(struct device *dev)
+{
+
+	struct v4l2_frmivalenum fival;
+	int list_fps = 0;
+	CLEAR(fival);
+	fival.index = 0;
+	fival.pixel_format = dev->pixelformat;
+	fival.width = dev->width;
+	fival.height = dev->height;
+	std::vector<int> frame_rates;
+	while (ioctl(dev->fd, VIDIOC_ENUM_FRAMEINTERVALS, &fival) == 0)
+	{
+		fival.index++;
+		if (fival.type == V4L2_FRMIVAL_TYPE_DISCRETE)
+		{
+			list_fps++;
+			//printf("add frame rate = %d\r\n", fival.discrete.denominator);
+			frame_rates.push_back(fival.discrete.denominator);
+		}
+		else if (fival.type == V4L2_FRMIVAL_TYPE_CONTINUOUS)
+		{
+			printf("{min { %u/%u } .. max { %u/%u } }, ",
+				   fival.stepwise.min.numerator,
+				   fival.stepwise.min.numerator,
+				   fival.stepwise.max.denominator,
+				   fival.stepwise.max.denominator);
+			break;
+		}
+		else if (fival.type == V4L2_FRMIVAL_TYPE_STEPWISE)
+		{
+			printf("{min { %u/%u } .. max { %u/%u } / "
+				   "stepsize { %u/%u } }, ",
+				   fival.stepwise.min.numerator,
+				   fival.stepwise.min.denominator,
+				   fival.stepwise.max.numerator,
+				   fival.stepwise.max.denominator,
+				   fival.stepwise.step.numerator,
+				   fival.stepwise.step.denominator);
+			break;
+		}
+	}
+	return frame_rates;
+}
+
 /** 
  * To get frames in few steps
  * 1. prepare information about the buffer you are queueing
@@ -757,14 +857,40 @@ void streaming_loop(struct device *dev, int socket)
 
 	send_fd(socket, dev->fd);
 	cv::namedWindow(window_name, cv::WINDOW_NORMAL);
-
 	image_count = 0;
-	*loop = 1;
+	set_restart_flag(0);
+	set_loop(1);
+
 	while (*loop)
+	{
+		// after *restart again. it seems new opencv window couldn't
+		// pick up commands from GUI
+		if (*restart)
+		{
+			int tmp_nbufs = dev->nbufs; /// save a tmp nbufs
+			set_restart_flag(0);		/// reset restart flag
+			stop_Camera(dev);			/// stream off
+			video_free_buffers(dev);	/// free buffer
+			cv::destroyWindow(window_name);
+
+			std::vector<std::string> elem =
+				split(resolutions[*res_index], 'x');
+			dev->width = stoi(elem[0]);
+			dev->height = stoi(elem[1]);
+			dev->nbufs = tmp_nbufs;
+			video_set_format(dev); /// update the resolution etc
+			check_dev_cap(dev->fd);
+			get_frame_rate(dev->fd); /// list the current frame rate
+			cur_frame_rates = get_frame_rates(dev);
+
+			video_alloc_buffers(dev);
+			start_camera(dev);
+			set_loop(1);
+		}
 		get_a_frame(dev);
-	
+	}
 	int v4l2_dev = dev->fd;
-	unmap_variables();	
+	unmap_variables();
 	stop_Camera(dev); 			/// stream off
 	video_free_buffers(dev); 	/// free buffer
 	close(v4l2_dev);			/// close device
@@ -781,7 +907,7 @@ void streaming_loop(struct device *dev, int socket)
  */
 void get_a_frame(struct device *dev)
 {
-	
+
 	for (size_t i = 0; i < dev->nbufs; i++)
 	{
 		/// time measured in OpenCV for fps
@@ -827,7 +953,7 @@ void soft_ae_enable(int enable)
  * 		const void *p 		- camera streaming buffer pointer
  */
 double calc_mean(
-	struct device *dev, 
+	struct device *dev,
 	const void *p)
 {
 	/// define ROI: 256x256 square pixels in the middle of image
@@ -877,7 +1003,7 @@ double calc_mean(
  * 		const void *p 		- camera streaming buffer pointer
  */
 void apply_soft_ae(
-	struct device *dev, 
+	struct device *dev,
 	const void *p)
 {
 	int local_gain = *cur_gain;
@@ -896,7 +1022,7 @@ void apply_soft_ae(
 	|| ((cur_gain_x_exp >= max_exp_time * max_gain) 
 	&& (image_mean < target_mean * 0.8)) 
 	|| ((cur_gain_x_exp <= max_exp_time * min_gain) 
-	&& (image_mean > target_mean * 1.2)))
+	&& (image_mean > target_mean * 1.2)))	
 	{
 		ae_done = TRUE;
 		return;
@@ -936,8 +1062,8 @@ void apply_soft_ae(
  * 		int shift 			- shift bits
  * */
 void perform_shift(
-	struct device *dev, 
-	const void *p, 
+	struct device *dev,
+	const void *p,
 	int shift)
 {
 
@@ -968,7 +1094,7 @@ void perform_shift(
 			*(dst++) = (unsigned char)tmp;
 		}
 	}
-	
+
 }
 
 /** 
@@ -1255,7 +1381,7 @@ void enable_rgb_matrix(
 	*bg = blue_green;
 	*bb = blue_blue;
 	*rgb_matrix_flg = 1;
-	
+
 	printf("-----------rgb matrix enabled-----------\r\n");
 	printf("rr = %-4d\trg = %-4d\trb = %-4d\r\n"
 		   "gr = %-4d\tgg = %-4d\tgb = %-4d\r\n"
@@ -1395,10 +1521,10 @@ static void group_gpu_image_proc(
 
 	if (*(gamma_val) != (float)1)
 		apply_gamma_correction(opencvImage,*gamma_val);
-	
+
 	if (*(alpha) != (float)1 || (*beta) != (float)0)
 		apply_brightness_and_contrast(opencvImage, *alpha, *beta);
-	
+
 	if (*abc_flag)
 		apply_auto_brightness_and_contrast(opencvImage, 1);
 
@@ -1407,8 +1533,8 @@ static void group_gpu_image_proc(
 
 	if (*clahe_flag)
 		apply_clahe(opencvImage);
-		
-	if (*show_edge_flag) 
+
+	if (*show_edge_flag)
 		canny_filter_control(opencvImage,*edge_low_thres);
 
 }
@@ -1425,7 +1551,7 @@ static void group_gpu_image_proc(
  * 
  */
 void decode_process_a_frame(
-	struct device *dev, 
+	struct device *dev,
 	const void *p,
 	double *cur_time)
 {
@@ -1441,7 +1567,7 @@ void decode_process_a_frame(
 		apply_soft_ae(dev, p);
 	if (*save_raw)
 		v4l2_core_save_data_to_file(p, dev->imagesize);
-	
+
 	/** --- for raw8, raw10, raw12 bayer camera ---*/
 	if (shift != 0)
 	{
@@ -1456,17 +1582,17 @@ void decode_process_a_frame(
 		 * tried with CV_16UC1 and then cast back, it doesn't really improve fps
 		 * I guess use openmp is already efficient enough 
 		 */
-		if (shift > 0) 
+		if (shift > 0)
 			perform_shift(dev, p, shift);
-			
+
 		/**
 		 *  --- for raw8 camera ---
 		 * each pixel is 8-bit instead of 16-bit now
 		 * need to adjust read width
 		 */
-		else 
+		else
 			width = width * 2;
-		
+
 		//swap_two_bytes(dev, p);
 		cv::Mat img(height, width, CV_8UC1, (void *)p);
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
@@ -1474,11 +1600,11 @@ void decode_process_a_frame(
 		debayer_awb_a_frame(gpu_img, *bayer_flag, *awb_flag);
 		gpu_img.download(img);
 #else
-		debayer_awb_a_frame(img, *bayer_flag, *awb_flag);	
+		debayer_awb_a_frame(img, *bayer_flag, *awb_flag);
 #endif
 
 		if (*rgb_matrix_flg)
-		{	
+		{
 			//Timer timer;
 			int ccm[3][3] = {
 				{*rr, *rg, *rb},
@@ -1488,19 +1614,19 @@ void decode_process_a_frame(
 			if (*rr==256 && *rg==0 && *rb==0 && \
 				*gr==0 && *gg==256 && *gb==0 && \
 				*br==0 && *bg==0 && *bb==256)
-					apply_rgb_matrix_post_debayer(img, 
-					(int *)ccm);
-			
+				apply_rgb_matrix_post_debayer(img,
+											  (int *)ccm);
+
 		}
 		share_img = img;
 	}
 
 	/** --- for yuv camera ---*/
 	else if (shift == 0)
-	{	
-		
+	{
+
 		if (dev->pixelformat == 0x47504a4d) {
-			
+
 			cv::Mat inputMat(height, width, CV_8UC3, (void *)p);
 			cv::Mat img;
 			img = cv::imdecode(inputMat, cv::IMREAD_COLOR);
@@ -1525,7 +1651,7 @@ void decode_process_a_frame(
 	gpu_img.download(share_img);
 #else
 	group_gpu_image_proc(share_img);
-#endif 
+#endif
 
 	if (*flip_flag)
 		cv::flip(share_img, share_img, 0);
@@ -1534,25 +1660,25 @@ void decode_process_a_frame(
 	if (*save_bmp)
 		save_frame_image_bmp(share_img);
 
-	if (*histogram_ena) 
+	if (*histogram_ena)
 		display_histogram(share_img);
-	else 
+	else
 		cv::destroyWindow("histogram");
 
-	if (*motion_detector_ena) 
+	if (*motion_detector_ena)
 		motion_detector(share_img);
 
-	if (*separate_dual) 
+	if (*separate_dual)
 		display_dual_stereo_separately(share_img);
-	else 
+	else
 	{
 		cv::destroyWindow("cam_left");
 		cv::destroyWindow("cam_right");
 	}
 	/** if image larger than 720p by any dimension, resize the window */
-	//if (*resize_window_ena) 
-		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
-			cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
+	//if (*resize_window_ena)
+	if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
+		cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
 	if (*display_info_ena)
 		display_current_mat_stream_info(share_img, cur_time);
 	if (share_img.rows > 0 && share_img.cols > 0)
@@ -1600,7 +1726,7 @@ void rgb_ir_correction_enable(int enable)
  * 		const void *p 		- camera streaming buffer pointer
  */
 void apply_color_correction_rgb_ir(
-	struct device *dev, 
+	struct device *dev,
 	const void *p)
 {
 	int pixel_max_val = BIT(*bpp) - 1;
@@ -1669,7 +1795,7 @@ void rgb_ir_ir_display_enable(int enable)
  * 		const void *p 		- camera streaming buffer pointer
  */
 void display_rgbir_ir_channel(
-	struct device *dev, 
+	struct device *dev,
 	const void *p)
 {
 	int pixel_max_val = BIT(*bpp) - 1;
@@ -1679,7 +1805,7 @@ void display_rgbir_ir_channel(
 	uint16_t ir_orig1, ir_orig2, ir_orig3, ir_orig4;
 	uint16_t *src_short = (uint16_t *)p;
 	uint16_t *dst = (uint16_t *)p;
-	for (int i=0; i < height; i+=4) {
+for (int i=0; i < height; i+=4) {
 		for (int j=0; j < width; j+=4) {
 			// IR1
 			ir_orig1 = src_short[BOTTOM_RIGHT(j,i,width)];
@@ -1724,7 +1850,7 @@ void display_rgbir_ir_channel(
 	sharpness_control(rgbir_ir, *sharpness);
 	cv::imshow("RGB-IR IR Channel", rgbir_ir);
 
-	
+
 }
 
 /**
@@ -1759,6 +1885,7 @@ int video_alloc_buffers(
 		printf("Unable to request buffers: %d.\n", errno);
 		return ret;
 	}
+	printf("********************Allocate Buffer for Capturing************\n");
 	printf("%u buffers requested.\n", bufrequest.count);
 
 	/** allocate buffer */
@@ -1788,11 +1915,11 @@ int video_alloc_buffers(
 		buffers[i].length = querybuffer.length; /** remember for munmap() */
 
 		buffers[i].start = mmap(
-			NULL, 
-			querybuffer.length, 
+			NULL,
+			querybuffer.length,
 			PROT_READ | PROT_WRITE,
-		 	MAP_SHARED, 
-			dev->fd, 
+			MAP_SHARED,
+			dev->fd,
 			querybuffer.m.offset);
 
 		if (buffers[i].start == MAP_FAILED)
@@ -1835,7 +1962,7 @@ int video_free_buffers(struct device *dev)
 {
 	struct v4l2_requestbuffers requestbuf;
 	int ret;
-
+	printf("******************Deallocate Buffer for Capturing************\n");
 	if (dev->nbufs == 0)
 		return 0;
 
@@ -1878,4 +2005,3 @@ void set_loop(int exit)
 {
 	*loop = exit;
 }
-

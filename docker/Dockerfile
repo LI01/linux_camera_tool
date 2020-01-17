@@ -19,15 +19,13 @@ RUN apt-get update && apt-get install -y \
         libopencv-dev \
         libudev-dev
 
-## install OpenCV
-RUN mkdir ~/opencv_build && cd ~/opencv_build
-RUN git clone https://github.com/opencv/opencv.git
-RUN git clone https://github.com/opencv/opencv_contrib.git
-RUN cd opencv
-
-## prepare build
-RUN mkdir build && cd build
-RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
+## install OpenCV, prepare build, install
+RUN mkdir ~/opencv_build && cd ~/opencv_build \
+&& git clone https://github.com/opencv/opencv.git \
+&& git clone https://github.com/opencv/opencv_contrib.git \
+&& cd opencv \
+&& mkdir build && cd build \
+&& cmake -D CMAKE_BUILD_TYPE=RELEASE \
         -D CMAKE_INSTALL_PREFIX=/usr/local \
         -D WITH_TBB=ON \
         -D BUILD_NEW_PYTHON_EXAMPLES=ON \
@@ -35,13 +33,11 @@ RUN cmake -D CMAKE_BUILD_TYPE=RELEASE \
         -D WITH_OPENGL=ON \
         -D WITH_GTK=ON \
         -D WITH_GTK3=ON \
-        -D WITH_GTK_2_X=OFF ..
+        -D WITH_GTK_2_X=OFF .. \
+&& make -j6 && make install -j6 \
+&& sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf' \
+&& ldconfig 
 
-## install
-RUN make -j6 && make install -j6
-RUN sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf'
-RUN ldconfig
-
-RUN git clone https://github.com/danyu9394/linux_camera_tool ~/linux_camera_tool
-
+RUN git clone https://github.com/danyu9394/linux_camera_tool ~/linux_camera_tool \
+&& git pull 
 #sudo docker exec -it frosty_keller bash

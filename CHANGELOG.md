@@ -2,6 +2,20 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.4.7 - 2020-01-17  
+**Added:**  
+- add resolution, frame rate ctrl in GUI
+- FIXME: after turning camera view off, stream process turn off and share memory no longer work except EXIT?
+
+## v0.4.6 - 2020-01-09  
+**Added:**  
+- add mjpeg support for ar1335 4k, use ```$./leopard_cam -s 4056x3120 -n 10 2> /dev/null```
+
+## v0.4.5 - 2019-10-02  
+**Added:**  
+- add socket for fd sharing between two processes. 
+- FIXME: OV580 read&write still didn't update results in GUI
+
 ## v0.4.4 - 2019-09-27  
 **Added:**  
 - add ov580 cbs api ctrls in the 3rd tab

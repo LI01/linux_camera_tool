@@ -1,35 +1,41 @@
 /*
- * Definitions for file descriptor passing.
- *
- * Sockets in the AF_LOCAL (formerly AF_UNIX) address family may be used
- * to pass file descriptors between processes on single system. It is
- * first necessary to create the sockets between which the file descritors
- * will be send, which may be done with socketpair(2):
- *
- * 	int fds[2];
- *
- * 	rc = socketpair(AF_LOCAL, SOCK_STREAM, 0, fds);
- * 	if (rc == -1)
- * 		// Handle error here
- *
- * Note that you can also use SOCK_DGRAM, though this hasn't been tested
- * with these functions.
- *
- * Sockets can also be created file socket files. These are created by
- * creating a socket with address family AF_LOCAL and then using bind(2)
- * to create an association between the socket and the Linux file namespace.
- * The address is specified by passing the path, in a struct sockaddr_un,
- * and the length of the path. Struct sockaddr_un is in the header file
- * sys/un.h.
- * (Untested).
- *
- * Once the socket has been created (or opened, if using socket type
- * files bound to a path on your filesystem, you can use the
- * sendfds() and recvfds() functions to send and receive file descriptors
- * on the socket file descriptor.
+  * This file is part of the Linux Camera Tool 
+ * Copyright (c) 2020 Leopard Imaging Inc.
  * 
- * ref:
- * http://poincare.matf.bg.ac.rs/~ivana/courses/ps/sistemi_knjige/pomocno/apue/APUE/0201433079/ch17lev1sec4.html
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * 
+ * ioctl transfer file descriptor is for controlling a STREAMS decice
+ * error: [Errno 25] Inappropriate ioctl for device --> I_SENDFD
+ * only solution is to use unix socket sendmsg, SCM_RIGHTS(send or 
+ * receive a set of open file descriptors from another process.), msg_control
+ * domain socket couldn't pass file descriptor, need some kernel operation
+ * it supports sendmsg, and stream
+ * 
+ * The kernel internals that support FD passing are actually quite simple 
+ * - POSIX already require that two processes be able to share the same 
+ * underlying reference to a file because of the semantics of the fork call. 
+ * Adding some ability to share arbitrary file descriptors between two processes 
+ * then is far more about how you ask the kernel than the actual file descriptor 
+ * sharing operating. In linux, file descriptors can be passed through local 
+ * network sockets. The sender constructs a mystic-looking sendmsg call, placing 
+ * the file descriptor in the control field of that operation. The kernel pulls 
+ * the file descriptor out of the control field, allocates a file descriptor in 
+ * the target process which references the same file object and then sticks the 
+ * file descriptor in a queue for the receiving process to fetch
+ * ref: http://poincare.matf.bg.ac.rs/~ivana/courses/ps/sistemi_knjige/pomocno/apue/APUE/0201433079/ch17lev1sec4.html
+ 
+ *  Author: Danyu L                                                           
+ *  Last edit: 2019/09     
  */
 #pragma once
 #include <sys/socket.h>
