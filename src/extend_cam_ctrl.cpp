@@ -91,6 +91,8 @@ static int *alpha, *beta, *sharpness;
 static int *edge_low_thres;
 static int *restart;
 static int *res_index = 0;
+static int *fps_index = 0;
+
 static int image_count;			  /// image count number add to capture name
 static constexpr const char* window_name = "Camera View"; 
 
@@ -116,7 +118,6 @@ extern void free_device_vars();
 **                           Function definition
 *****************************************************************************/
 
-
 void set_restart_flag(int flag)
 {
 	*restart = flag;
@@ -124,11 +125,15 @@ void set_restart_flag(int flag)
 
 void video_change_res(int resolution_index)
 {
-
 	*res_index = resolution_index;
 	set_restart_flag(1);
 }
 
+void video_change_fps(int frame_rate_index)
+{
+	*fps_index = frame_rate_index;	
+	set_restart_flag(1);
+}
 /*
  * flip the flag of one enable/disable switch
  * use *flag for these global shared memory flag
@@ -443,7 +448,7 @@ void *mmap_wrapper(int len)
 /** mmap the variables for processes share */
 void mmap_variables()
 {
-gamma_val 			= (float *)mmap_wrapper(sizeof(float));
+	gamma_val 			= (float *)mmap_wrapper(sizeof(float));
 	save_bmp 			 = (int *)mmap_wrapper(sizeof(int));
 	save_raw 			 = (int *)mmap_wrapper(sizeof(int));
 	bpp 				 = (int *)mmap_wrapper(sizeof(int));
@@ -489,6 +494,8 @@ gamma_val 			= (float *)mmap_wrapper(sizeof(float));
 	rgb_ir_ir 			 = (int *)mmap_wrapper(sizeof(int));
 	restart 			 = (int *)mmap_wrapper(sizeof(int));
 	res_index 			 = (int *)mmap_wrapper(sizeof(int));
+	fps_index 			 = (int *)mmap_wrapper(sizeof(int));
+	
 	//cur_frame_rate 		 = (int *)mmap_wrapper(sizeof(int));
 }
 /** 
@@ -592,6 +599,7 @@ void unmap_variables()
 	unmap_wrapper(rgb_ir_ir);
 	unmap_wrapper(restart);
 	unmap_wrapper(res_index);
+	unmap_wrapper(fps_index);
 	//unmap_wrapper(cur_frame_rate);
 	free_device_vars();
 }
@@ -612,9 +620,6 @@ void start_camera(struct device *dev)
 		printf("Couldn't start camera streaming\n");
 		return;
 	}
-	mmap_variables();
-	initialize_shared_memory_var();
-	return;
 }
 
 /**
@@ -662,6 +667,15 @@ void video_set_format(
 	fmt.fmt.pix.pixelformat = pixelformat;
 	dev->pixelformat = pixelformat;
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	
+	/* Buggy driver paranoia. */
+	unsigned int min;
+  	min = fmt.fmt.pix.width * 2;
+  	if (fmt.fmt.pix.bytesperline < min)
+    	fmt.fmt.pix.bytesperline = min;
+  	min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
+  	if (fmt.fmt.pix.sizeimage < min)
+    	fmt.fmt.pix.sizeimage = min;
 
 	ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt);
 	if (ret < 0)
@@ -700,6 +714,15 @@ void video_set_format(
 	//fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
+	/* Buggy driver paranoia. */
+	unsigned int min;
+  	min = fmt.fmt.pix.width * 2;
+  	if (fmt.fmt.pix.bytesperline < min)
+    	fmt.fmt.pix.bytesperline = min;
+  	min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
+  	if (fmt.fmt.pix.sizeimage < min)
+    	fmt.fmt.pix.sizeimage = min;
+
 	ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt);
 	if (ret < 0)
 	{
@@ -737,6 +760,7 @@ void video_get_format(struct device *dev)
 
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
+
 	ret = ioctl(dev->fd, VIDIOC_G_FMT, &fmt);
 	if (ret < 0)
 	{
@@ -744,11 +768,21 @@ void video_get_format(struct device *dev)
 			   errno);
 		return;
 	}
+	/* Buggy driver paranoia. */
+	unsigned int min;
+  	min = fmt.fmt.pix.width * 2;
+  	if (fmt.fmt.pix.bytesperline < min)
+    	fmt.fmt.pix.bytesperline = min;
+  	min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
+  	if (fmt.fmt.pix.sizeimage < min)
+    	fmt.fmt.pix.sizeimage = min;
+
 	dev->width = fmt.fmt.pix.width;
 	dev->height = fmt.fmt.pix.height;
 	dev->bytesperline = fmt.fmt.pix.bytesperline;
 	dev->imagesize = fmt.fmt.pix.bytesperline ? fmt.fmt.pix.sizeimage : 0;
 	dev->pixelformat = fmt.fmt.pix.pixelformat;
+	
 	printf("\nGet Current Video Format:%c%c%c%c (%08x)%ux%u\n"
 		   "byte per line:%d\nsize image:%u\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
@@ -836,6 +870,16 @@ get_frame_rates(struct device *dev)
 	}
 	return frame_rates;
 }
+void do_update_resolution(struct device *dev, int resolution_index)
+{
+	std::cout << "New Resolution: " << resolutions[*res_index] << std::endl;
+	std::vector<std::string> elem =
+		split(resolutions[resolution_index], 'x');
+	dev->width = stoi(elem[0]);
+	dev->height = stoi(elem[1]);
+	video_set_format(dev); 		/// update the resolution etc
+}
+
 
 /** 
  * To get frames in few steps
@@ -851,7 +895,6 @@ get_frame_rates(struct device *dev)
  * args: 
  * 		struct device *dev - every infomation for camera
 */
-//void streaming_loop(struct device *dev)
 void streaming_loop(struct device *dev, int socket)
 {
 
@@ -860,32 +903,39 @@ void streaming_loop(struct device *dev, int socket)
 	image_count = 0;
 	set_restart_flag(0);
 	set_loop(1);
-
+	initialize_shared_memory_var();
 	while (*loop)
 	{
-		// after *restart again. it seems new opencv window couldn't
-		// pick up commands from GUI
 		if (*restart)
 		{
+			static int last_res, last_fps;
+			/* stop streaming */
 			int tmp_nbufs = dev->nbufs; /// save a tmp nbufs
 			set_restart_flag(0);		/// reset restart flag
 			stop_Camera(dev);			/// stream off
 			video_free_buffers(dev);	/// free buffer
-			cv::destroyWindow(window_name);
 
-			std::vector<std::string> elem =
-				split(resolutions[*res_index], 'x');
-			dev->width = stoi(elem[0]);
-			dev->height = stoi(elem[1]);
+			//cv::destroyWindow(window_name); // so the window don't resize
+
+			/* prepare streaming */
 			dev->nbufs = tmp_nbufs;
-			video_set_format(dev); /// update the resolution etc
+			if (last_res != *res_index) {
+				do_update_resolution(dev, *res_index);		
+			}
+			if (last_fps != *fps_index) {
+				set_frame_rate(dev->fd, cur_frame_rates[*fps_index]);
+			}
+		 	cur_frame_rates = get_frame_rates(dev);
 			check_dev_cap(dev->fd);
-			get_frame_rate(dev->fd); /// list the current frame rate
-			cur_frame_rates = get_frame_rates(dev);
+			get_frame_rate(dev->fd); 	/// list the current frame rate
 
+			/* activate streaming */
 			video_alloc_buffers(dev);
 			start_camera(dev);
 			set_loop(1);
+
+			last_fps = *fps_index;
+			last_res = *res_index;
 		}
 		get_a_frame(dev);
 	}
@@ -1915,10 +1965,10 @@ int video_alloc_buffers(
 		buffers[i].length = querybuffer.length; /** remember for munmap() */
 
 		buffers[i].start = mmap(
-			NULL,
+			NULL, /* start anywhere */
 			querybuffer.length,
-			PROT_READ | PROT_WRITE,
-			MAP_SHARED,
+			PROT_READ | PROT_WRITE, /* required */
+			MAP_SHARED, /* recommended */
 			dev->fd,
 			querybuffer.m.offset);
 

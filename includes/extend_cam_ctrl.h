@@ -79,8 +79,11 @@ typedef enum
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
+void do_update_resolution(struct device *dev, int resolution_index);
+
 void set_restart_flag(int flag);
 void video_change_res(int resolution_index);
+void video_change_fps(int frame_rate_index);
 
 void resize_window_enable(int enable);
 

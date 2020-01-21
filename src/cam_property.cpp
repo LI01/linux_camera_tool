@@ -294,6 +294,7 @@ int get_frame_rate(int fd)
     //    param.parm.capture.timeperframe.numerator);
     return param.parm.capture.timeperframe.denominator;
 }
+
 /**------------------------------------------------------------------------ */
 /** Get current resolution height
  *  args:
@@ -352,6 +353,12 @@ int check_dev_cap(int fd)
 	if (!(cap.capabilities & V4L2_CAP_READWRITE))
 	{
 		printf("Does not support read, try with mmap\n");
+		return -1;
+	}
+
+    if (!(cap.capabilities &V4L2_CAP_ASYNCIO))
+	{
+		printf("Does not support async I/O, try with mmap\n");
 		return -1;
 	}
 	return 0;

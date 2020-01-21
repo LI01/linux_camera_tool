@@ -198,19 +198,21 @@ int main(int argc, char **argv)
 		/** try to get all the static camera info before fork */
 		if (!is_ov580_stereo())
 			read_cam_uuid_hwfw_rev(dev.fd);
+
 		check_dev_cap(dev.fd);
 		video_get_format(&dev);   /** list the current resolution etc */
 		resolutions = get_resolutions(&dev);
 		get_frame_rate(dev.fd); /** list the current frame rate */
 		cur_frame_rates = get_frame_rates(&dev);
+		
 		individual_sensor_test(dev.fd);
 
 		video_alloc_buffers(&dev);
-		
+
 		printf("********************Control Logs*****************************\n");
 		/** Activate streaming */
 		start_camera(&dev); 	// need to be put before fork for shared memory
-
+		mmap_variables();		// before fork for shared memory
 		int socket_pair[2];
       	if (socketpair(AF_LOCAL, SOCK_STREAM, 0, socket_pair) < 0) {
 	    	std::cout << "socketpair failed" << std::endl;

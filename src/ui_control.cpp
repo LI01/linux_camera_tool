@@ -113,7 +113,7 @@ extern std::vector<int> cur_frame_rates;
 *****************************************************************************/
 void update_resolution(GtkWidget *widget)
 {
-    g_print("Update Resolution\n");
+    g_print("*********************Update Resolution***********************\n");
     char cur_fps[10];
     
     int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
@@ -138,7 +138,7 @@ void update_resolution(GtkWidget *widget)
     gtk_combo_box_set_active(GTK_COMBO_BOX(combo_box_frame_rate),0);
     int cur_fps_size = cur_frame_rates.size();
     for(int i=0; i<cur_fps_size; i++) {
-        if (cur_frame_rate != cur_frame_rates[i]) {
+        if (cur_frame_rate != cur_frame_rates[i] && cur_fps_size != 1) {
             char buf[10];
             snprintf(buf, sizeof(buf), "%d fps", cur_frame_rates[i]);
             gtk_combo_box_text_append_text(
@@ -150,23 +150,17 @@ void update_resolution(GtkWidget *widget)
 }
 void update_frame_rate(GtkWidget *widget)
 {
-    g_print("Update Frame Rate\n");
-    
-    int cur_fps_size = cur_frame_rates.size();
-    int cur_frame_rate = get_frame_rate(v4l2_dev);
-    for(int i=0; i<cur_fps_size; i++) {
-        if (cur_frame_rate != cur_frame_rates[i]) {
-            char buf[10];
-            snprintf(buf, sizeof(buf), "%d fps", cur_frame_rates[i]);
-            gtk_combo_box_text_append_text(
-                GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
-                buf);     
-        }
-    }
+    g_print("********************Update Frame Rate************************\n");
+    /*disable fps combobox signals*/
+	// g_signal_handlers_block_by_func(
+    //     GTK_COMBO_BOX(combo_box_resolution), 
+    //     (gpointer)(update_resolution), NULL);
+
     int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
-    set_restart_flag(1);
-    set_frame_rate(v4l2_dev, cur_frame_rates[cmd_index]);
+    video_change_fps(cmd_index);
+
 }
+
 /** a menu_item formater to save some typing */
 void menu_item_formater(
     GtkWidget *item,

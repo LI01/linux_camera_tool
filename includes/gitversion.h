@@ -1,1 +1,1 @@
-const char *gitversion = "v0.4.7 - 2020-01-17";
+const char *gitversion = "v0.4.8 - 2020-01-21";

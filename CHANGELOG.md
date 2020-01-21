@@ -2,10 +2,13 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.4.8 - 2020-01-21  
+**Fixed:**  
+- fix the bug of change resolution loss GUI control -> mmap share memory before fork
+
 ## v0.4.7 - 2020-01-17  
 **Added:**  
 - add resolution, frame rate ctrl in GUI
-- FIXME: after turning camera view off, stream process turn off and share memory no longer work except EXIT?
 
 ## v0.4.6 - 2020-01-09  
 **Added:**  
@@ -112,7 +115,6 @@ All notable changes to Linux Camera Tool will be documented in this file.
 **Added:**
 - add error check for parsing  hex/dec input
 - add firmware update from shell script
-- TODO: need to integrate into GUI
 ## v0.2.3 - 2019-06-26
 **Added:**  
 - add batch cmd parser
@@ -120,7 +122,6 @@ All notable changes to Linux Camera Tool will be documented in this file.
 **Added:**  
 - add AR0231 DUAL CAM DEMO code
 - add byte swap debug function
-- TODO: ui click need to further debug
 ## v0.2.1 - 2019-06-13
 **Added:**  
 - add firmware erase
@@ -151,7 +152,6 @@ All notable changes to Linux Camera Tool will be documented in this file.
 ## v0.1.5 - 2019-05-01  
 **Added:**
 - integrate register write into json
-- TODO: capture images in while loop or before?
 ## v0.1.4 - 2019-04-30
 **Changed:**  
 - put header files into includes
@@ -165,7 +165,7 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - clean up the code
 ## v0.1.2 - 2019-04-17
 **Changed:**  
-- correct udev for laptop with webcam, TODO: batch.txt etc
+- correct udev for laptop with webcam
 - add doc
 ## v0.1.1 - 2019-04-12
 **Changed:**  
@@ -206,7 +206,7 @@ All notable changes to Linux Camera Tool will be documented in this file.
 - add readme and .gigignore etc
 - add awb in ui control
 - add white balance
-- TODO: edit UI
+
 ## v0.0.3 - 2019-04-05  
 **Changed:**
 - remove unused libraries
