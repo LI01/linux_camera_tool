@@ -18,7 +18,7 @@
  *  system call to obtain camera information on: exposure, gain, pan, tilt,   
  *  zoom etc. Most bayer camera won't support PTZ control, some may have       
  *  the ability of enable auto exposure some may not. Please check with       
- *  Leopard for detailed driver support.                                                           *
+ *  Leopard for detailed driver support.                                                           
  *                                                                            
  *  Author: Danyu L                                                           
  *  Last edit: 2019/08                                                        
@@ -131,7 +131,7 @@ void uvc_set_control(int fd, unsigned int id, int value)
     if (ioctl(fd, VIDIOC_S_CTRL, &ctrl) < 0)
         error_handle_cam_ctrl();
 
-    printf("Control 0x%08x set to %u, is %u\n", id, value,
+    printf("Control 0x%08x set to %d, is %d\n", id, value,
            ctrl.value);
 }
 /**
@@ -209,7 +209,7 @@ int query_exposure_absolute_max(int fd)
     return (int)uvc_query_ctrl_max(fd, V4L2_CID_EXPOSURE_ABSOLUTE);
 }
 
-// from below, it might not support by every camera
+/*--------- From below, it might not support by every camera -------------*/
 
 /**  
  *  Enables automatic adjustments of the exposure time and/or iris aperture. 
@@ -364,7 +364,10 @@ int check_dev_cap(int fd)
 	return 0;
 }
 
-void usage( const char *argv0)
+/**
+ * print out usage argument
+ */
+void usage(const char *argv0)
 {
 	printf("Usage: %s [options]\n", argv0);
 	printf("Supported options:\n");

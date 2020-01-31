@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 					dev.nbufs = atoi(optarg);
 					if (dev.nbufs > V4L_BUFFERS_MAX)
 						dev.nbufs = V4L_BUFFERS_MAX;
-					printf("device nbuf %d\n", dev.nbufs);
+					printf("device nbuf %u\n", dev.nbufs);
 					break;
 				}
 				case 's':
@@ -201,8 +201,7 @@ int main(int argc, char **argv)
 
 		check_dev_cap(dev.fd);
 		video_get_format(&dev);   /** list the current resolution etc */
-		resolutions = get_resolutions(&dev);
-		get_frame_rate(dev.fd); /** list the current frame rate */
+		resolutions = get_resolutions(dev.fd);
 		cur_frame_rates = get_frame_rates(&dev);
 		
 		individual_sensor_test(dev.fd);

@@ -18,7 +18,7 @@
  *  system call to obtain camera information on: exposure, gain, pan, tilt,   
  *  zoom etc. Most bayer camera won't support PTZ control, some may have       
  *  the ability of enable auto exposure some may not. Please check with       
- *  Leopard for detailed driver support.                                                           *
+ *  Leopard for detailed driver support.                                                         
  *                                                                            
  *  Author: Danyu L                                                           
  *  Last edit: 2019/08                                                        

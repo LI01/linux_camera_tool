@@ -35,9 +35,7 @@
 #include "../includes/gitversion.h"
 #include "../includes/fd_socket.h"
 #include "../includes/batch_cmd_parser.h"
-#include <iostream>
-#include <string>
-#include <vector>
+
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -100,67 +98,20 @@ static GtkWidget *separator_tab3_1;
 static GtkWidget *check_button_rgb_ir_color, *check_button_rgb_ir_ir;
 static GtkWidget *label_resolution, *combo_box_resolution;
 static GtkWidget *label_frame_rate, *combo_box_frame_rate;
-
+static GtkWidget *label_cap_video, *toggle_button_cap_video;
 static int ov580_dev_flag;
 static int address_width_flag;
 static int value_width_flag;
 
-int v4l2_dev; /** global variable, file descriptor for camera device */
+int v4l2_dev;        /** global variable, file descriptor for camera device */
+
 extern std::vector<std::string> resolutions;
 extern std::vector<int> cur_frame_rates;
+
 /*****************************************************************************
-**                      	Helper functions
+**                      	Internal Callbacks
 *****************************************************************************/
-void update_resolution(GtkWidget *widget)
-{
-    g_print("*********************Update Resolution***********************\n");
-    char cur_fps[10];
-    
-    int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
-    video_change_res(cmd_index);
-
-    sleep(1);
-    int cur_frame_rate = get_frame_rate(v4l2_dev);
-    snprintf(cur_fps, sizeof(cur_fps), "%d fps", cur_frame_rate);
-   
-    /*disable fps combobox signals*/
-	g_signal_handlers_block_by_func(
-        GTK_COMBO_BOX(combo_box_frame_rate), 
-        (gpointer)(update_frame_rate), NULL);
-	/* clear out the old fps list... */
-	GtkListStore *store = GTK_LIST_STORE(
-        gtk_combo_box_get_model (GTK_COMBO_BOX(combo_box_frame_rate)));
-	gtk_list_store_clear(store);
-
-    gtk_combo_box_text_append_text(
-        GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
-        cur_fps);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(combo_box_frame_rate),0);
-    int cur_fps_size = cur_frame_rates.size();
-    for(int i=0; i<cur_fps_size; i++) {
-        if (cur_frame_rate != cur_frame_rates[i] && cur_fps_size != 1) {
-            char buf[10];
-            snprintf(buf, sizeof(buf), "%d fps", cur_frame_rates[i]);
-            gtk_combo_box_text_append_text(
-                GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
-                buf);     
-        }
-    }
-  
-}
-void update_frame_rate(GtkWidget *widget)
-{
-    g_print("********************Update Frame Rate************************\n");
-    /*disable fps combobox signals*/
-	// g_signal_handlers_block_by_func(
-    //     GTK_COMBO_BOX(combo_box_resolution), 
-    //     (gpointer)(update_resolution), NULL);
-
-    int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
-    video_change_fps(cmd_index);
-
-}
-
+/**-------------------------menu bar callbacks------------------------------*/
 /** a menu_item formater to save some typing */
 void menu_item_formater(
     GtkWidget *item,
@@ -171,11 +122,6 @@ void menu_item_formater(
     g_signal_connect(item, "activate", handler, window);
 }
 
-
-/*****************************************************************************
-**                      	Internal Callbacks
-*****************************************************************************/
-/**-------------------------menu bar callbacks------------------------------*/
 /** callback for find and load config files */
 void open_config_dialog(GtkWidget *widget, gpointer window)
 {
@@ -208,6 +154,7 @@ void open_config_dialog(GtkWidget *widget, gpointer window)
     gtk_widget_destroy(file_dialog);
     
 }
+
 /** callback for fw update info */
 void fw_update_clicked (GtkWidget *item)
 {
@@ -227,6 +174,7 @@ void fw_update_clicked (GtkWidget *item)
     }
 
 }
+
 /** callback for display linux camera tool info */
 void about_info()
 {
@@ -237,7 +185,7 @@ void about_info()
         "Linux Camera Tool");
     gtk_about_dialog_set_version(GTK_ABOUT_DIALOG(dialog_about), gitversion);
     gtk_about_dialog_set_copyright(GTK_ABOUT_DIALOG(dialog_about),
-    "Copyright \xc2\xa9 Leopard Imaging Inc, 2019");
+    "Copyright \xc2\xa9 Leopard Imaging Inc, 2020");
     gtk_about_dialog_set_license_type(GTK_ABOUT_DIALOG(dialog_about),
         GTK_LICENSE_GPL_3_0);
     gtk_about_dialog_set_website(GTK_ABOUT_DIALOG(dialog_about), 
@@ -245,6 +193,7 @@ void about_info()
     gtk_window_set_transient_for(GTK_WINDOW(dialog_about), GTK_WINDOW(window));
     gtk_widget_show_all(dialog_about);
 }
+
 /** callback for exit when click EXIT in help */
 void exit_from_help(GtkWidget *widget)
 {
@@ -260,7 +209,6 @@ void radio_datatype(GtkWidget *widget, gpointer data)
     /// disable a bunch of function if it is YUV,MJPEG camera
     if (strcmp((char *)data, "3") == 0 || strcmp((char *)data, "5") == 0)
     {
-        //printf("datatype = %c\r\n", (char *)data);
         gtk_widget_set_sensitive(radio_rg,0);
         gtk_widget_set_sensitive(radio_gr,0);
         gtk_widget_set_sensitive(radio_gb,0);
@@ -463,7 +411,7 @@ void gamma_correction()
 {
     float gamma = atof((char *)gtk_entry_get_text(
         GTK_ENTRY(entry_gamma)));
-    if (isgreater(gamma, 0.0)) 
+    if (std::isgreater(gamma, 0.0)) 
     {
         add_gamma_val(gamma);
         g_print("gamma = %f\n", gamma);
@@ -731,7 +679,7 @@ void ov580_register_read()
             'x', 
             0xffff, 
             0x0);
-        printf("reg addr = 0x%x\r\n", regAddr);
+        g_print("reg addr = 0x%x\r\n", regAddr);
         unsigned char regVal = ov580_read_system_reg(v4l2_dev, regAddr);
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
@@ -750,16 +698,100 @@ void ov580_register_read()
             0xffff, 
             0x0);
         unsigned char regVal;
-        printf("reg addr = 0x%x\r\n", regAddr);
+        g_print("reg addr = 0x%x\r\n", regAddr);
         if ((ov580_dev_flag) == _SCCB0_FLG)
             regVal = ov580_read_sccb0_reg(v4l2_dev, slaveAddr, regAddr);
         else 
             regVal = ov580_read_sccb1_reg(v4l2_dev, slaveAddr, regAddr);
-        //g_print("read register 0x%x = 0x%x\r\n", regAddr, regVal);
+ 
         char buf[10];
         snprintf(buf, sizeof(buf), "0x%x", regVal);
         gtk_entry_set_text(GTK_ENTRY(entry_ov580_reg_val), buf);
     }
+}
+
+/**
+ * callback for start and stop capturing video from GUI
+ */
+void video_capture_toggle_button(GtkWidget *widget)
+{
+    int active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+
+    if (active > 0)
+        active = -1;
+    else    
+        active = 1;
+    
+    if (active > 0)
+    {
+        gtk_button_set_label(GTK_BUTTON(widget), "Stop Video");
+        set_video_cap_flag(0);
+        //gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), TRUE);
+    }
+    else 
+    {
+        gtk_button_set_label(GTK_BUTTON(widget), "Start Video");
+        set_video_cap_flag(1);
+        //gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+    }
+}
+
+/**
+ * callback for changing resolution on GUI, frame rate will update as well
+ * need to disable event of frame rate change 
+ */
+void update_resolution(GtkWidget *widget)
+{
+    g_print("*********************Update Resolution***********************\n");
+    char cur_fps[10];
+    
+    int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    video_change_res(cmd_index);
+
+    sleep(1);
+    int cur_frame_rate = get_frame_rate(v4l2_dev);
+    snprintf(cur_fps, sizeof(cur_fps), "%d fps", cur_frame_rate);
+   
+    /*disable fps combobox signals*/
+	g_signal_handlers_block_by_func(
+        GTK_COMBO_BOX(combo_box_frame_rate), 
+        (gpointer)(update_frame_rate), NULL);
+	/* clear out the old fps list... */
+	GtkListStore *store = GTK_LIST_STORE(
+        gtk_combo_box_get_model (GTK_COMBO_BOX(combo_box_frame_rate)));
+	gtk_list_store_clear(store);
+
+    gtk_combo_box_text_append_text(
+        GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
+        cur_fps);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(combo_box_frame_rate),0);
+    int cur_fps_size = cur_frame_rates.size();
+    for(int i=0; i<cur_fps_size; i++) {
+        if (cur_frame_rate != cur_frame_rates[i] && cur_fps_size != 1) {
+            char buf[10];
+            snprintf(buf, sizeof(buf), "%d fps", cur_frame_rates[i]);
+            gtk_combo_box_text_append_text(
+                GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
+                buf);     
+        }
+    }
+  
+}
+
+/**
+ * update frame rate from GUI
+ */
+void update_frame_rate(GtkWidget *widget)
+{
+    g_print("********************Update Frame Rate************************\n");
+    /*disable fps combobox signals*/
+	// g_signal_handlers_block_by_func(
+    //     GTK_COMBO_BOX(combo_box_resolution), 
+    //     (gpointer)(update_resolution), NULL);
+
+    int cmd_index =(int)gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
+    video_change_fps(cmd_index);
+
 }
 
 /**-------------------------micellanous callbacks---------------------------*/
@@ -820,8 +852,6 @@ void init_grid1_widgets()
     if (exposure_max == UNDEFINED_MAX_EXPOSURE_LINE)
         exposure_max = get_current_height(v4l2_dev) * 3;
 
-
-
     label_datatype   = gtk_label_new(NULL);
     label_bayer      = gtk_label_new(NULL);
     label_exposure   = gtk_label_new(NULL);
@@ -870,7 +900,7 @@ void init_grid1_widgets()
     radio_raw12 = gtk_radio_button_new_with_group(radio_raw10);
     radio_yuyv  = gtk_radio_button_new_with_group(radio_raw10);
     radio_raw8  = gtk_radio_button_new_with_group(radio_raw10);
-    radio_mjpeg  = gtk_radio_button_new_with_group(radio_raw10);
+    radio_mjpeg = gtk_radio_button_new_with_group(radio_raw10);
 
     radio_bg    = gtk_radio_button_new(NULL);
     radio_gb    = gtk_radio_button_new_with_group(radio_bg);
@@ -884,11 +914,8 @@ void init_grid1_widgets()
     radio_8bit_val     = gtk_radio_button_new(NULL);
     radio_16bit_val    = gtk_radio_button_new_with_group(radio_8bit_val);
 
-
-   
     separator_tab1_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     separator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-
 
     if (gain_max == 13)
         gtk_widget_set_sensitive(hscale_gain, 0);
@@ -955,10 +982,10 @@ void init_grid2_widgets()
  
     hscale_alpha                = gtk_hscale_new(1, ALPHA_MAX);
     hscale_beta                 = gtk_hscale_new(-BETA_MAX, BETA_MAX);
-    // gtk_range_set_value(GTK_RANGE(hscale_beta), 0);
+ 
     hscale_sharpness            = gtk_hscale_new(1, SHARPNESS_MAX);
     hscale_edge_low_thres       = gtk_hscale_new(0, LOW_THRESHOLD_MAX);
-    // gtk_widget_set_sensitive(hscale_edge_low_thres,0);                                         
+                                         
 }
 /** 
  * init and declare all the grid3 widgets here
@@ -972,31 +999,29 @@ void init_grid3_widgets()
     label_ov580_reg_val  = gtk_label_new(NULL);
     label_resolution     = gtk_label_new(NULL);
     label_frame_rate     = gtk_label_new(NULL);
+    label_cap_video      = gtk_label_new(NULL);
 
     hbox_ov580_device    = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     radio_ov580          = gtk_radio_button_new(NULL);
     radio_sccb0          = gtk_radio_button_new_with_group(radio_ov580);
     radio_sccb1          = gtk_radio_button_new_with_group(radio_ov580);
 
-    button_ov580_read             = gtk_button_new();
-    button_ov580_write            = gtk_button_new();
+    button_ov580_read    = gtk_button_new();
+    button_ov580_write   = gtk_button_new();
 
     entry_ov580_i2c_addr = gtk_entry_new();
     entry_ov580_reg_addr = gtk_entry_new();
     entry_ov580_reg_val  = gtk_entry_new();
+   
+    separator_tab3_1          = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
 
-    separator_tab3_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    check_button_rgb_ir_color = gtk_check_button_new();
+    check_button_rgb_ir_ir    = gtk_check_button_new();
 
-    check_button_rgb_ir_color   = gtk_check_button_new();
-    check_button_rgb_ir_ir      = gtk_check_button_new();
-    
-    combo_box_resolution = gtk_combo_box_text_new();
-    combo_box_frame_rate = gtk_combo_box_text_new();
-    gtk_widget_set_halign (combo_box_resolution, GTK_ALIGN_FILL);
-	gtk_widget_set_hexpand (combo_box_resolution, TRUE);
-    gtk_widget_set_halign (combo_box_frame_rate, GTK_ALIGN_FILL);
-	gtk_widget_set_hexpand (combo_box_frame_rate, TRUE);
-    gtk_widget_set_sensitive(entry_ov580_i2c_addr, 0); 
+    combo_box_resolution      = gtk_combo_box_text_new();
+    combo_box_frame_rate      = gtk_combo_box_text_new();
+
+    toggle_button_cap_video   = gtk_toggle_button_new();
 }
 
 /** def_element hold all gtk type widgets initialization setup */
@@ -1013,13 +1038,16 @@ void iterate_def_elements (
                     GTK_LABEL(def->widget), 
                     def->label_str);
                 break;
+            
             case GTK_WIDGET_TYPE_BUTTON:
                 gtk_button_set_label(
                     GTK_BUTTON(def->widget), 
                     def->label_str);
                 break;
-            case GTK_WIDGET_TYPE_VBOX:
+            
+            case GTK_WIDGET_TYPE_HBOX:
                 break;
+            
             case GTK_WIDGET_TYPE_RADIO_BUTTON:  
                 gtk_box_pack_start(
                     GTK_BOX(def->parent), 
@@ -1028,11 +1056,13 @@ void iterate_def_elements (
                     GTK_BUTTON(def->widget), 
                     def->label_str);
                 break;
+            
             case GTK_WIDGET_TYPE_CHECK_BUTTON:
                 gtk_button_set_label(
                     GTK_BUTTON(def->widget), 
                     def->label_str);
                 break;
+            
             case GTK_WIDGET_TYPE_ENTRY:
                 gtk_entry_set_text(
                     GTK_ENTRY(def->widget), 
@@ -1040,15 +1070,23 @@ void iterate_def_elements (
                 gtk_entry_set_width_chars(
                     GTK_ENTRY(def->widget), -1);
                 break;
+            
             case GTK_WIDGET_TYPE_HSCALE:
                 gtk_widget_set_hexpand(def->widget, TRUE);
                 break;
+
             case GTK_WIDGET_TYPE_COMBO_BOX:
                 gtk_combo_box_text_append_text(
                     GTK_COMBO_BOX_TEXT(def->widget), 
                     def->label_str);
                 gtk_combo_box_set_active(
                     GTK_COMBO_BOX(def->widget),0);
+                gtk_widget_set_halign(
+                    def->widget, 
+                    GTK_ALIGN_FILL);
+	            gtk_widget_set_hexpand(
+                    def->widget, 
+                    TRUE);
                 break;
             default:
                 break;
@@ -1060,7 +1098,6 @@ void iterate_def_elements (
 /** iterate over definition element for grid1 widgets setup */
 void init_grid1_def_elements ()
 {
- 
     static def_element definitions[] = {
         {.widget = label_exposure,    
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
@@ -1252,8 +1289,6 @@ void init_grid1_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
          .parent = hbox_val_width, 
          .label_str = "16-bit"},
-        
-
     };
     iterate_def_elements(definitions, SIZE(definitions));
 }
@@ -1440,10 +1475,11 @@ void init_grid2_def_elements ()
 /** iterate over definition element for grid1 widgets setup */
 void init_grid3_def_elements ()
 {
+    /// append the current frame rate
     int cur_frame_rate = get_frame_rate(v4l2_dev);
     char fps_buf[10];
     snprintf(fps_buf, sizeof(fps_buf), "%d fps", cur_frame_rate);
-
+    
     static def_element definitions[] = {
         {.widget = label_ov580_device,
          .wid_type = GTK_WIDGET_TYPE_LABEL,
@@ -1483,6 +1519,10 @@ void init_grid3_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_BUTTON, 
          .parent = NULL, 
          .label_str = "Read"}, 
+        {.widget = toggle_button_cap_video,          
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Start Video"}, 
 
         {.widget = entry_ov580_i2c_addr,    
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
@@ -1524,6 +1564,10 @@ void init_grid3_def_elements ()
          .parent = NULL, 
          .label_str = fps_buf},   
 
+        {.widget = label_cap_video,        
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Video Capture:"},   
     };
 
     iterate_def_elements(definitions, SIZE(definitions));
@@ -1535,9 +1579,21 @@ void init_grid3_def_elements ()
             GTK_COMBO_BOX_TEXT(combo_box_resolution), 
             resolutions[i].c_str());        
     }
+
+    /// set the current resolution as active
+    for (int res_index=0; res_index<resolution_counts; res_index++) {
+        std::vector<std::string> elem = 
+			split(resolutions[res_index], 'x');
+		int height = stoi(elem[1]);
+        if (get_current_height(v4l2_dev) == height) {
+            gtk_combo_box_set_active(
+                GTK_COMBO_BOX(combo_box_resolution),
+                res_index);
+        }
+    }
+
     /// append the remaining frame rates
     int cur_fps_size = cur_frame_rates.size();
-    //printf("cur_fps_size = %d\r\n",cur_fps_size);
     for(int i=0; i<cur_fps_size; i++) {
         if (cur_frame_rate != cur_frame_rates[i]) {
             char buf[10];
@@ -1546,24 +1602,9 @@ void init_grid3_def_elements ()
                 GTK_COMBO_BOX_TEXT(combo_box_frame_rate), 
                 buf);     
         }
+        else // cur_frame_rate == cur_frame_rates[i]
+            update_fps_index(i);
     }
-
-    /// set the current resolution as active
-    int res_index;
-    for (res_index=0; res_index< resolution_counts; res_index++) {
-        std::vector<std::string> elem = 
-			split(resolutions[res_index], 'x');
-
-		int height = stoi(elem[1]);
-        if (get_current_height(v4l2_dev) == height) {
-            //printf("res index = %d\r\n", res_index);
-            gtk_combo_box_set_active(
-                GTK_COMBO_BOX(combo_box_resolution),
-                res_index);
-        }
-    }
-
-    
 }
     
 
@@ -1723,6 +1764,10 @@ void list_all_grid3_elements(GtkWidget *grid)
 
         {.widget = label_frame_rate,         .col =++col,.row =row,  .width =1},
         {.widget = combo_box_frame_rate,     .col =++col,.row =row,  .width =1},
+
+        {.widget = label_cap_video,          .col =col=0,.row =++row,.width =1},
+        {.widget = toggle_button_cap_video,  .col =++col,.row =row,  .width =1},
+
     };
     iterate_grid_elements(grid, elements, SIZE(elements));
 }
@@ -1968,6 +2013,10 @@ void list_all_grid3_element_callbacks()
          .signal = "changed", 
          .handler = G_CALLBACK(update_frame_rate),             
          .data = NULL},
+        {.widget = toggle_button_cap_video,
+         .signal = "toggled",
+         .handler = G_CALLBACK(video_capture_toggle_button),
+         .data = NULL},
         
     };
     
@@ -2000,6 +2049,10 @@ void list_all_window_signals(GtkWidget *window)
 /** init the sensitivity of GUI widget */ 
 void init_sensitivity()
 {
+    gtk_toggle_button_set_active(
+       GTK_TOGGLE_BUTTON(check_button_resize_window), TRUE); 
+    gtk_toggle_button_set_active(
+       GTK_TOGGLE_BUTTON(check_button_stream_info), TRUE);  
 
     /** OV580 firmware doesn't have a bunch of fx3 extension unit capabilities */
     if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
@@ -2018,10 +2071,9 @@ void init_sensitivity()
 
     }
 
-    gtk_toggle_button_set_active(
-       GTK_TOGGLE_BUTTON(check_button_stream_info), TRUE);  
     gtk_range_set_value(GTK_RANGE(hscale_beta), 0);
     gtk_widget_set_sensitive(hscale_edge_low_thres,0);    
+    gtk_widget_set_sensitive(entry_ov580_i2c_addr, 0); 
 
 }
 
@@ -2162,16 +2214,17 @@ std::string convert_bpp_to_string(int bpp)
 void menu_bar_setup(GtkWidget *maintable)
 {
 
-    GtkWidget *menu_bar = gtk_menu_bar_new();
+    GtkWidget *menu_bar       = gtk_menu_bar_new();
     gtk_menu_bar_set_pack_direction(GTK_MENU_BAR(menu_bar), 
         GTK_PACK_DIRECTION_LTR); 
     gtk_widget_set_hexpand(menu_bar, TRUE);
     gtk_widget_set_halign(menu_bar, GTK_ALIGN_FILL);
+
     /** init all menus */
-    GtkWidget *device_menu = gtk_menu_new();
-    GtkWidget *file_menu = gtk_menu_new();
+    GtkWidget *device_menu    = gtk_menu_new();
+    GtkWidget *file_menu      = gtk_menu_new();
     GtkWidget *fw_update_menu = gtk_menu_new();
-    GtkWidget *help_menu = gtk_menu_new();
+    GtkWidget *help_menu      = gtk_menu_new();
 
     /** device info items */
     GtkWidget *device_item = 
@@ -2205,6 +2258,8 @@ void menu_bar_setup(GtkWidget *maintable)
 	    || (strcmp(get_product(), "USB Cam-OV580-OG01A") == 0))
             bpp = RAW8_FLG;
         else if (strcmp(get_product(), "OV580 STEREO") == 0)
+            bpp = YUYV_FLG;
+        else
             bpp = YUYV_FLG;
         device_info.push_back("Datatype: " 
             + convert_bpp_to_string(bpp));
@@ -2304,6 +2359,7 @@ void menu_bar_setup(GtkWidget *maintable)
 
     gtk_container_add(GTK_CONTAINER(maintable), menu_bar);
 }
+
 /**
  * Display the built info(built from OpenCV CUDA) from status bar
  */
@@ -2430,9 +2486,10 @@ void gui_run()
 {
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Camera Control");
+    // gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_MOUSE);
     gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
     gtk_widget_set_size_request(window, 500, 100);
-    //gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
+    // gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_UTILITY);
     const char* icon1path = "./pic/leopard_cam_tool.jpg";  
     const char* icon2path = "../pic/leopard_cam_tool.jpg"; 
 
@@ -2465,7 +2522,6 @@ void gui_run()
  * int init_control_gui(int argc, char *argv[])
  */
 void ctrl_gui_main(int socket)
-//void ctrl_gui_main()
 {
     v4l2_dev = recv_fd(socket);
     gui_init();

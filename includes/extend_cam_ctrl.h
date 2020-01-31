@@ -42,10 +42,10 @@
  *  Last edit: 2020/01                                                        
  *****************************************************************************/
 #pragma once
-#include <string>
-#include <iostream>
-#include <sstream>
-#include <vector>
+
+#include <omp.h> 				         /** openmp */
+#include <opencv2/videoio.hpp> 	   /** video write */
+#include <ctime>				         /** time */
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -79,13 +79,24 @@ typedef enum
 /****************************************************************************
 **							 Function declaration
 *****************************************************************************/
-void do_update_resolution(struct device *dev, int resolution_index);
-
-void set_restart_flag(int flag);
-void video_change_res(int resolution_index);
-void video_change_fps(int frame_rate_index);
-
+void enable_wrapper(int *flag, int enable);
 void resize_window_enable(int enable);
+
+void set_video_cap_flag(int flag);
+void set_restart_flag(int flag);
+
+void video_change_res(int resolution_index);
+std::vector<std::string> 
+get_resolutions(int fd);
+void do_update_resolution(
+   struct device *dev, 
+   int resolution_index);
+int update_resolution_index(struct device *dev);
+
+void video_change_fps(int frame_rate_index);
+std::vector<int> 
+get_frame_rates(struct device *dev);
+void update_fps_index(int index);
 
 void video_capture_save_raw();
 inline void set_save_raw_flag(int flag);
@@ -123,6 +134,8 @@ void unmap_wrapper(T *data);
 
 void unmap_variables();
 
+std::string get_cur_time_video_name();
+
 void start_camera(struct device *dev);
 void stop_Camera(struct device *dev);
 
@@ -130,12 +143,6 @@ void video_set_format(struct device *dev, int width,
                       int height, int pixelformat);
 void video_set_format(struct device *dev);
 void video_get_format(struct device *dev);
-
-std::vector<std::string> 
-get_resolutions(struct device *dev);
-
-std::vector<int> 
-get_frame_rates(struct device *dev);
 
 void streaming_loop(struct device *dev, int socket);
 
@@ -191,10 +198,11 @@ void add_sharpness_val(int sharpness_val_from_gui);
 void add_edge_thres_val(int edge_low_thres_val_from_gui);
 void switch_on_keys();
 
+
 void decode_process_a_frame(
    struct device *dev, 
-   const void *p,
-   double *cur_time);
+   const void *p);//,
+   //double *cur_time);
 
 int video_alloc_buffers(struct device *dev);
 int video_free_buffers(struct device *dev);

@@ -544,7 +544,7 @@ void trigger_delay_time(int fd, unsigned int delay_time)
  * Once trigger_enable is called, streaming will freeze.
  * There will be frames coming out for each trigger pulse you've been sent.
  * soft_trigger will generate one trigger for each call.
- * However, a dedicated triggering pin to generate the desired frame rate is prefered 
+ * However, a dedicated triggering pin to generate the desired frame rate is preferred 
  * to sync with more than one camera.
  */
 void trigger_enable(int fd, int ena, int enb)
@@ -959,7 +959,7 @@ void eeprom_set_page_addr(int fd, int page_addr)
 // buf17[0] = 0xaa; // flag to trigger EEPROM reflash
 void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
 {
-	unsigned char buf17[LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE] = {0};
+	unsigned char buf17[LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE] = {0};
 	CLEAR(buf17);
 	int addr = 0;
 #ifdef AR1335_ICP3
@@ -970,11 +970,11 @@ void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
 	{
 		printf("..");
 		fflush(stdout);
-		for (int i = 0; i < LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE; i++)
+		for (int i = 0; i < LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE; i++)
 			buf17[i] = 0;
 		buf17[0] = 0xaa;
 
-		memcpy(&buf17[1], buf + position, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE - 1);
+		memcpy(&buf17[1], buf + position, LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE - 1);
 		write_cam_defect_pixel_table(fd, buf17);
 
 		usleep(2000);
@@ -986,7 +986,7 @@ void eeprom_fill_page_buffer(int fd, unsigned char *buf, int len)
 	for (addr = 0; addr < len; addr += 32)
 	{
 		buf17[0] = 0x0;
-		memcpy(&buf17[1], buf, LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE - 1);
+		memcpy(&buf17[1], buf, LI_XU_SENSOR_REGISTER_CONFIGURATION_SIZE - 1);
 		write_cam_defect_pixel_table(fd, buf17);
 	}
 	if (addr != len)
@@ -1026,7 +1026,7 @@ void ap020x_read_data(int fd, int reg_addr, int count)
 	s_buf[3] = LOWBYTE(reg_addr);
 	write_cam_defect_pixel_table(fd, s_buf);
 	read_cam_defect_pixel_table(fd, s_buf);
-	for (int i = 0; i < LI_XU_SENSOR_DEFECT_PIXEL_TABLE_SIZE; i++)
+	for (int i = 0; i < 4; i++)
 	{
 		printf("buf17[%d] = 0x%x\r\n", i, s_buf[i]);
 	}

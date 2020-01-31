@@ -17,13 +17,14 @@ RUN apt-get update && apt-get install -y \
         libv4l-dev \
         libjson-c-dev \
         libopencv-dev \
-        libudev-dev
+        libudev-dev \ 
+        nano
 
 ## install OpenCV, prepare build, install
 RUN mkdir ~/opencv_build && cd ~/opencv_build \
 && git clone https://github.com/opencv/opencv.git \
-&& git clone https://github.com/opencv/opencv_contrib.git \
 && cd opencv \
+&& git checkout 3.4.2 \
 && mkdir build && cd build \
 && cmake -D CMAKE_BUILD_TYPE=RELEASE \
         -D CMAKE_INSTALL_PREFIX=/usr/local \
@@ -36,8 +37,5 @@ RUN mkdir ~/opencv_build && cd ~/opencv_build \
         -D WITH_GTK_2_X=OFF .. \
 && make -j6 && make install -j6 \
 && sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf' \
-&& ldconfig 
-
-RUN git clone https://github.com/danyu9394/linux_camera_tool ~/linux_camera_tool \
-&& git pull 
-#sudo docker exec -it frosty_keller bash
+&& ldconfig \
+&& git clone https://github.com/danyu9394/linux_camera_tool ~/linux_camera_tool 

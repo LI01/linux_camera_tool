@@ -23,7 +23,6 @@
 #include "../includes/shortcuts.h"
 #include "../includes/isp_lib.h"
 #include "../includes/utility.h"
-#include <opencv2/video/background_segm.hpp>
 
 void tic(double &t)
 {
@@ -759,9 +758,13 @@ void streaming_put_text(
  * 		that can be modified inside the functions
 */
 void display_current_mat_stream_info(
-	cv::InputOutputArray& opencvImage,
-	double *cur_time)
+	cv::InputOutputArray& opencvImage)
+	
 {
+	static struct timeval tv_pre;
+    static struct timeval tv_cur;
+	static int interval;
+
 	cv::Mat _opencvImage = opencvImage.getMat();
 	int height_scale = (_opencvImage.cols / 1000);
 	streaming_put_text(_opencvImage, "ESC: close application",
@@ -773,7 +776,15 @@ void display_current_mat_stream_info(
 	streaming_put_text(_opencvImage, resolution,
 					   height_scale * TEXT_SCALE_BASE * 2);
 
-	double fps = 1.0 / toc(*cur_time);
+	//double fps = 1.0 / toc(*cur_time);
+	struct timeval tv;
+	gettimeofday(&tv,NULL);
+    tv_cur = tv;
+    interval = (tv.tv_sec*1000+tv.tv_usec/1000) - (tv_pre.tv_sec*1000+tv_pre.tv_usec/1000);
+    tv_pre = tv;
+	double fps = ((float)1000)/((float)interval);
+
+
 	char string_frame_rate[10];				 // string to save fps
 	sprintf(string_frame_rate, "%.2f", fps); // to 2 decimal places
 	char fpsString[20];
@@ -939,4 +950,23 @@ void apply_rgb_matrix_post_debayer(
 		}
 	);
 
+}
+
+/*
+ * decode the given input image and return cv::mat
+ * args:
+ * 		cv::InputOutputArray opencvImage
+ * return:
+ * 		cv::Mat img
+ */
+cv::Mat decode_mpeg_img(
+	cv::InputOutputArray opencvImage)
+{
+	cv::Mat img;
+	img = cv::imdecode(opencvImage, cv::IMREAD_COLOR);
+	if (img.data == NULL)
+	{
+		printf("NULL in mjpeg image\r\n");
+	}
+	return img;
 }

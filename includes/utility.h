@@ -21,7 +21,6 @@
  *****************************************************************************/
 #pragma once
 #include <chrono> //high resolution clock
-#include <iostream>
 
 /**
  * timer used for benchmark ISP performance

@@ -25,6 +25,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/background_segm.hpp> /// for motion detector
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 #include <opencv4/opencv2/cudaobjdetect.hpp>
 #include <opencv4/opencv2/cudaimgproc.hpp>
@@ -89,8 +90,7 @@ void streaming_put_text(
 	int cordinate_y);
 
 void display_current_mat_stream_info(
-	cv::InputOutputArray& opencvImage,
-	double *cur_time);
+	cv::InputOutputArray& opencvImage);
 
 void debayer_awb_a_frame(
 	cv::InputOutputArray& opencvImage,
@@ -100,3 +100,6 @@ void debayer_awb_a_frame(
 void apply_rgb_matrix_post_debayer(
 	cv::InputOutputArray& opencvImage,
 	int* ccm);
+
+cv::Mat decode_mpeg_img(
+	cv::InputOutputArray opencvImage);

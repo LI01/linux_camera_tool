@@ -117,6 +117,9 @@ char *get_file_extension(char *filename)
     return extname;
 }
 
+/**
+ * identify filename's file type
+ */
 config_file_type 
 config_file_identifier(char *filename)
 {

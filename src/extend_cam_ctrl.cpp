@@ -39,7 +39,7 @@
  * 10. Close your descriptor to the device                                    
  *                                                                            
  *  Author: Danyu L                                                           
- *  Last edit: 2020/01                                                        
+ *  Last edit: 2020/02                                                        
  *****************************************************************************/
 #include "../includes/shortcuts.h"
 #include "../includes/extend_cam_ctrl.h"
@@ -49,15 +49,17 @@
 #include "../includes/uvc_extension_unit_ctrl.h"
 #include "../includes/cam_property.h"
 #include "../includes/batch_cmd_parser.h"
-#include <omp.h> /**for openmp */
-
 /*****************************************************************************
 **                      	Global variables 
 *****************************************************************************/
 /** 
  * Since we use fork, variables btw two processes are not shared
- * use mmap for all variables you need to share between gui, videostreaming
+ * use mmap for all variables you need to share between GUI, videostreaming
  */
+static int *loop;				  /// while (*loop)
+static int *display_info_ena;	  /// flag for display stream info enable
+static int *resize_window_ena;	  /// flag for resize window enable
+
 static int *save_bmp;			  /// flag for saving bmp
 static int *save_raw;			  /// flag for saving raw
 static int *bayer_flag;			  /// flag for choosing bayer pattern
@@ -65,9 +67,11 @@ static int *bpp;				  /// flag for datatype bits per pixel
 static int *awb_flag;			  /// flag for enable awb
 static int *clahe_flag;			  /// flag for enable CLAHE
 static int *abc_flag;			  /// flag for enable auto brightness&contrast
-static float *gamma_val;		  /// gamma correction value from gui
-static int *blc; 				  /// black level correction value from gui
-static int *loop;				  /// while (*loop)
+static float *gamma_val;		  /// gamma correction value from GUI
+static int *blc; 				  /// black level correction value from GUI
+static int image_count;			  /// image count number add to capture name
+static constexpr const char* window_name = "Camera View"; 
+
 static int *rgb_gainoffset_flg;   /// flag for rgb gain and offset enable
 static int *r_gain;				  /// values for rgb gain, offset correction
 static int *b_gain;
@@ -83,26 +87,24 @@ static int *soft_ae_flag; 		  /// flag for software AE
 static int *flip_flag, *mirror_flag;
 static int *show_edge_flag;
 static int *histogram_ena, *motion_detector_ena;
-static int *separate_dual;
-static int *display_info_ena;
-static int *resize_window_ena;
-static int *rgb_ir_color, *rgb_ir_ir;
-static int *alpha, *beta, *sharpness;
-static int *edge_low_thres;
-static int *restart;
-static int *res_index = 0;
-static int *fps_index = 0;
-
-static int image_count;			  /// image count number add to capture name
-static constexpr const char* window_name = "Camera View"; 
-
+static int *separate_dual;		  /// flag for enable separate stereo dual cam
+static int *alpha, *beta, *sharpness; /// value for alpha, beta, sharpness
+static int *edge_low_thres;		  /// value for edge detection low threshold
 int *cur_exposure; 				  /// update current exposure for AE
 int *cur_gain;	 				  /// update current gain for AE
+
+static int *rgb_ir_color, *rgb_ir_ir; /// flag for rgb-ir ISP enable
+static int *restart;			  /// restart flag for change resolution,fps
+static int *res_index;			  /// resolution index
+static int *fps_index;			  /// frame rate index
+static int *start_video_cap;	  /// flag for start and stop video capture
+static cv::VideoWriter writer;	  /// video record writer
 
 struct v4l2_buffer queuebuffer;   /// queuebuffer for enqueue, dequeue buffer
 
 extern std::vector<std::string> resolutions;
 extern std::vector<int> cur_frame_rates;
+
 /*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
@@ -114,27 +116,10 @@ extern void set_exposure_absolute(int fd, int exposure_absolute);
 extern int get_current_height(int fd);
 extern void free_device_vars();
 
-/******************************************************************************
+/*****************************************************************************
 **                           Function definition
 *****************************************************************************/
-
-void set_restart_flag(int flag)
-{
-	*restart = flag;
-}
-
-void video_change_res(int resolution_index)
-{
-	*res_index = resolution_index;
-	set_restart_flag(1);
-}
-
-void video_change_fps(int frame_rate_index)
-{
-	*fps_index = frame_rate_index;	
-	set_restart_flag(1);
-}
-/*
+/**
  * flip the flag of one enable/disable switch
  * use *flag for these global shared memory flag
  */
@@ -153,6 +138,7 @@ void enable_wrapper(int *flag, int enable)
 		break;
 	}
 }
+
 /**
  * resize opencv image
  * args:
@@ -163,9 +149,182 @@ void resize_window_enable(int enable)
 	enable_wrapper(resize_window_ena, enable);
 }
 
+/**
+ * set video capture flag 
+ * args:
+ * 		flag - set the flag when video capture button clicked: start and stop
+ */
+void set_video_cap_flag(int flag)
+{
+	*start_video_cap = flag;
+}
 
 /**
- * callback for save raw image from gui
+ * set restart flag
+ * args:
+ * 		flag - use when you change
+ */
+void set_restart_flag(int flag)
+{
+	*restart = flag;
+}
+
+/**
+ * update resolution flag and restart flag
+ * args:
+ * 		resolution_index 
+ */
+void video_change_res(int resolution_index)
+{
+	*res_index = resolution_index;
+	set_restart_flag(1);
+}
+
+/**
+ * Get all the resolutions for the camera
+ * args:
+ * 		int fd - file descriptor to get info from v4l2 sys call
+ * return:
+ * 		std::vector<std::string> resolutions
+ */
+std::vector<std::string> 
+get_resolutions(int fd)
+{
+	struct v4l2_fmtdesc fmtdesc;
+    struct v4l2_frmsizeenum frms;
+	CLEAR(fmtdesc);
+	CLEAR(frms);
+    fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	fmtdesc.index = 0;
+	std::vector<std::string> total_res;
+	while(ioctl (fd, VIDIOC_ENUM_FMT, &fmtdesc) == 0)
+	{
+		fmtdesc.index++;	
+		// internal fourcc definitions are identical with v4l2
+		frms.pixel_format = fmtdesc.pixelformat;
+		for(frms.index = 0; !ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &frms); frms.index++) 
+		{
+			if (frms.type == V4L2_FRMSIZE_TYPE_DISCRETE)
+            {
+				std::string each_line = 
+				std::to_string(frms.discrete.width) 
+				+ "x" + std::to_string(frms.discrete.height);
+				total_res.push_back(each_line);
+			}
+		}
+	}
+	return total_res;
+}
+
+/**
+ * update the current resolution in dev->width and dev->height 
+ * getting  the actvie resolution index from GUI
+ * args:
+ * 		struct device *dev - camera resolution info
+ * 		int resolution_index - resolution index get from GUI
+ */
+void do_update_resolution(struct device *dev, int resolution_index)
+{
+	std::cout << "New Resolution: " << resolutions[*res_index] << std::endl;
+	std::vector<std::string> elem =
+		split(resolutions[resolution_index], 'x');
+	dev->width = stoi(elem[0]);
+	dev->height = stoi(elem[1]);
+	video_set_format(dev); 		/// update the resolution etc
+}
+
+/**
+ * update *res_index from the current dev->width and dev->height
+ * used in the initialize period 
+ * args:
+ * 		stuct device *dev - current resolution dev->width, dev->height
+ * returns:
+ * 		int *res_index
+ */
+int update_resolution_index(struct device *dev)
+{
+	for(size_t i=0; i<resolutions.size();i++) {
+		std::vector<std::string> elem = 
+			split(resolutions[i],'x');
+		if (dev->width == (unsigned int)stoi(elem[0])) 
+			*res_index = i;
+	}
+	return *res_index;
+}
+
+/**
+ *  update frame rate flag and restart flag
+ * args:
+ * 		frame_rate_index
+ */
+void video_change_fps(int frame_rate_index)
+{
+	*fps_index = frame_rate_index;	
+	set_restart_flag(1);
+}
+
+/**
+ * args:
+ * 		struct device *dev - get the corresponding frame rates 
+ * 		for current active resolution(dev->width, dev->height) 
+ * return:
+ * 		std::vector<int> cur_frame_rates
+ */
+std::vector<int> 
+get_frame_rates(struct device *dev)
+{
+
+	struct v4l2_frmivalenum fival;
+	int list_fps = 0;
+	CLEAR(fival);
+	fival.index = 0;
+	fival.pixel_format = dev->pixelformat;
+	fival.width = dev->width;
+	fival.height = dev->height;
+	std::vector<int> frame_rates;
+	while (ioctl(dev->fd, VIDIOC_ENUM_FRAMEINTERVALS, &fival) == 0)
+	{
+		fival.index++;
+		if (fival.type == V4L2_FRMIVAL_TYPE_DISCRETE)
+		{
+			list_fps++;
+			//printf("add frame rate = %d\r\n", fival.discrete.denominator);
+			frame_rates.push_back(fival.discrete.denominator);
+		}
+		else if (fival.type == V4L2_FRMIVAL_TYPE_CONTINUOUS)
+		{
+			printf("{min { %u/%u } .. max { %u/%u } }, ",
+				   fival.stepwise.min.numerator,
+				   fival.stepwise.min.numerator,
+				   fival.stepwise.max.denominator,
+				   fival.stepwise.max.denominator);
+			break;
+		}
+		else if (fival.type == V4L2_FRMIVAL_TYPE_STEPWISE)
+		{
+			printf("{min { %u/%u } .. max { %u/%u } / "
+				   "stepsize { %u/%u } }, ",
+				   fival.stepwise.min.numerator,
+				   fival.stepwise.min.denominator,
+				   fival.stepwise.max.numerator,
+				   fival.stepwise.max.denominator,
+				   fival.stepwise.step.numerator,
+				   fival.stepwise.step.denominator);
+			break;
+		}
+	}
+	return frame_rates;
+}
+/**
+ * update frame rate index from GUI
+ */
+void update_fps_index(int index)
+{
+	*fps_index = index;
+}
+
+/**
+ * callback for save raw image from GUI
  */
 void video_capture_save_raw()
 {
@@ -231,7 +390,7 @@ int v4l2_core_save_data_to_file(
 }
 
 /**
- * callback for save bmp image from gui
+ * callback for save bmp image from GUI
  */
 void video_capture_save_bmp()
 {
@@ -258,16 +417,17 @@ inline void set_save_bmp_flag(int flag)
  *   none
  */
 static int save_frame_image_bmp(
-	cv::InputOutputArray& opencvImage)
+	cv::InputOutputArray& opencvImage,
+	int& img_count)
 {
 
 	printf("save one capture bmp\n");
 	cv::imwrite(cv::format(
 					"captures_%s_%d.bmp",
 					get_product(),
-					image_count),
+					img_count),
 				opencvImage);
-	image_count++;
+	img_count++;
 	set_save_bmp_flag(0);
 	return 0;
 }
@@ -349,13 +509,14 @@ void change_bayerpattern(void *bayer)
 		*bayer_flag = CV_MONO_FLG;
 }
 
-/** callback for set blc from gui */
+/** callback for set blc from GUI */
 void add_blc(int blc_val_from_gui)
 {
 	*blc = blc_val_from_gui;
+	printf("blc=%d\r\n", *blc);
 }
 
-/** callback for set gamma_val for gamma correction from gui */
+/** callback for set gamma_val for gamma correction from GUI */
 void add_gamma_val(float gamma_val_from_gui)
 {
 	*gamma_val = gamma_val_from_gui;
@@ -495,7 +656,7 @@ void mmap_variables()
 	restart 			 = (int *)mmap_wrapper(sizeof(int));
 	res_index 			 = (int *)mmap_wrapper(sizeof(int));
 	fps_index 			 = (int *)mmap_wrapper(sizeof(int));
-	
+	start_video_cap 	 = (int *)mmap_wrapper(sizeof(int));	
 	//cur_frame_rate 		 = (int *)mmap_wrapper(sizeof(int));
 }
 /** 
@@ -525,9 +686,10 @@ int set_bpp(int datatype)
 /** initialize share memory variables after declaration */
 void initialize_shared_memory_var()
 {
-	*gamma_val = 1.0;
-	*blc = 0;
-		if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
+	*display_info_ena = TRUE;
+	*resize_window_ena = TRUE;
+	
+	if ((strcmp(get_product(), "USB Camera-OV580") == 0) 
 	|| (strcmp(get_product(), "USB Cam-OV580-OG01A") == 0))
 		*bpp = RAW8_FLG;
 	else if (strcmp(get_product(), "OV580 STEREO") == 0)
@@ -535,10 +697,13 @@ void initialize_shared_memory_var()
 	else
 		*bpp = set_bpp(get_li_datatype());
 	*bayer_flag = CV_BayerBG2BGR_FLG;
-	*display_info_ena = TRUE;
+
+	*gamma_val = 1.0;
+	*blc = 0;
 	*alpha = 1;
 	*beta = 0;
 	*sharpness = 1;
+
 }
 
 /** wrapper for unmap shared memory */
@@ -600,8 +765,26 @@ void unmap_variables()
 	unmap_wrapper(restart);
 	unmap_wrapper(res_index);
 	unmap_wrapper(fps_index);
+	unmap_wrapper(start_video_cap);
 	//unmap_wrapper(cur_frame_rate);
 	free_device_vars();
+}
+
+/**
+ * return video name in .avi, format YYYY-mm-dd-HH-SS
+ * returns:
+ * 		std::string "./cur_time.avi"
+ */
+std::string get_cur_time_video_name()
+{
+	/// name the video(.avi) as the current time
+	time_t cur_time;
+	struct tm *timeinfo;
+	char buf[30];
+	time(&cur_time);
+	timeinfo = localtime(&cur_time);
+	strftime(buf, 30, "./%Y-%m-%d-%H-%M-%S.avi",timeinfo);
+	return (std::string)buf;
 }
 
 /**
@@ -668,14 +851,14 @@ void video_set_format(
 	dev->pixelformat = pixelformat;
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	
-	/* Buggy driver paranoia. */
-	unsigned int min;
-  	min = fmt.fmt.pix.width * 2;
-  	if (fmt.fmt.pix.bytesperline < min)
-    	fmt.fmt.pix.bytesperline = min;
-  	min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
-  	if (fmt.fmt.pix.sizeimage < min)
-    	fmt.fmt.pix.sizeimage = min;
+	// /* Buggy driver paranoia. */
+	// unsigned int min;
+  	// min = fmt.fmt.pix.width * 2;
+  	// if (fmt.fmt.pix.bytesperline < min)
+    // 	fmt.fmt.pix.bytesperline = min;
+  	// min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
+  	// if (fmt.fmt.pix.sizeimage < min)
+    // 	fmt.fmt.pix.sizeimage = min;
 
 	ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt);
 	if (ret < 0)
@@ -714,14 +897,14 @@ void video_set_format(
 	//fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-	/* Buggy driver paranoia. */
-	unsigned int min;
-  	min = fmt.fmt.pix.width * 2;
-  	if (fmt.fmt.pix.bytesperline < min)
-    	fmt.fmt.pix.bytesperline = min;
-  	min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
-  	if (fmt.fmt.pix.sizeimage < min)
-    	fmt.fmt.pix.sizeimage = min;
+	// /* Buggy driver paranoia. */
+	// unsigned int min;
+  	// min = fmt.fmt.pix.width * 2;
+  	// if (fmt.fmt.pix.bytesperline < min)
+    // 	fmt.fmt.pix.bytesperline = min;
+  	// min = fmt.fmt.pix.bytesperline * fmt.fmt.pix.height;
+  	// if (fmt.fmt.pix.sizeimage < min)
+    // 	fmt.fmt.pix.sizeimage = min;
 
 	ret = ioctl(dev->fd, VIDIOC_S_FMT, &fmt);
 	if (ret < 0)
@@ -782,7 +965,7 @@ void video_get_format(struct device *dev)
 	dev->bytesperline = fmt.fmt.pix.bytesperline;
 	dev->imagesize = fmt.fmt.pix.bytesperline ? fmt.fmt.pix.sizeimage : 0;
 	dev->pixelformat = fmt.fmt.pix.pixelformat;
-	
+
 	printf("\nGet Current Video Format:%c%c%c%c (%08x)%ux%u\n"
 		   "byte per line:%d\nsize image:%u\n",
 		   (fmt.fmt.pix.pixelformat >> 0) & 0xff,
@@ -796,90 +979,6 @@ void video_get_format(struct device *dev)
 		   fmt.fmt.pix.sizeimage);
 	return;
 }
-
-std::vector<std::string> 
-get_resolutions(struct device *dev)
-{
-	struct v4l2_fmtdesc fmtdesc;
-    struct v4l2_frmsizeenum frms;
-	CLEAR(fmtdesc);
-	CLEAR(frms);
-    fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	fmtdesc.index = 0;
-	std::vector<std::string> total_res;
-	while(ioctl (dev->fd, VIDIOC_ENUM_FMT, &fmtdesc) == 0)
-	{
-		fmtdesc.index++;	
-		// internal fourcc definitions are identical with v4l2
-		frms.pixel_format = fmtdesc.pixelformat;
-		for(frms.index = 0; !ioctl(dev->fd, VIDIOC_ENUM_FRAMESIZES, &frms); frms.index++) 
-		{
-			if (frms.type == V4L2_FRMSIZE_TYPE_DISCRETE)
-            {
-				std::string each_line = std::to_string(frms.discrete.width) 
-				+ "x" + std::to_string(frms.discrete.height);
-				total_res.push_back(each_line);
-			}
-		}
-	}
-	return total_res;
-}
-
-std::vector<int> 
-get_frame_rates(struct device *dev)
-{
-
-	struct v4l2_frmivalenum fival;
-	int list_fps = 0;
-	CLEAR(fival);
-	fival.index = 0;
-	fival.pixel_format = dev->pixelformat;
-	fival.width = dev->width;
-	fival.height = dev->height;
-	std::vector<int> frame_rates;
-	while (ioctl(dev->fd, VIDIOC_ENUM_FRAMEINTERVALS, &fival) == 0)
-	{
-		fival.index++;
-		if (fival.type == V4L2_FRMIVAL_TYPE_DISCRETE)
-		{
-			list_fps++;
-			//printf("add frame rate = %d\r\n", fival.discrete.denominator);
-			frame_rates.push_back(fival.discrete.denominator);
-		}
-		else if (fival.type == V4L2_FRMIVAL_TYPE_CONTINUOUS)
-		{
-			printf("{min { %u/%u } .. max { %u/%u } }, ",
-				   fival.stepwise.min.numerator,
-				   fival.stepwise.min.numerator,
-				   fival.stepwise.max.denominator,
-				   fival.stepwise.max.denominator);
-			break;
-		}
-		else if (fival.type == V4L2_FRMIVAL_TYPE_STEPWISE)
-		{
-			printf("{min { %u/%u } .. max { %u/%u } / "
-				   "stepsize { %u/%u } }, ",
-				   fival.stepwise.min.numerator,
-				   fival.stepwise.min.denominator,
-				   fival.stepwise.max.numerator,
-				   fival.stepwise.max.denominator,
-				   fival.stepwise.step.numerator,
-				   fival.stepwise.step.denominator);
-			break;
-		}
-	}
-	return frame_rates;
-}
-void do_update_resolution(struct device *dev, int resolution_index)
-{
-	std::cout << "New Resolution: " << resolutions[*res_index] << std::endl;
-	std::vector<std::string> elem =
-		split(resolutions[resolution_index], 'x');
-	dev->width = stoi(elem[0]);
-	dev->height = stoi(elem[1]);
-	video_set_format(dev); 		/// update the resolution etc
-}
-
 
 /** 
  * To get frames in few steps
@@ -898,26 +997,28 @@ void do_update_resolution(struct device *dev, int resolution_index)
 void streaming_loop(struct device *dev, int socket)
 {
 
+	static int last_res = update_resolution_index(dev);
+	static int last_fps = *fps_index;
+
 	send_fd(socket, dev->fd);
 	cv::namedWindow(window_name, cv::WINDOW_NORMAL);
+	cv::startWindowThread();
 	image_count = 0;
 	set_restart_flag(0);
 	set_loop(1);
 	initialize_shared_memory_var();
+
 	while (*loop)
 	{
 		if (*restart)
 		{
-			static int last_res, last_fps;
-			/* stop streaming */
-			int tmp_nbufs = dev->nbufs; /// save a tmp nbufs
+			/** stop streaming */
+			int tmp_nbufs = dev->nbufs; /// save tmp nbufs
 			set_restart_flag(0);		/// reset restart flag
 			stop_Camera(dev);			/// stream off
 			video_free_buffers(dev);	/// free buffer
 
-			//cv::destroyWindow(window_name); // so the window don't resize
-
-			/* prepare streaming */
+			/** prepare streaming */
 			dev->nbufs = tmp_nbufs;
 			if (last_res != *res_index) {
 				do_update_resolution(dev, *res_index);		
@@ -929,7 +1030,7 @@ void streaming_loop(struct device *dev, int socket)
 			check_dev_cap(dev->fd);
 			get_frame_rate(dev->fd); 	/// list the current frame rate
 
-			/* activate streaming */
+			/** activate streaming */
 			video_alloc_buffers(dev);
 			start_camera(dev);
 			set_loop(1);
@@ -939,7 +1040,11 @@ void streaming_loop(struct device *dev, int socket)
 		}
 		get_a_frame(dev);
 	}
-	int v4l2_dev = dev->fd;
+	if (writer.isOpened()) {
+    	writer.release();		    
+    }
+
+	int v4l2_dev = dev->fd;		/// save file descriptor before unmap variables
 	unmap_variables();
 	stop_Camera(dev); 			/// stream off
 	video_free_buffers(dev); 	/// free buffer
@@ -960,10 +1065,6 @@ void get_a_frame(struct device *dev)
 
 	for (size_t i = 0; i < dev->nbufs; i++)
 	{
-		/// time measured in OpenCV for fps
-		double cur;
-		tic(cur);
-		double *cur_time = &cur;
 		queuebuffer.index = i;
 
 		/// The buffer's waiting in the outgoing queue
@@ -972,9 +1073,9 @@ void get_a_frame(struct device *dev)
 			perror("VIDIOC_DQBUF");
 			return;
 		}
-
-		decode_process_a_frame(dev, dev->buffers[i].start, cur_time);
-
+		
+		decode_process_a_frame(dev, dev->buffers[i].start);
+	
 		if (ioctl(dev->fd, VIDIOC_QBUF, &queuebuffer) < 0)
 		{
 			perror("VIDIOC_QBUF");
@@ -995,6 +1096,7 @@ void soft_ae_enable(int enable)
 {
 	enable_wrapper(soft_ae_flag, enable);
 }
+
 /**
  * calculate the mean value of a given unprocessed image for a defined ROI
  * return the value used for software AE
@@ -1042,6 +1144,7 @@ double calc_mean(
 	mean = total / size / size;
 	return mean;
 }
+
 /**
  * simple and brute software generate auto exposure
  * set a target mean value and the range, if the current image illuminance 
@@ -1519,25 +1622,25 @@ void display_info_enable(int enable)
 	enable_wrapper(display_info_ena, enable);
 }
 
-/** callback for set alpha for contrast correction from gui */
+/** callback for set alpha for contrast correction from GUI */
 void add_alpha_val(int alpha_val_from_gui)
 {
 	*alpha = alpha_val_from_gui;
 }
 
-/** callback for set beta for brightness correction from gui */
+/** callback for set beta for brightness correction from GUI */
 void add_beta_val(int beta_val_from_gui)
 {
 	*beta = beta_val_from_gui;
 }
 
-/** callback for set sharpness for sharpness correction from gui */
+/** callback for set sharpness for sharpness correction from GUI */
 void add_sharpness_val(int sharpness_val_from_gui)
 {
 	*sharpness = sharpness_val_from_gui;
 }
 
-/** callback for add edge detection for threshold value from gui */
+/** callback for add edge detection for threshold value from GUI */
 void add_edge_thres_val(int edge_low_thres_val_from_gui)
 {
 	*edge_low_thres = edge_low_thres_val_from_gui;
@@ -1588,6 +1691,37 @@ static void group_gpu_image_proc(
 		canny_filter_control(opencvImage,*edge_low_thres);
 
 }
+
+/**
+ * create mpeg video record
+ * FIXME: mono record looks glitched
+ * args:
+ * 		struct device *dev - get current resolution
+ * 		cv::InputOutputArray opencvImage - determine is_color
+ */
+static void create_mpeg_video_record(
+	struct device *dev, 
+	cv::InputOutputArray opencvImage)
+{
+	/// select desired codec (must be available at runtime)
+    int codec = cv::VideoWriter::fourcc('M', 'J', 'P', 'G');  
+	/// get framerate of the created video stream
+	double fps = (double)get_frame_rate(dev->fd);                         
+	bool is_color = (opencvImage.type() != CV_8UC1);
+	// printf("is color = %d\r\n", (int)is_color);
+	writer.open(
+		get_cur_time_video_name(), 
+		codec,
+		fps, 
+		cv::Size(dev->width, dev->height), 
+		is_color);
+
+	/// check if we succeeded
+    if (!writer.isOpened()) 
+        printf("Could not open the output video file for write\r\n");
+    
+}
+
 /** 
  * OpenCV only support debayering 8 and 16 bits 
  * 
@@ -1600,23 +1734,27 @@ static void group_gpu_image_proc(
 
  * 
  */
+
 void decode_process_a_frame(
 	struct device *dev,
-	const void *p,
-	double *cur_time)
+	const void *p)
+
 {
+	
 	int height = dev->height;
-	int width = dev->width;
-	int shift = set_shift(*bpp);
+	int width  = dev->width;
+	int shift  = set_shift(*bpp);
 	cv::Mat share_img;
+	static int last_video_cap = 0;
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	cv::cuda::GpuMat gpu_img;
 #endif
 
 	if (*soft_ae_flag)
 		apply_soft_ae(dev, p);
+	/// use queuebuffer.bytesused instead od dev->imagesize in case it is not raw camera
 	if (*save_raw)
-		v4l2_core_save_data_to_file(p, dev->imagesize);
+		v4l2_core_save_data_to_file(p, queuebuffer.bytesused);
 
 	/** --- for raw8, raw10, raw12 bayer camera ---*/
 	if (shift != 0)
@@ -1664,9 +1802,9 @@ void decode_process_a_frame(
 			if (*rr==256 && *rg==0 && *rb==0 && \
 				*gr==0 && *gg==256 && *gb==0 && \
 				*br==0 && *bg==0 && *bb==256)
-				apply_rgb_matrix_post_debayer(img,
-											  (int *)ccm);
-
+				apply_rgb_matrix_post_debayer(
+					img,
+					(int *)ccm);
 		}
 		share_img = img;
 	}
@@ -1674,25 +1812,18 @@ void decode_process_a_frame(
 	/** --- for yuv camera ---*/
 	else if (shift == 0)
 	{
-
-		if (dev->pixelformat == 0x47504a4d) {
-
-			cv::Mat inputMat(height, width, CV_8UC3, (void *)p);
-			cv::Mat img;
-			img = cv::imdecode(inputMat, cv::IMREAD_COLOR);
-			if (img.data == NULL)
-			{
-				printf("NULL in mjpeg image\r\n");
-			}
-			share_img = img;
-		}
+		// if pixel format FOURCC is MJPG 
+		if (dev->pixelformat == (u_int32_t)cv::VideoWriter::fourcc('M', 'J', 'P', 'G')) {
+			cv::Mat img(height, width, CV_8UC3, (void *)p);
+			share_img = decode_mpeg_img(img);
+		} 
 		else {
 			cv::Mat img(height, width, CV_8UC2, (void *)p);
 			cv::cvtColor(img, img, cv::COLOR_YUV2BGR_YUY2);
-			if (*bayer_flag == CV_MONO_FLG && img.type() != CV_8UC1)
-				cv::cvtColor(img, img, cv::COLOR_BGR2GRAY);
 			share_img = img;
 		}
+		if (*bayer_flag == CV_MONO_FLG && share_img.type() != CV_8UC1)
+			cv::cvtColor(share_img, share_img, cv::COLOR_BGR2GRAY);
 	}
 
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
@@ -1708,12 +1839,7 @@ void decode_process_a_frame(
 	if (*mirror_flag)
 		cv::flip(share_img, share_img, 1);
 	if (*save_bmp)
-		save_frame_image_bmp(share_img);
-
-	if (*histogram_ena)
-		display_histogram(share_img);
-	else
-		cv::destroyWindow("histogram");
+		save_frame_image_bmp(share_img, image_count);
 
 	if (*motion_detector_ena)
 		motion_detector(share_img);
@@ -1726,13 +1852,30 @@ void decode_process_a_frame(
 		cv::destroyWindow("cam_right");
 	}
 	/** if image larger than 720p by any dimension, resize the window */
-	//if (*resize_window_ena)
-	if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
-		cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
+	if (*resize_window_ena)
+		if (width >= CROPPED_WIDTH || height >= CROPPED_HEIGHT)
+			cv::resizeWindow(window_name, CROPPED_WIDTH, CROPPED_HEIGHT);
+
+	if (*histogram_ena)
+		display_histogram(share_img);
+	else
+		cv::destroyWindow("histogram");
+
 	if (*display_info_ena)
-		display_current_mat_stream_info(share_img, cur_time);
-	if (share_img.rows > 0 && share_img.cols > 0)
+		display_current_mat_stream_info(share_img);
+
+	if ((share_img.rows > 0) && (share_img.cols > 0)) {
+		/** keep recording video*/
+		if (*start_video_cap && last_video_cap) 
+			writer.write(share_img);
+		/** first time click record*/
+		else if (*start_video_cap && last_video_cap == 0) {
+			create_mpeg_video_record(dev, share_img);
+			last_video_cap = 1; /// update flag so it won't in the loop again
+		}
+		cv::moveWindow(window_name, 1920,0);
 		cv::imshow(window_name, share_img);
+	}
 	switch_on_keys();
 
 }
@@ -1837,6 +1980,7 @@ void rgb_ir_ir_display_enable(int enable)
 {
 	enable_wrapper(rgb_ir_ir, enable);
 }
+
 /** display the IR channel in a RGB-IR raw camera,
  *  the size of the image will be usually 1/4 of the full resolution
  *  (depend on the RGB-IR sensor's CCM)
@@ -1855,7 +1999,7 @@ void display_rgbir_ir_channel(
 	uint16_t ir_orig1, ir_orig2, ir_orig3, ir_orig4;
 	uint16_t *src_short = (uint16_t *)p;
 	uint16_t *dst = (uint16_t *)p;
-for (int i=0; i < height; i+=4) {
+	for (int i=0; i < height; i+=4) {
 		for (int j=0; j < width; j+=4) {
 			// IR1
 			ir_orig1 = src_short[BOTTOM_RIGHT(j,i,width)];
@@ -1899,8 +2043,6 @@ for (int i=0; i < height; i+=4) {
 	apply_gamma_correction(rgbir_ir, *gamma_val);
 	sharpness_control(rgbir_ir, *sharpness);
 	cv::imshow("RGB-IR IR Channel", rgbir_ir);
-
-
 }
 
 /**
@@ -1924,7 +2066,6 @@ int video_alloc_buffers(
 	bufrequest.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	bufrequest.memory = V4L2_MEMORY_MMAP;
 	bufrequest.count = dev->nbufs;
-	dev->nbufs = dev->nbufs;
 	dev->memtype = V4L2_MEMORY_MMAP;
 	dev->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
@@ -2049,7 +2190,7 @@ int video_free_buffers(struct device *dev)
 }
 
 /**
- * callback for exit streaming from gui
+ * callback for exit streaming from GUI
  */
 void set_loop(int exit)
 {

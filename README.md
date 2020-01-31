@@ -29,8 +29,8 @@ Table of Contents
     - [Kill Linux Camera Tool Zombie Process](#kill-linux-camera-tool-zombie-process)
   - [Examples](#examples)
     - [Test on RAW sensor 12 Megapixel Sensor IMX477](#test-on-raw-sensor-12-megapixel-sensor-imx477)
-    - [Test on RAW sensor 5 Megapixel Sensor OS05A20](#test-on-raw-sensor-5-megapixel-sensor-os05a20)
-    - [Test on OV4689-OV580 stereo YUV422 2 Megapixel Cam](#test-on-ov4689-ov580-stereo-yuv422-2-megapixel-cam)
+    - [Test on YUV 12 Megapixel AR1335-ICP3 MJPG output](#test-on-yuv-12-megapixel-ar1335-icp3-mjpg-output)
+    - [Test on OV9782-OV580 stereo RAW8 1 Megapixel Cam](#test-on-ov9782-ov580-stereo-raw8-1-megapixel-cam)
   - [Code Structure](#code-structure)
   - [Declarations](#declarations)
     - [Image Processing Functionalities](#image-processing-functionalities)
@@ -62,7 +62,7 @@ The non-OpenCV CUDA support part has been tested and verified on the following O
 - `3.4.3` 
 - `4.0.1`
 - `4.1.1`
-  
+Doesn't work with OpenCV `4.2.0`
 ### Hardware Prerequisites
 - __Camera__: any Leopard USB3.0/2.0 cameras
 - __Host PC__: with USB3.0 port connectivity 
@@ -107,8 +107,6 @@ Device Descriptor:
 foo@bar:~$ ls /dev//vi* ## list all the video device in your host PC
 /dev/video0  /dev/video1
 ```
-
-
 ### Dependencies
 Make sure the libraries have installed. Run [configure.sh](configure.sh) in current directory for completing installing all the required dependencies.
 ```sh
@@ -238,43 +236,29 @@ $ killall -9 leopard_cam
 
 ## Examples
 ### Test on RAW sensor 12 Megapixel Sensor IMX477
-__Original streaming after debayer for IMX477:__ 
-> image is dark and blue
-> <img src="pic/imx477Orig.jpg" width="1000">
 
-__Modified streaming for IMX477:__
-> enabled AWB, gamma correction, black level correction with _non OpenCV CUDA support_
-> <img src="pic/imx477.jpg" width="1000">
+> 1. Original streaming 12M(4056x3120) after debayer for IMX477 raw sensor
+> 2. Use generic register read/write to talk to IMX477 sensor(8-bit slave addr:0x20)
+> 3. Switch resolution to 8M(3840x2050), change bayer pattern, enable awb, auto brightness & contrast with _OpenCV CUDA support_  
+> 4. Apply gamma correction(1/2.2) and black level correction for debayered image
+>><img src="pic/first.gif" width="1000">
 
-> enable awb, auto brightness & contrast, sharpness control with _OpenCV CUDA support_
-> <img src="pic/imx477Cuda.jpg" width="1000">
+### Test on YUV 12 Megapixel AR1335-ICP3 MJPG output
+> 1. Original streaming for 12M AR1335-ICP3 full resolution MJPEG @10fps 
+> 2. Capture a bmp and raw image, save in the current directory
+> 3. Flip and mirror image streaming
+> 4. Enable/disable showing RGB color histogram
+> 5. Change streaming contrast and brightness
+> 6. Start and stop capturing video, save in the current directory
+>><img src="pic/second.gif" width="1000">
 
-### Test on RAW sensor 5 Megapixel Sensor OS05A20
-__Modified streaming for OS05A20 full resolution__
-> change bayer pattern to GRBG
-> enable software AWB, gamma correction
-> increase exposure, gain
-> <img src="pic/os05a20.jpg" width="1000">
-
-
-__Modified OS05A20 resolution to an available one__
-> binning mode
-> capture raw and bmp, save them in the camera tool directory
-<img src="pic/changeResOS05A20.jpg" width="1000">
-
-### Test on OV4689-OV580 stereo YUV422 2 Megapixel Cam
-
-__Original streaming:__
-> Default YUV output
-> <img src="pic/stereo.jpg" width="1000">
-
-__CLAHE:__
-> Run OpenCV CLAHE(Contrast Limited Adaptive Histogram Equalization)
-><img src="pic/stereoClahe.jpg" width="1000">
-
-__Edge detection(Canny):__
-> Run OpenCV Canny edge detection
-><img src="pic/edge.jpg" width="1000">
+### Test on OV9782-OV580 stereo RAW8 1 Megapixel Cam
+> 1. Original streaming two 1M(1280x800) OV9782 raw sensors after debayer 
+> 2. Enabled AWB, CLAHE(Contrast Limited Adaptive Histogram Equalization) algorithm) with _non OpenCV CUDA support_
+> 3. Find device information and software info in menu bar
+> 4. Flip and mirror image streaming, display left and right camera separately
+> 5. Enable edge detection and change edge threshold 
+>><img src="pic/third.gif" width="1000">
 
 ---
 
@@ -305,6 +289,7 @@ $ linux_camera_tool .
 |   ├── isp_lib.h
 │   ├── core_io.h
 │   ├── fd_socket.h
+│   ├── gui_callbacks.h
 |   ├── json_parser.h
 │   ├── batch_cmd_parser.h
 │   ├── ui_control.h
@@ -317,6 +302,7 @@ $ linux_camera_tool .
 |   ├── isp_lib.cpp                       # ISP using OpenCV
 |   ├── core_io.cpp                       # string manipulation for parser
 |   ├── fd_socket.cpp                     # file descriptor socket for IPC
+│   ├── gui_callbacks.cpp                 # part of the GUI callbacks
 |   ├── json_parser.cpp                   # json parser
 |   ├── batch_cmd_parser.cpp              # BatchCmd.txt parser
 |   ├── ui_control.cpp                    # all GUI related

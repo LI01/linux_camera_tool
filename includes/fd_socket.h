@@ -39,10 +39,7 @@
  */
 #pragma once
 #include <sys/socket.h>
-#include <errno.h>
-#include <sys/types.h>      
 #include <sys/stat.h>
-
 
 void send_fd(int socket, int send_fd);
 int recv_fd(int socket);

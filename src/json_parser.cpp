@@ -28,9 +28,17 @@
 **                      	External Callbacks
 *****************************************************************************/
 extern char *get_product();
-extern void generic_I2C_write(int fd, int rw_flag, int bufCnt,
-                              int slaveAddr, int regAddr, unsigned char *i2c_data);
-extern void sensor_reg_write(int fd, int regAddr, int regVal);
+extern void generic_I2C_write(
+    int fd, 
+    int rw_flag, 
+    int bufCnt,
+    int slaveAddr, 
+    int regAddr, 
+    unsigned char *i2c_data);
+extern void sensor_reg_write(
+    int fd, 
+    int regAddr, 
+    int regVal);
 extern void video_capture_save_raw();
 extern void video_capture_save_bmp();
 

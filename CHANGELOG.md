@@ -2,6 +2,10 @@
 All notable changes to Linux Camera Tool will be documented in this file.
 
 ## [Unreleased]
+## v0.4.9 - 2020-01-30
+**Added:**   
+- add record video while streaming in GUI
+  
 ## v0.4.8 - 2020-01-21  
 **Fixed:**  
 - fix the bug of change resolution loss GUI control -> mmap share memory before fork

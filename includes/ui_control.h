@@ -26,11 +26,9 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 
-
 /****************************************************************************
 **                      	Global data 
 *****************************************************************************/
-
 /// Hold init data for GTK signals
 typedef struct
 {
@@ -44,7 +42,7 @@ typedef enum
 {
   GTK_WIDGET_TYPE_LABEL = 0,
   GTK_WIDGET_TYPE_BUTTON,
-  GTK_WIDGET_TYPE_VBOX,
+  GTK_WIDGET_TYPE_HBOX,
   GTK_WIDGET_TYPE_RADIO_BUTTON,
   GTK_WIDGET_TYPE_CHECK_BUTTON,
   GTK_WIDGET_TYPE_HSCALE,
@@ -76,26 +74,21 @@ typedef struct
   GCallback handler;
   gpointer data;
 } element_callback;
-void update_frame_rate(GtkWidget *widget);
-void update_resolution(GtkWidget *widget);
 
-/*****************************************************************************
-**                      	Helper functions
-*****************************************************************************/
-void init_sensitivity();
-
-void menu_item_formater(
-    GtkWidget *item,
-    GtkWidget *menu,
-    GCallback handler);
 
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
 /**-------------------------menu bar callbacks------------------------------*/
+void menu_item_formater(
+    GtkWidget *item,
+    GtkWidget *menu,
+    GCallback handler);
+
 void open_config_dialog(
   GtkWidget *widget, 
   gpointer window);
+
 void fw_update_clicked (
   GtkWidget *item);
 void about_info();
@@ -149,12 +142,15 @@ void update_ov580_dev(
   gpointer data);
 void ov580_register_write();
 void ov580_register_read();
+
+void video_capture_toggle_button(GtkWidget *widget);
+void update_resolution(GtkWidget *widget);
+void update_frame_rate(GtkWidget *widget);
 /**-------------------------micellanous callbacks---------------------------*/
 void exit_loop(GtkWidget *widget);
 gboolean check_escape(
   GtkWidget *widget, 
   GdkEventKey *event);
-
 
 /*****************************************************************************
 **                      	GUI Layout Setup, DON'T CHANGE
@@ -196,7 +192,7 @@ void iterate_window_signals(
   size_t members);
 void list_all_window_signals(
   GtkWidget *window);
-
+void init_sensitivity();
 
 /*****************************************************************************
 **                      	Main GUI
@@ -215,4 +211,3 @@ void css_setup();
 
 void gui_run();
 void ctrl_gui_main(int socket);
-//void ctrl_gui_main();
