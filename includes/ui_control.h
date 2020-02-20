@@ -75,7 +75,6 @@ typedef struct
   gpointer data;
 } element_callback;
 
-
 /*****************************************************************************
 **                      	Internal Callbacks
 *****************************************************************************/
@@ -146,6 +145,9 @@ void ov580_register_read();
 void video_capture_toggle_button(GtkWidget *widget);
 void update_resolution(GtkWidget *widget);
 void update_frame_rate(GtkWidget *widget);
+
+void aruco_mark_gen();
+void checkboard_gen();
 /**-------------------------micellanous callbacks---------------------------*/
 void exit_loop(GtkWidget *widget);
 gboolean check_escape(

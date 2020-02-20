@@ -16,8 +16,10 @@ FYI, you will need to be in superuser to run docker properly. If you feel lazy o
 - __Build your own image from Dockerfile__
 You can build the image on your own, note that it will take some time...
 ```sh
-sudo docker build -f Dockerfile .
+# -t to tag 
+sudo docker build -t test_camtool -f Dockerfile.
 ```
+
 - __Download the pre-built docker image from docker hub__
 ```sh
 sudo docker pull danyu9394/linux_camera_tool:v047
@@ -26,6 +28,7 @@ sudo docker pull danyu9394/linux_camera_tool:v047
 ## Usage
 This is an example of running a Leopard USB3 that currently listed as `/dev/video2` in your host machine onto docker container, assuming you use the image downloaded from docker hub. For more information, please refer to <sup>2</sup>
 ```sh
+export NO_AT_BRIDGE=1
 sudo xhost +local:root      # allow display something on your screen
 sudo docker run -it \
     --env="DISPLAY" --env=DISPLAY:$DISPLAY \
@@ -68,4 +71,5 @@ docker rmi $(docker images -q) -f
 ```
 ## References
 <sup>1</sup>: https://www.docker.com/resources/what-container
+
 <sup>2</sup>: http://wiki.ros.org/docker/Tutorials/GUI

@@ -970,3 +970,234 @@ cv::Mat decode_mpeg_img(
 	}
 	return img;
 }
+///////////////////////////////////////////////////////////
+/* 
+ * Make a chessboard pattern given the number of rows & cols, 
+ * square size in pixels, and square colors 
+ * Ref: https://gist.github.com/udaya1223/fa4212f07f6aa80188d309d601084953
+*/
+void create_checkboard(
+	cv::Mat &checkboard_output, 
+	int num_row, 
+	int num_col, 
+	int square_size, 
+	cv::Scalar color1, 
+	cv::Scalar color2)
+{
+	CV_Assert(num_row > 1 && num_col > 1);
+	CV_Assert(square_size > 0);
+
+	int checkboard_img_col = num_col*square_size;
+	int checkboard_img_row = num_row*square_size;
+	checkboard_output = cv::Mat(
+		checkboard_img_row, 
+		checkboard_img_col, 
+		CV_8UC3, 
+		cv::Scalar(0, 0, 0));
+	
+	for (size_t rows = 0, row_num = 0; \
+		rows < checkboard_img_row; \
+		rows += square_size, row_num++)
+	{
+		for (size_t cols = 0, col_num = 0; \
+		cols < checkboard_img_col; \
+		cols += square_size, col_num++)
+		{
+			cv::Rect rec(cols, rows, square_size, square_size);
+			if ((row_num + col_num) % 2 == 0)
+				cv::rectangle(checkboard_output, rec, color1, -1, 8);
+			else
+				cv::rectangle(checkboard_output, rec, color2, -1, 8);
+		}
+	}
+}
+
+void generate_checkboard(int row, int col)
+{
+	cv::Mat checkboard_img;
+	create_checkboard(
+		checkboard_img, 
+		row, 
+		col,
+		100, 
+		CV_RGB(0,0,0), 			/* white */
+		CV_RGB(255,255,255));   /* black */
+	cv::imwrite("Checkboard.bmp", checkboard_img);
+
+	// create_checkboard(
+	// 	chessboardImg, 
+	// 	5, 
+	// 	7, 
+	// 	200, 
+	// 	CV_RGB(255,0,0), 
+	// 	CV_RGB(0,0,255));
+	// // cv::imshow("Chessboard2", checkboard_img);
+	// cv::imwrite("Chessboard2.bmp", checkboard_img);
+}
+
+
+// based on George Lecakes on youtube
+// Ref: https://www.youtube.com/watch?v=l_4fNNyk1aw&list=PLAp0ZhYvW6XbEveYeefGSuLhaPlFML9gP
+void create_aruco_markers(int cap_num)
+{
+	if (cap_num <= 0 || cap_num > 100)
+		return;
+	cv::Mat output_marker;
+	cv::Ptr<cv::aruco::Dictionary> marker_dictionary = 
+		cv::aruco::getPredefinedDictionary(
+			cv::aruco::PREDEFINED_DICTIONARY_NAME::DICT_4X4_50);
+	for (int i=0; i<cap_num; i++) {
+		cv::aruco::drawMarker(marker_dictionary, i, 500, output_marker,1);
+		std::ostringstream convert;
+		std::string image_name = "4x4Marker_";
+		convert << image_name << i << ".jpg";
+		cv::imwrite(convert.str(),output_marker);
+	}
+}
+
+
+/* 
+ * tell OpenCV in perfect condition, the distance between each point line up 
+ * args:
+ * 		cv::Size board_size		 - board size
+ * 		float square_edge_length - length of one side of the square
+ * 		vector<Point3f>& corners - all points calculate, a flat plane->all z=0
+ */
+void create_known_board_position(
+	cv::Size board_size, 
+	float square_edge_length, 
+	std::vector<cv::Point3f>& corners)
+{
+	for (int i = 0; i < board_size.height; i++)
+	{
+		for (int j = 0; j < board_size.width; j++)
+		{
+			corners.push_back(
+				cv::Point3f(
+					j * square_edge_length, 	/* x */ 
+					i * square_edge_length, 	/* y */
+					0.0f));						/* z=0 */
+		}
+	}
+}
+
+/**
+ * Extract from an actual image the chessboard corners that are being detected
+ * args:
+ * 		vector<Mat> images 						  - a bunch of images captured
+ * 		vector<vector<Point2f>> all_found_corners - found corners on the 2d images
+ * 		bool show_results						  - whether to show results
+ */
+void get_chessboard_corners(
+	cv::Size board_size, 
+	std::vector<cv::Mat> images, 
+	std::vector<std::vector<cv::Point2f>>& all_found_corners, 
+	bool show_results /*= false*/)
+{
+	
+	/// iterate through the images
+	for (std::vector<cv::Mat>::iterator iter = images.begin(); 
+		iter != images.end(); 
+		iter++)
+	{
+		/// buf to hold all the points found detected
+		std::vector<cv::Point2f> point_buf; 
+		/// use OpenCV function to find chessboard corner
+		bool found = cv::findChessboardCorners(
+			*iter, 
+			board_size, 
+			point_buf, 
+			CV_CALIB_CB_ADAPTIVE_THRESH | CV_CALIB_CB_NORMALIZE_IMAGE);
+
+		/// if find corners, add the point into add found corners
+		if (found)
+		{
+			all_found_corners.push_back(point_buf);
+		}
+		if (show_results)
+		{
+			cv::drawChessboardCorners(
+				*iter, 
+				board_size, 
+				point_buf, 
+				found);
+			cv::imshow("Looking for Corners", *iter);
+			cv::waitKey(0);
+		}
+	}
+}
+
+void camera_calibration(
+	std::vector<cv::Mat> calibration_images, 
+	cv::Size board_size, 
+	float square_edge_length, 
+	cv::Mat& camera_matrix, 
+	cv::Mat& distance_coefficients)
+{
+	std::vector<std::vector<cv::Point2f>> checkerboard_image_space_points;
+	get_chessboard_corners(
+		chessboard_dimensions,
+		calibration_images, 
+		checkerboard_image_space_points, 
+		false);
+
+	std::vector<std::vector<cv::Point3f>> world_space_corner_points(1);
+
+	create_known_board_position(
+		board_size, 
+		square_edge_length, 
+		world_space_corner_points[0]);
+	world_space_corner_points.resize(
+		checkerboard_image_space_points.size(), 
+		world_space_corner_points[0]);
+
+	std::vector<cv::Mat> r_vectors, t_vectors;
+	distance_coefficients = cv::Mat::zeros(8, 1, CV_64F);
+
+	calibrateCamera(
+		world_space_corner_points, 
+		checkerboard_image_space_points, 
+		board_size, 
+		camera_matrix, 
+		distance_coefficients, 
+		r_vectors, 
+		t_vectors);
+
+}
+
+
+//save calibration in a text file
+bool save_camera_calibration(
+	std::string name, 
+	cv::Mat camera_matrix, 
+	cv::Mat distance_coefficients)
+{
+	std::ofstream out_stream(name);
+	if (out_stream) {
+		uint16_t rows = camera_matrix.rows;
+		uint16_t columns = camera_matrix.cols;
+
+		for (int r = 0; r < rows; r++) {
+			for (int c = 0; c < columns; c++) {
+				double value = camera_matrix.at<double>(r, c);
+				out_stream << value << std::endl;
+			}
+			
+		}
+
+		rows = distance_coefficients.rows;
+		columns = distance_coefficients.cols;
+
+		for (int r = 0; r < rows; r++) {
+			for (int c = 0; c < columns; c++) {
+				double value = distance_coefficients.at<double>(r, c);
+				out_stream << value << std::endl;
+			}
+		}
+
+		out_stream.close();
+		return true;
+	}
+
+	return false;
+}

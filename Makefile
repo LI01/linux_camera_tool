@@ -16,7 +16,8 @@ LDFLAGS	+= \
 		-ljson-c \
 		-lm \
 		$(LDLIBS) \
-		$(LDLIBCV)
+		$(LDLIBCV) \
+		-lopencv_aruco
 
 # path marcros
 SRC_PATH := src

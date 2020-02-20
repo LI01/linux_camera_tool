@@ -105,6 +105,7 @@ struct v4l2_buffer queuebuffer;   /// queuebuffer for enqueue, dequeue buffer
 extern std::vector<std::string> resolutions;
 extern std::vector<int> cur_frame_rates;
 
+
 /*****************************************************************************
 **                      	External Callbacks
 *****************************************************************************/
@@ -1007,7 +1008,7 @@ void streaming_loop(struct device *dev, int socket)
 	set_restart_flag(0);
 	set_loop(1);
 	initialize_shared_memory_var();
-
+	
 	while (*loop)
 	{
 		if (*restart)
@@ -1745,6 +1746,7 @@ void decode_process_a_frame(
 	int width  = dev->width;
 	int shift  = set_shift(*bpp);
 	cv::Mat share_img;
+	cv::Mat draw_to_img;
 	static int last_video_cap = 0;
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 	cv::cuda::GpuMat gpu_img;
@@ -1863,7 +1865,22 @@ void decode_process_a_frame(
 
 	if (*display_info_ena)
 		display_current_mat_stream_info(share_img);
+	
+	std::vector<cv::Vec2f> found_points;
+	bool found = false;
+	// found = cv::findChessboardCorners(
+	// 	share_img, 
+	// 	chessboard_dimensions, 
+	// 	found_points,
+	// 	CV_CALIB_CB_ADAPTIVE_THRESH \
+	// 	+ CV_CALIB_CB_NORMALIZE_IMAGE \
+	// 	+ CV_CALIB_CB_FAST_CHECK);
 
+	// cv::drawChessboardCorners(
+	// 	share_img,
+	// 	chessboard_dimensions,
+	// 	found_points,
+	// 	found);
 	if ((share_img.rows > 0) && (share_img.cols > 0)) {
 		/** keep recording video*/
 		if (*start_video_cap && last_video_cap) 
@@ -1873,9 +1890,11 @@ void decode_process_a_frame(
 			create_mpeg_video_record(dev, share_img);
 			last_video_cap = 1; /// update flag so it won't in the loop again
 		}
-		cv::moveWindow(window_name, 1920,0);
+		// cv::moveWindow(window_name, 1920,0);
+
 		cv::imshow(window_name, share_img);
 	}
+
 	switch_on_keys();
 
 }

@@ -35,7 +35,7 @@
 #include "../includes/gitversion.h"
 #include "../includes/fd_socket.h"
 #include "../includes/batch_cmd_parser.h"
-
+#include "../includes/isp_lib.h"
 /*****************************************************************************
 **                      	Global data 
 *****************************************************************************/
@@ -61,10 +61,11 @@ static GtkWidget *label_reg_addr, *entry_reg_addr;
 static GtkWidget *label_reg_val, *entry_reg_val;
 static GtkWidget *button_read, *button_write;
 static GtkWidget *check_button_just_sensor;
-static GtkWidget *label_capture, *button_capture_bmp, *button_capture_raw;
+static GtkWidget *label_img_cap, *button_capture_bmp, *button_capture_raw;
 static GtkWidget *label_gamma, *entry_gamma, *button_apply_gamma;
 static GtkWidget *label_trig, *check_button_trig_en, *button_trig;
 static GtkWidget *label_blc, *entry_blc, *button_apply_blc;
+static GtkWidget *label_video_cap, *toggle_button_cap_video;
 static GtkWidget *separator_tab1_1, *separator_tab1_2;
 /// grid2 elements
 static GtkWidget *check_button_rgb_gain, *button_update_rgb_gain;
@@ -94,11 +95,20 @@ static GtkWidget *label_ov580_i2c_addr, *entry_ov580_i2c_addr;
 static GtkWidget *label_ov580_reg_addr, *entry_ov580_reg_addr;
 static GtkWidget *label_ov580_reg_val, *entry_ov580_reg_val;
 static GtkWidget *button_ov580_read, *button_ov580_write;
-static GtkWidget *separator_tab3_1;
+static GtkWidget *separator_tab3_1, *separator_tab3_2, *separator_tab3_3;
 static GtkWidget *check_button_rgb_ir_color, *check_button_rgb_ir_ir;
 static GtkWidget *label_resolution, *combo_box_resolution;
 static GtkWidget *label_frame_rate, *combo_box_frame_rate;
-static GtkWidget *label_cap_video, *toggle_button_cap_video;
+
+static GtkWidget *label_checkboard, *label_num_row, *label_num_col;
+static GtkWidget *entry_num_row, *entry_num_col;
+static GtkWidget *label_aruco_mark_gen, *label_mark_num;
+static GtkWidget *entry_aruco_mark_gen;
+static GtkWidget *button_checkboard_gen, *button_aruco_mark_gen;
+static GtkWidget *label_num_img_calib, *entry_num_img_calib;
+static GtkWidget *label_distort_param, *entry_distort_param;
+static GtkWidget *button_calib_start, *label_calib_status;
+
 static int ov580_dev_flag;
 static int address_width_flag;
 static int value_width_flag;
@@ -794,6 +804,38 @@ void update_frame_rate(GtkWidget *widget)
 
 }
 
+void aruco_mark_gen()
+{
+   int mark_num = entry_formater(
+        entry_aruco_mark_gen, 
+        "aruco marker number", 
+        'd', 
+        512, 
+        0);
+    create_aruco_markers(mark_num);
+    g_print("Generate %d aruco marker\r\n", mark_num);
+}
+
+void checkboard_gen()
+{
+   int row_num = entry_formater(
+        entry_num_row, 
+        "checkboard row number", 
+        'd', 
+        50, 
+        0);
+   int col_num = entry_formater(
+        entry_num_col, 
+        "checkboard column number", 
+        'd', 
+        50, 
+        0);
+    generate_checkboard(row_num, col_num);
+    g_print("Generate checkboard %dx%d\r\n", 
+        row_num, 
+        col_num);
+}
+
 /**-------------------------micellanous callbacks---------------------------*/
 /** exit streaming loop */
 void exit_loop(GtkWidget *widget)
@@ -861,10 +903,11 @@ void init_grid1_widgets()
     label_val_width  = gtk_label_new(NULL);
     label_reg_addr   = gtk_label_new(NULL);
     label_reg_val    = gtk_label_new(NULL);
-    label_capture    = gtk_label_new(NULL);  
+    label_img_cap    = gtk_label_new(NULL);  
     label_gamma      = gtk_label_new(NULL);
     label_trig       = gtk_label_new(NULL);
     label_blc        = gtk_label_new(NULL);
+    label_video_cap  = gtk_label_new(NULL);
 
     button_read             = gtk_button_new();
     button_write            = gtk_button_new();
@@ -916,6 +959,8 @@ void init_grid1_widgets()
 
     separator_tab1_1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
     separator_tab1_2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+
+    toggle_button_cap_video   = gtk_toggle_button_new();
 
     if (gain_max == 13)
         gtk_widget_set_sensitive(hscale_gain, 0);
@@ -999,7 +1044,15 @@ void init_grid3_widgets()
     label_ov580_reg_val  = gtk_label_new(NULL);
     label_resolution     = gtk_label_new(NULL);
     label_frame_rate     = gtk_label_new(NULL);
-    label_cap_video      = gtk_label_new(NULL);
+ 
+    label_checkboard     = gtk_label_new(NULL);
+    label_num_row        = gtk_label_new(NULL);
+    label_num_col        = gtk_label_new(NULL);
+    label_aruco_mark_gen = gtk_label_new(NULL);
+    label_mark_num       = gtk_label_new(NULL);
+    label_num_img_calib  = gtk_label_new(NULL);
+    label_distort_param  = gtk_label_new(NULL);
+    label_calib_status   = gtk_label_new(NULL);
 
     hbox_ov580_device    = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
     radio_ov580          = gtk_radio_button_new(NULL);
@@ -1008,20 +1061,30 @@ void init_grid3_widgets()
 
     button_ov580_read    = gtk_button_new();
     button_ov580_write   = gtk_button_new();
+    button_checkboard_gen= gtk_button_new();
+    button_aruco_mark_gen= gtk_button_new();
+    button_calib_start   = gtk_button_new();
 
     entry_ov580_i2c_addr = gtk_entry_new();
     entry_ov580_reg_addr = gtk_entry_new();
     entry_ov580_reg_val  = gtk_entry_new();
-   
-    separator_tab3_1          = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    entry_num_row        = gtk_entry_new();
+    entry_num_col        = gtk_entry_new();
+    entry_aruco_mark_gen = gtk_entry_new();
+    entry_num_img_calib  = gtk_entry_new();
+    entry_distort_param  = gtk_entry_new();
 
+    separator_tab3_1          = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    separator_tab3_2          = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    separator_tab3_3          = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+   
     check_button_rgb_ir_color = gtk_check_button_new();
     check_button_rgb_ir_ir    = gtk_check_button_new();
 
     combo_box_resolution      = gtk_combo_box_text_new();
     combo_box_frame_rate      = gtk_combo_box_text_new();
 
-    toggle_button_cap_video   = gtk_toggle_button_new();
+   
 }
 
 /** def_element hold all gtk type widgets initialization setup */
@@ -1139,10 +1202,10 @@ void init_grid1_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
          .label_str = "Trigger Sensor:"},
-        {.widget = label_capture,     
+        {.widget = label_img_cap,     
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
-         .label_str = "Capture:"},     
+         .label_str = "Image Capture:"},     
         {.widget = label_gamma,       
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
@@ -1163,11 +1226,11 @@ void init_grid1_def_elements ()
         {.widget = button_capture_bmp,    
          .wid_type = GTK_WIDGET_TYPE_BUTTON, 
          .parent = NULL, 
-         .label_str = "Capture bmp"},  
+         .label_str = "Save bmp"},  
         {.widget = button_capture_raw,    
          .wid_type = GTK_WIDGET_TYPE_BUTTON, 
          .parent = NULL, 
-         .label_str = "Capture raw"},  
+         .label_str = "Save raw"},  
         {.widget = button_trig,           
          .wid_type = GTK_WIDGET_TYPE_BUTTON, 
          .parent = NULL, 
@@ -1196,7 +1259,7 @@ void init_grid1_def_elements ()
         {.widget = check_button_just_sensor,   
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
-         .label_str = "Just sensor read/write"},
+         .label_str = "Just Sensor R/W"},
         {.widget = check_button_trig_en,       
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
@@ -1289,6 +1352,15 @@ void init_grid1_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_RADIO_BUTTON, 
          .parent = hbox_val_width, 
          .label_str = "16-bit"},
+
+        {.widget = label_video_cap,        
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Video Capture:"},   
+        {.widget = toggle_button_cap_video,          
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Start Video"}, 
     };
     iterate_def_elements(definitions, SIZE(definitions));
 }
@@ -1451,7 +1523,7 @@ void init_grid2_def_elements ()
         {.widget = check_button_abc, 
          .wid_type = GTK_WIDGET_TYPE_CHECK_BUTTON, 
          .parent = NULL, 
-         .label_str = "Auto bright&contrast"},
+         .label_str = "Auto brightness&contrast"},
         {.widget = label_alpha, 
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
@@ -1519,10 +1591,7 @@ void init_grid3_def_elements ()
          .wid_type = GTK_WIDGET_TYPE_BUTTON, 
          .parent = NULL, 
          .label_str = "Read"}, 
-        {.widget = toggle_button_cap_video,          
-         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
-         .parent = NULL, 
-         .label_str = "Start Video"}, 
+
 
         {.widget = entry_ov580_i2c_addr,    
          .wid_type = GTK_WIDGET_TYPE_ENTRY, 
@@ -1564,10 +1633,74 @@ void init_grid3_def_elements ()
          .parent = NULL, 
          .label_str = fps_buf},   
 
-        {.widget = label_cap_video,        
+        {.widget = label_checkboard,        
          .wid_type = GTK_WIDGET_TYPE_LABEL, 
          .parent = NULL, 
-         .label_str = "Video Capture:"},   
+         .label_str = "Generate Checkboard"},   
+        {.widget = label_num_row,        
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "# Row:"},   
+        {.widget = entry_num_row,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "6"},
+        {.widget = label_num_col,        
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "# Columns:"},   
+        {.widget = entry_num_col,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "9"},
+        {.widget = button_checkboard_gen,          
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Generate"}, 
+
+        {.widget = label_aruco_mark_gen,        
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "Generate Aruco Mark"},   
+        {.widget = label_mark_num,        
+         .wid_type = GTK_WIDGET_TYPE_LABEL, 
+         .parent = NULL, 
+         .label_str = "# Images:"},   
+
+        {.widget = entry_aruco_mark_gen,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "30"},
+
+        {.widget = button_aruco_mark_gen,          
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Generate"}, 
+
+        {.widget = label_num_img_calib,
+         .wid_type = GTK_WIDGET_TYPE_LABEL,
+         .parent = NULL,
+         .label_str = "Capture Image #:"},
+        {.widget = entry_num_img_calib,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "0"},
+        {.widget = label_distort_param,
+         .wid_type = GTK_WIDGET_TYPE_LABEL,
+         .parent = NULL,
+         .label_str = "Distortion Param #:"},
+        {.widget = entry_distort_param,    
+         .wid_type = GTK_WIDGET_TYPE_ENTRY, 
+         .parent = NULL, 
+         .label_str = "0"},
+        {.widget = button_calib_start,          
+         .wid_type = GTK_WIDGET_TYPE_BUTTON, 
+         .parent = NULL, 
+         .label_str = "Start"}, 
+        {.widget = label_calib_status,
+         .wid_type = GTK_WIDGET_TYPE_LABEL,
+         .parent = NULL,
+         .label_str = "Status: "},
     };
 
     iterate_def_elements(definitions, SIZE(definitions));
@@ -1663,15 +1796,20 @@ void list_all_grid1_elements(GtkWidget *grid)
         {.widget = check_button_trig_en,     .col =++col, .row =row,   .width =1},
         {.widget = button_trig,              .col =++col, .row =row++, .width =1},
         {.widget = separator_tab1_2,         .col =col=0, .row =row++, .width =3},
-        {.widget = label_capture,            .col =col=0, .row =row,   .width =1},
+        {.widget = label_img_cap,            .col =col=0, .row =row,   .width =1},
         {.widget = button_capture_bmp,       .col =++col, .row =row,   .width =1},
-        {.widget = button_capture_raw,       .col =++col, .row =row++, .width =1},
-        {.widget = label_gamma,              .col =col=0, .row =row,   .width =1},
+        {.widget = button_capture_raw,       .col =++col, .row =row, .width =1},
+       
+        {.widget = label_video_cap,          .col =col=0, .row =++row, .width =1},
+        {.widget = toggle_button_cap_video,  .col =++col, .row =row,   .width =1},        
+       
+        {.widget = label_gamma,              .col =col=0, .row =++row,   .width =1},
         {.widget = entry_gamma,              .col =++col, .row =row,   .width =1},
         {.widget = button_apply_gamma,       .col =++col, .row =row++, .width =1},
         {.widget = label_blc,                .col =col=0, .row =row,   .width =1},
         {.widget = entry_blc,                .col =++col, .row =row,   .width =1},
         {.widget = button_apply_blc,         .col =++col, .row =row++, .width =1},
+    
     };
     iterate_grid_elements(grid, elements, SIZE(elements));
 }
@@ -1765,8 +1903,26 @@ void list_all_grid3_elements(GtkWidget *grid)
         {.widget = label_frame_rate,         .col =++col,.row =row,  .width =1},
         {.widget = combo_box_frame_rate,     .col =++col,.row =row,  .width =1},
 
-        {.widget = label_cap_video,          .col =col=0,.row =++row,.width =1},
-        {.widget = toggle_button_cap_video,  .col =++col,.row =row,  .width =1},
+   
+        {.widget = separator_tab3_2,         .col =col=0,.row =++row,.width =4},
+
+        {.widget = label_checkboard,         .col=col=0, .row=++row, .width =1},
+        {.widget = label_num_row,            .col =++col,.row =row,  .width =1},
+        {.widget = entry_num_row,            .col =++col,.row =row,  .width =1},
+        {.widget = button_checkboard_gen,    .col =++col,.row =row,  .width =1},
+        {.widget = label_num_col,            .col=col=1, .row=++row, .width =1},
+        {.widget = entry_num_col,            .col =++col,.row =row,  .width =1},
+        {.widget = label_aruco_mark_gen,     .col=col=0, .row=++row, .width =1},
+        {.widget = label_mark_num,           .col =++col,.row =row,  .width =1},
+        {.widget = entry_aruco_mark_gen,     .col =++col,.row =row,  .width =1},
+        {.widget = button_aruco_mark_gen,    .col =++col,.row =row,  .width =1},
+        {.widget = separator_tab3_3,         .col =col=0,.row =++row,.width =4},
+        {.widget = label_num_img_calib,      .col=col=0, .row=++row, .width =1},
+        {.widget = entry_num_img_calib,      .col =++col,.row =row,  .width =1},
+        {.widget = label_distort_param,      .col =++col,.row =row,  .width =1},
+        {.widget = entry_distort_param,      .col =++col,.row =row,  .width =1},        
+        {.widget = button_calib_start,       .col=col=0, .row=++row, .width =1},
+        {.widget = label_calib_status,       .col =++col,.row =row,  .width =1},    
 
     };
     iterate_grid_elements(grid, elements, SIZE(elements));
@@ -1904,6 +2060,10 @@ void list_all_grid1_element_callbacks()
          .signal = "clicked", 
          .handler = G_CALLBACK(black_level_correction),   
          .data = NULL},
+        {.widget = toggle_button_cap_video,
+         .signal = "toggled",
+         .handler = G_CALLBACK(video_capture_toggle_button),
+         .data = NULL}, 
     };
 
     iterate_element_cb(callbacks, SIZE(callbacks));
@@ -2013,11 +2173,17 @@ void list_all_grid3_element_callbacks()
          .signal = "changed", 
          .handler = G_CALLBACK(update_frame_rate),             
          .data = NULL},
-        {.widget = toggle_button_cap_video,
-         .signal = "toggled",
-         .handler = G_CALLBACK(video_capture_toggle_button),
+
+
+        {.widget = button_checkboard_gen,        
+         .signal = "clicked", 
+         .handler = G_CALLBACK(checkboard_gen),       
          .data = NULL},
-        
+        {.widget = button_aruco_mark_gen,        
+         .signal = "clicked", 
+         .handler = G_CALLBACK(aruco_mark_gen),       
+         .data = NULL},
+
     };
     
     iterate_element_cb(callbacks, SIZE(callbacks));

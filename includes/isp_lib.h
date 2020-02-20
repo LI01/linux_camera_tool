@@ -25,7 +25,11 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+
 #include <opencv2/video/background_segm.hpp> /// for motion detector
+
+#include <opencv2/aruco.hpp>				 /// for camera calibration
+#include <opencv2/calib3d/calib3d.hpp>		 
 #ifdef HAVE_OPENCV_CUDA_SUPPORT
 #include <opencv4/opencv2/cudaobjdetect.hpp>
 #include <opencv4/opencv2/cudaimgproc.hpp>
@@ -44,6 +48,11 @@ typedef enum
    CV_BayerGR2BGR_FLG,
    CV_MONO_FLG
 } pixel_order_flag;
+
+
+const float calibrationSquareDimension = 0.01905f;  // meters
+const float arucoSquareDimension = 0.1016f; 		// meters
+const cv::Size chessboard_dimensions = cv::Size(6, 8);
 
 void tic(double &t);
 double toc(double &t);
@@ -103,3 +112,39 @@ void apply_rgb_matrix_post_debayer(
 
 cv::Mat decode_mpeg_img(
 	cv::InputOutputArray opencvImage);
+
+
+///////////////////////////////////////////
+void create_checkboard(
+	cv::Mat &checkboard_output, 
+	int num_row, 
+	int num_col, 
+	int square_size, 
+	cv::Scalar color1, 
+	cv::Scalar color2);
+void generate_checkboard(int row, int col);
+
+void create_aruco_markers(int cap_num);
+void create_known_board_position(
+	cv::Size board_size, 
+	float square_edge_length, 
+	std::vector<cv::Point3f>& corners);
+
+void get_chessboard_corners(
+	cv::Size board_size, 
+	std::vector<cv::Mat> images, 
+	std::vector<std::vector<cv::Point2f>>& all_found_corners, 
+	bool show_results /*= false*/);
+
+void camera_calibration(
+	std::vector<cv::Mat> calibration_images, 
+	cv::Size board_size, 
+	float square_edge_length, 
+	cv::Mat& camera_matrix, 
+	cv::Mat& distance_coefficients);
+
+bool save_camera_calibration(
+	std::string name, 
+	cv::Mat camera_matrix, 
+	cv::Mat distance_coefficients);
+
