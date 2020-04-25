@@ -1654,7 +1654,8 @@ void switch_on_keys()
 	case 'q':
 	case 'Q':
 	case _ESC_KEY_ASCII:
-		cv::destroyWindow(window_name);
+	    if(cv::getWindowProperty(window_name, cv::WND_PROP_VISIBLE) >= 0)
+			cv::destroyWindow(window_name);
 		set_loop(0);
 		break;
 	default:
@@ -1848,8 +1849,10 @@ void decode_process_a_frame(
 		display_dual_stereo_separately(share_img);
 	else
 	{
-		cv::destroyWindow("cam_left");
-		cv::destroyWindow("cam_right");
+	    if(cv::getWindowProperty("cam_left", cv::WND_PROP_VISIBLE) >= 0)
+			cv::destroyWindow("cam_left");
+	    if(cv::getWindowProperty("cam_right", cv::WND_PROP_VISIBLE) >= 0)
+			cv::destroyWindow("cam_right");
 	}
 	/** if image larger than 720p by any dimension, resize the window */
 	if (*resize_window_ena)
@@ -1859,7 +1862,8 @@ void decode_process_a_frame(
 	if (*histogram_ena)
 		display_histogram(share_img);
 	else
-		cv::destroyWindow("histogram");
+	    if(cv::getWindowProperty("histogram", cv::WND_PROP_VISIBLE) >= 0)
+			cv::destroyWindow("histogram");
 
 	if (*display_info_ena)
 		display_current_mat_stream_info(share_img);
