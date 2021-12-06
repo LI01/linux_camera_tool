@@ -8,4 +8,4 @@ sudo apt-get -y install v4l-utils libv4l-dev                #for v4l2
 sudo apt-get -y install libudev-dev                         #for udev
 sudo apt-get -y install libopencv-dev                       #for opencv dependencies
 sudo apt-get -y install libjson-c-dev                       #for json parser
-sudo apt-get -y install libpng12-dev                        #for capturing png
+sudo apt-get -y install libpng-dev                          #for capturing png
